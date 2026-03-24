@@ -58,9 +58,10 @@ const EMPTY_METADATA: EditableMetadata = {
 
 function SuggestionInput({ id, label, value, suggestions, onChange }: SuggestionInputProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
   const normalizedQuery = value.trim().toLowerCase();
   const filteredSuggestions = (
-    normalizedQuery ? suggestions.filter((item) => item.toLowerCase().includes(normalizedQuery)) : suggestions
+    isFiltering && normalizedQuery ? suggestions.filter((item) => item.toLowerCase().includes(normalizedQuery)) : suggestions
   ).slice(0, 8);
 
   return (
@@ -73,12 +74,17 @@ function SuggestionInput({ id, label, value, suggestions, onChange }: Suggestion
           onBlur={() => {
             // Delay close so option click can commit first.
             window.setTimeout(() => setIsOpen(false), 120);
+            setIsFiltering(false);
           }}
           onChange={(event) => {
             onChange(event.target.value);
             setIsOpen(true);
+            setIsFiltering(true);
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            setIsOpen(true);
+            setIsFiltering(false);
+          }}
         />
         <span aria-hidden="true" className="suggestion-chevron">
           ▾
@@ -94,6 +100,7 @@ function SuggestionInput({ id, label, value, suggestions, onChange }: Suggestion
               onClick={() => {
                 onChange(option);
                 setIsOpen(false);
+                setIsFiltering(false);
               }}
               type="button"
             >
