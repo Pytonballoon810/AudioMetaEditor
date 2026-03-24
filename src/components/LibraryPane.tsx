@@ -1,6 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Album01Icon, Copy01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
-import { useMemo, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AudioLibraryItem, EditableMetadata } from '../types';
 import { formatDuration } from '../lib/format';
 import { requireAudioMetaApi } from '../services/audioMetaApi';
@@ -258,6 +258,26 @@ export function LibraryPane({
   const [albumContextMenu, setAlbumContextMenu] = useState<AlbumContextMenuState | null>(null);
   const [trackContextMenu, setTrackContextMenu] = useState<TrackContextMenuState | null>(null);
   const [isMovingTrack, setIsMovingTrack] = useState(false);
+
+  useEffect(() => {
+    if (!editingAlbum) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || isApplyingAlbumEdit) {
+        return;
+      }
+
+      setIsAlbumModalCoverPickerOpen(false);
+      setEditingAlbum(null);
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [editingAlbum, isApplyingAlbumEdit]);
 
   const activeSortLabel = useMemo(
     () => SORT_OPTIONS.find((option) => option.value === sortMethod)?.label || 'Sort',
