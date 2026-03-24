@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { MagicWand01Icon, RedoIcon, UndoIcon } from '@hugeicons/core-free-icons';
+import { Album01Icon, Copy01Icon, MagicWand01Icon, RedoIcon, UndoIcon } from '@hugeicons/core-free-icons';
 import { type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import type { AudioLibraryItem, EditableMetadata, MetadataSuggestions } from '../types';
 import defaultCover from '../assets/defaultCover.png';
@@ -530,6 +530,7 @@ export function MetadataEditor({
 
             <div className="daw-toolbar-group">
               <button
+                aria-label="Replace artwork"
                 className="cover-toolbar-action"
                 onClick={() => coverInputRef.current?.click()}
                 title="Replace artwork"
@@ -563,25 +564,31 @@ export function MetadataEditor({
                 <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
               </button>
             </div>
-          </div>
 
-          <div className="cover-actions">
-            <button
-              className="secondary-button"
-              disabled={albumCoverOptions.length === 0}
-              onClick={onCarryOverAlbumCover}
-              type="button"
-            >
-              Carry over cover from derived album cover
-            </button>
-            <button
-              className="secondary-button"
-              disabled={otherTrackCoverOptions.length === 0}
-              onClick={onCopyCoverFromOtherTrack}
-              type="button"
-            >
-              Copy cover from other track
-            </button>
+            <span aria-hidden="true" className="daw-toolbar-divider" />
+
+            <div className="daw-toolbar-group">
+              <button
+                aria-label="Carry over cover from derived album cover"
+                className="daw-tool-button"
+                disabled={albumCoverOptions.length === 0}
+                onClick={onCarryOverAlbumCover}
+                title="Carry over cover from derived album cover"
+                type="button"
+              >
+                <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
+              </button>
+              <button
+                aria-label="Copy cover from other track"
+                className="daw-tool-button"
+                disabled={otherTrackCoverOptions.length === 0}
+                onClick={onCopyCoverFromOtherTrack}
+                title="Copy cover from other track"
+                type="button"
+              >
+                <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
+              </button>
+            </div>
           </div>
 
           {isAlbumCoverPickerOpen && albumCoverOptions.length > 1 ? (
