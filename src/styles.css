@@ -707,24 +707,54 @@ textarea {
   gap: 0.75rem;
 }
 
-.album-edit-cover-image {
+.album-edit-cover-image-wrap {
   width: 140px;
   height: 140px;
   border-radius: 16px;
-  object-fit: cover;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 14px 14px,
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 14px 14px,
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 14px 14px,
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 14px 14px,
+    rgba(255, 255, 255, 0.03);
 }
 
-.album-edit-cover-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.album-edit-cover-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.album-edit-cover-toolbar {
+  width: min(100%, 21.5rem);
 }
 
 .album-edit-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 0.75rem;
+}
+
+.album-edit-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.album-edit-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.album-edit-toggle-wrap input {
+  width: auto;
 }
 
 .album-edit-grid label {

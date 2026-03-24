@@ -1,3 +1,5 @@
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Album01Icon, Copy01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
 import { useMemo, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AudioLibraryItem, EditableMetadata } from '../types';
 import { formatDuration } from '../lib/format';
@@ -12,16 +14,64 @@ type LibraryPaneProps = {
   onMoveTrackToAlbum: (item: AudioLibraryItem, targetDirectory: string) => Promise<void>;
 };
 
-export type AlbumBulkEditFields = Pick<
+export type AlbumBulkEditableValues = Pick<
   EditableMetadata,
   'artist' | 'album' | 'producer' | 'composer' | 'genre' | 'year' | 'coverArt'
 >;
+
+export type AlbumBulkEditFields = Partial<AlbumBulkEditableValues>;
+
+type AlbumEditFieldApplyState = {
+  artist: boolean;
+  album: boolean;
+  producer: boolean;
+  composer: boolean;
+  genre: boolean;
+  year: boolean;
+  coverArt: boolean;
+};
+
+const DEFAULT_ALBUM_FIELD_APPLY_STATE: AlbumEditFieldApplyState = {
+  artist: false,
+  album: false,
+  producer: false,
+  composer: false,
+  genre: false,
+  year: false,
+  coverArt: false,
+};
+
+type AlbumCoverHistoryState = {
+  undo: Array<string | null>;
+  redo: Array<string | null>;
+};
+
+const EMPTY_COVER_HISTORY_STATE: AlbumCoverHistoryState = {
+  undo: [],
+  redo: [],
+};
+
+type AlbumEditableFieldKey = keyof AlbumBulkEditableValues;
+
+type AlbumEditableTextFieldKey = Exclude<AlbumEditableFieldKey, 'coverArt'>;
+
+type AlbumEditSuggestionInputProps = {
+  id: string;
+  label: string;
+  value: string;
+  suggestions: string[];
+  isApplied: boolean;
+  onToggleApply: (nextApplied: boolean) => void;
+  onChange: (nextValue: string) => void;
+};
 
 type AlbumEditDialogState = {
   folderPath: string;
   folderName: string;
   trackCount: number;
-  draft: AlbumBulkEditFields;
+  draft: AlbumBulkEditableValues;
+  apply: AlbumEditFieldApplyState;
+  coverHistory: AlbumCoverHistoryState;
 };
 
 type AlbumCoverSourceOption = {
@@ -41,16 +91,6 @@ type TrackContextMenuState = {
   showMoveTargets: boolean;
   showCreateAlbumInput: boolean;
   newAlbumName: string;
-};
-
-type AlbumEditTextFieldKey = 'artist' | 'album' | 'producer' | 'composer' | 'genre' | 'year';
-
-type AlbumEditSuggestionInputProps = {
-  id: string;
-  label: string;
-  value: string;
-  suggestions: string[];
-  onChange: (nextValue: string) => void;
 };
 
 type LibrarySortMethod = 'folder-asc' | 'folder-desc' | 'title-asc' | 'artist-asc' | 'duration-desc' | 'format-asc';
@@ -104,21 +144,47 @@ function pickAlbumCover(items: AudioLibraryItem[]) {
   return items.map((item) => item.metadata.coverArt).find((cover): cover is string => Boolean(cover)) || null;
 }
 
-function AlbumEditSuggestionInput({ id, label, value, suggestions, onChange }: AlbumEditSuggestionInputProps) {
+function AlbumEditSuggestionInput({
+  id,
+  label,
+  value,
+  suggestions,
+  isApplied,
+  onToggleApply,
+  onChange,
+}: AlbumEditSuggestionInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const normalizedQuery = query.trim().toLowerCase();
+  const inputValue = isApplied ? value : '';
   const filteredSuggestions = (
     normalizedQuery ? suggestions.filter((item) => item.toLowerCase().includes(normalizedQuery)) : suggestions
   ).slice(0, 16);
 
   return (
     <label className="suggestion-field">
-      {label}
+      <span className="album-edit-field-head">
+        <span>{label}</span>
+        <span className="album-edit-toggle-wrap">
+          <input
+            checked={isApplied}
+            onChange={(event) => {
+              onToggleApply(event.target.checked);
+              if (!event.target.checked) {
+                setIsOpen(false);
+                setQuery('');
+              }
+            }}
+            type="checkbox"
+          />
+          Apply
+        </span>
+      </span>
       <div className="suggestion-input-wrap">
         <input
           autoComplete="off"
-          value={value}
+          placeholder={isApplied ? '' : "Don't change"}
+          value={inputValue}
           onBlur={() => {
             window.setTimeout(() => setIsOpen(false), 120);
             window.setTimeout(() => setQuery(''), 120);
@@ -138,14 +204,27 @@ function AlbumEditSuggestionInput({ id, label, value, suggestions, onChange }: A
           ▾
         </span>
       </div>
-      {isOpen && filteredSuggestions.length > 0 ? (
+      {isOpen ? (
         <div className="suggestion-menu" role="listbox">
+          <button
+            className={`suggestion-option${!isApplied ? ' active' : ''}`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              onToggleApply(false);
+              setIsOpen(false);
+              setQuery('');
+            }}
+            type="button"
+          >
+            Don't change
+          </button>
           {filteredSuggestions.map((option) => (
             <button
               key={`${id}-${option}`}
               className="suggestion-option"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => {
+                onToggleApply(true);
                 onChange(option);
                 setIsOpen(false);
               }}
@@ -168,6 +247,7 @@ export function LibraryPane({
   onMoveTrackToAlbum,
 }: LibraryPaneProps) {
   const panelRef = useRef<HTMLElement | null>(null);
+  const albumCoverInputRef = useRef<HTMLInputElement | null>(null);
   const [sortMethod, setSortMethod] = useState<LibrarySortMethod>('folder-asc');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -300,7 +380,7 @@ export function LibraryPane({
       .sort(groupComparator);
   }, [filteredItems, sortMethod]);
 
-  const albumEditSuggestions = useMemo<Record<AlbumEditTextFieldKey, string[]>>(
+  const albumEditSuggestions = useMemo<Record<AlbumEditableTextFieldKey, string[]>>(
     () => ({
       artist: uniqueSortedValues(items.map((item) => item.metadata.artist)),
       album: uniqueSortedValues(items.map((item) => item.metadata.album)),
@@ -336,6 +416,120 @@ export function LibraryPane({
     return Array.from(uniqueByCover.values());
   }, [editingAlbum, items]);
 
+  const hasAlbumFieldsSelected = useMemo(() => {
+    if (!editingAlbum) {
+      return false;
+    }
+
+    return Object.values(editingAlbum.apply).some(Boolean);
+  }, [editingAlbum]);
+
+  function setAlbumFieldApplied(field: AlbumEditableFieldKey, isApplied: boolean) {
+    setEditingAlbum((current) =>
+      current
+        ? {
+            ...current,
+            apply: {
+              ...current.apply,
+              [field]: isApplied,
+            },
+          }
+        : current,
+    );
+  }
+
+  function setAlbumTextField(field: AlbumEditableTextFieldKey, nextValue: string) {
+    setEditingAlbum((current) =>
+      current
+        ? {
+            ...current,
+            draft: {
+              ...current.draft,
+              [field]: nextValue,
+            },
+            apply: {
+              ...current.apply,
+              [field]: true,
+            },
+          }
+        : current,
+    );
+  }
+
+  function setAlbumCover(coverArt: string | null) {
+    setEditingAlbum((current) => {
+      if (!current || current.draft.coverArt === coverArt) {
+        return current;
+      }
+
+      return {
+        ...current,
+        draft: {
+          ...current.draft,
+          coverArt,
+        },
+        apply: {
+          ...current.apply,
+          coverArt: true,
+        },
+        coverHistory: {
+          undo: [...current.coverHistory.undo, current.draft.coverArt],
+          redo: [],
+        },
+      };
+    });
+  }
+
+  function undoAlbumCoverEdit() {
+    setEditingAlbum((current) => {
+      if (!current || current.coverHistory.undo.length === 0) {
+        return current;
+      }
+
+      const previousCover = current.coverHistory.undo[current.coverHistory.undo.length - 1] ?? null;
+      return {
+        ...current,
+        draft: {
+          ...current.draft,
+          coverArt: previousCover,
+        },
+        apply: {
+          ...current.apply,
+          coverArt: true,
+        },
+        coverHistory: {
+          undo: current.coverHistory.undo.slice(0, -1),
+          redo: [...current.coverHistory.redo, current.draft.coverArt],
+        },
+      };
+    });
+  }
+
+  function redoAlbumCoverEdit() {
+    setEditingAlbum((current) => {
+      if (!current || current.coverHistory.redo.length === 0) {
+        return current;
+      }
+
+      const nextCover = current.coverHistory.redo[current.coverHistory.redo.length - 1] ?? null;
+      return {
+        ...current,
+        draft: {
+          ...current.draft,
+          coverArt: nextCover,
+        },
+        apply: {
+          ...current.apply,
+          coverArt: true,
+        },
+        coverHistory: {
+          undo: [...current.coverHistory.undo, current.draft.coverArt],
+          redo: current.coverHistory.redo.slice(0, -1),
+        },
+      };
+    });
+  }
+
   function toggleAlbumCollapsed(folderPath: string) {
     setCollapsedAlbums((current) => ({
       ...current,
@@ -358,6 +552,12 @@ export function LibraryPane({
         year: mostFrequentMetadataValue(albumItems, (item) => item.metadata.year),
         coverArt: pickAlbumCover(albumItems),
       },
+      apply: {
+        ...DEFAULT_ALBUM_FIELD_APPLY_STATE,
+      },
+      coverHistory: {
+        ...EMPTY_COVER_HISTORY_STATE,
+      },
     });
   }
 
@@ -373,17 +573,7 @@ export function LibraryPane({
         return;
       }
 
-      setEditingAlbum((current) =>
-        current
-          ? {
-              ...current,
-              draft: {
-                ...current.draft,
-                coverArt: firstCoverOption.coverArt,
-              },
-            }
-          : current,
-      );
+      setAlbumCover(firstCoverOption.coverArt);
       setIsAlbumModalCoverPickerOpen(false);
       return;
     }
@@ -399,19 +589,12 @@ export function LibraryPane({
 
     const reader = new FileReader();
     reader.onload = () => {
-      setEditingAlbum((current) =>
-        current
-          ? {
-              ...current,
-              draft: {
-                ...current.draft,
-                coverArt: typeof reader.result === 'string' ? reader.result : current.draft.coverArt,
-              },
-            }
-          : current,
-      );
+      if (typeof reader.result === 'string') {
+        setAlbumCover(reader.result);
+      }
     };
     reader.readAsDataURL(file);
+    event.target.value = '';
   }
 
   function collapseAllAlbums() {
@@ -532,10 +715,38 @@ export function LibraryPane({
       return;
     }
 
+    const payload: AlbumBulkEditFields = {};
+    if (editingAlbum.apply.artist) {
+      payload.artist = editingAlbum.draft.artist;
+    }
+    if (editingAlbum.apply.album) {
+      payload.album = editingAlbum.draft.album;
+    }
+    if (editingAlbum.apply.producer) {
+      payload.producer = editingAlbum.draft.producer;
+    }
+    if (editingAlbum.apply.composer) {
+      payload.composer = editingAlbum.draft.composer;
+    }
+    if (editingAlbum.apply.genre) {
+      payload.genre = editingAlbum.draft.genre;
+    }
+    if (editingAlbum.apply.year) {
+      payload.year = editingAlbum.draft.year;
+    }
+    if (editingAlbum.apply.coverArt) {
+      payload.coverArt = editingAlbum.draft.coverArt;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setEditingAlbum(null);
+      return;
+    }
+
     setIsApplyingAlbumEdit(true);
 
     try {
-      await onApplyAlbumFields(editingAlbum.folderPath, editingAlbum.draft);
+      await onApplyAlbumFields(editingAlbum.folderPath, payload);
       setEditingAlbum(null);
     } finally {
       setIsApplyingAlbumEdit(false);
@@ -870,47 +1081,98 @@ export function LibraryPane({
             </div>
 
             <div className="album-edit-cover-card">
-              <img
-                alt="Album cover"
-                className="album-edit-cover-image"
-                onError={(event) => {
-                  event.currentTarget.src = defaultCover;
-                }}
-                src={editingAlbum.draft.coverArt || defaultCover}
-              />
-              <div className="album-edit-cover-actions">
-                <label className="secondary-button">
-                  Replace album cover
-                  <input accept="image/*" hidden onChange={onAlbumCoverChange} type="file" />
-                </label>
-                <button
-                  className="secondary-button"
-                  onClick={() =>
-                    setEditingAlbum((current) =>
-                      current
-                        ? {
-                            ...current,
-                            draft: {
-                              ...current.draft,
-                              coverArt: null,
-                            },
-                          }
-                        : current,
-                    )
-                  }
-                  type="button"
-                >
-                  Remove album cover
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={albumModalCoverSourceOptions.length === 0}
-                  onClick={onUseCoverFromOtherAlbumOrTrack}
-                  type="button"
-                >
-                  Use cover from other album or track
-                </button>
+              <div className="album-edit-cover-image-wrap">
+                <img
+                  alt="Album cover"
+                  className="album-edit-cover-image"
+                  onError={(event) => {
+                    event.currentTarget.src = defaultCover;
+                  }}
+                  src={editingAlbum.draft.coverArt || defaultCover}
+                />
               </div>
+
+                <div aria-label="Album artwork toolbar" className="cover-edit-toolbar album-edit-cover-toolbar" role="toolbar">
+                  <div className="daw-toolbar-group">
+                    <button
+                      aria-label="Undo album cover edit"
+                      className="daw-tool-button"
+                      disabled={editingAlbum.coverHistory.undo.length === 0}
+                      onClick={undoAlbumCoverEdit}
+                      title={editingAlbum.coverHistory.undo.length > 0 ? 'Undo last album cover edit' : 'No cover edit to undo'}
+                      type="button"
+                    >
+                      <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
+                    </button>
+                    <button
+                      aria-label="Redo album cover edit"
+                      className="daw-tool-button"
+                      disabled={editingAlbum.coverHistory.redo.length === 0}
+                      onClick={redoAlbumCoverEdit}
+                      title={editingAlbum.coverHistory.redo.length > 0 ? 'Redo last undone album cover edit' : 'No cover edit to redo'}
+                      type="button"
+                    >
+                      <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
+                    </button>
+                  </div>
+
+                  <span aria-hidden="true" className="daw-toolbar-divider" />
+
+                  <div className="daw-toolbar-group">
+                    <button
+                      aria-label="Upload replacement album artwork"
+                      className="daw-tool-button"
+                      onClick={() => albumCoverInputRef.current?.click()}
+                      title="Upload replacement album artwork image"
+                      type="button"
+                    >
+                      <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
+                    </button>
+                    <input accept="image/*" hidden onChange={onAlbumCoverChange} ref={albumCoverInputRef} type="file" />
+                  </div>
+
+                  <span aria-hidden="true" className="daw-toolbar-divider" />
+
+                  <div className="daw-toolbar-group">
+                    <button
+                      aria-label="Remove album cover"
+                      className="daw-tool-button"
+                      onClick={() => setAlbumCover(null)}
+                      title="Remove album cover"
+                      type="button"
+                    >
+                      X
+                    </button>
+                  </div>
+
+                  <span aria-hidden="true" className="daw-toolbar-divider" />
+
+                  <div className="daw-toolbar-group">
+                    <button
+                      aria-label="Use cover from other album or track"
+                      className="daw-tool-button"
+                      disabled={albumModalCoverSourceOptions.length === 0}
+                      onClick={onUseCoverFromOtherAlbumOrTrack}
+                      title="Use cover from other album or track"
+                      type="button"
+                    >
+                      <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
+                    </button>
+                    <button
+                      aria-label="Keep existing covers unchanged"
+                      className={`daw-tool-button${editingAlbum.apply.coverArt ? '' : ' cover-tool-active'}`}
+                      onClick={() => setAlbumFieldApplied('coverArt', !editingAlbum.apply.coverArt)}
+                      title={editingAlbum.apply.coverArt ? 'Apply edited album cover to tracks' : "Don't change track covers"}
+                      type="button"
+                    >
+                      <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="cover-editor-hint">
+                  Cover apply mode: {editingAlbum.apply.coverArt ? 'Apply this artwork to album tracks.' : "Don't change track covers."}
+                </p>
 
               {isAlbumModalCoverPickerOpen && albumModalCoverSourceOptions.length > 1 ? (
                 <div className="track-cover-picker" role="listbox">
@@ -919,17 +1181,7 @@ export function LibraryPane({
                       key={`album-modal-cover-source-${option.coverArt}`}
                       className="track-cover-option"
                       onClick={() => {
-                        setEditingAlbum((current) =>
-                          current
-                            ? {
-                                ...current,
-                                draft: {
-                                  ...current.draft,
-                                  coverArt: option.coverArt,
-                                },
-                              }
-                            : current,
-                        );
+                        setAlbumCover(option.coverArt);
                         setIsAlbumModalCoverPickerOpen(false);
                       }}
                       type="button"
@@ -949,115 +1201,55 @@ export function LibraryPane({
                 id="album-edit-artist"
                 label="Artist"
                 value={editingAlbum.draft.artist}
+                isApplied={editingAlbum.apply.artist}
                 suggestions={albumEditSuggestions.artist}
-                onChange={(value) =>
-                  setEditingAlbum((current) =>
-                    current
-                      ? {
-                          ...current,
-                          draft: {
-                            ...current.draft,
-                            artist: value,
-                          },
-                        }
-                      : current,
-                  )
-                }
+                onToggleApply={(nextApplied) => setAlbumFieldApplied('artist', nextApplied)}
+                onChange={(value) => setAlbumTextField('artist', value)}
               />
               <AlbumEditSuggestionInput
                 id="album-edit-album"
                 label="Album"
                 value={editingAlbum.draft.album}
+                isApplied={editingAlbum.apply.album}
                 suggestions={albumEditSuggestions.album}
-                onChange={(value) =>
-                  setEditingAlbum((current) =>
-                    current
-                      ? {
-                          ...current,
-                          draft: {
-                            ...current.draft,
-                            album: value,
-                          },
-                        }
-                      : current,
-                  )
-                }
+                onToggleApply={(nextApplied) => setAlbumFieldApplied('album', nextApplied)}
+                onChange={(value) => setAlbumTextField('album', value)}
               />
               <AlbumEditSuggestionInput
                 id="album-edit-producer"
                 label="Producer"
                 value={editingAlbum.draft.producer}
+                isApplied={editingAlbum.apply.producer}
                 suggestions={albumEditSuggestions.producer}
-                onChange={(value) =>
-                  setEditingAlbum((current) =>
-                    current
-                      ? {
-                          ...current,
-                          draft: {
-                            ...current.draft,
-                            producer: value,
-                          },
-                        }
-                      : current,
-                  )
-                }
+                onToggleApply={(nextApplied) => setAlbumFieldApplied('producer', nextApplied)}
+                onChange={(value) => setAlbumTextField('producer', value)}
               />
               <AlbumEditSuggestionInput
                 id="album-edit-composer"
                 label="Composer"
                 value={editingAlbum.draft.composer}
+                isApplied={editingAlbum.apply.composer}
                 suggestions={albumEditSuggestions.composer}
-                onChange={(value) =>
-                  setEditingAlbum((current) =>
-                    current
-                      ? {
-                          ...current,
-                          draft: {
-                            ...current.draft,
-                            composer: value,
-                          },
-                        }
-                      : current,
-                  )
-                }
+                onToggleApply={(nextApplied) => setAlbumFieldApplied('composer', nextApplied)}
+                onChange={(value) => setAlbumTextField('composer', value)}
               />
               <AlbumEditSuggestionInput
                 id="album-edit-genre"
                 label="Genre"
                 value={editingAlbum.draft.genre}
+                isApplied={editingAlbum.apply.genre}
                 suggestions={albumEditSuggestions.genre}
-                onChange={(value) =>
-                  setEditingAlbum((current) =>
-                    current
-                      ? {
-                          ...current,
-                          draft: {
-                            ...current.draft,
-                            genre: value,
-                          },
-                        }
-                      : current,
-                  )
-                }
+                onToggleApply={(nextApplied) => setAlbumFieldApplied('genre', nextApplied)}
+                onChange={(value) => setAlbumTextField('genre', value)}
               />
               <AlbumEditSuggestionInput
                 id="album-edit-year"
                 label="Year"
                 value={editingAlbum.draft.year}
+                isApplied={editingAlbum.apply.year}
                 suggestions={albumEditSuggestions.year}
-                onChange={(value) =>
-                  setEditingAlbum((current) =>
-                    current
-                      ? {
-                          ...current,
-                          draft: {
-                            ...current.draft,
-                            year: value,
-                          },
-                        }
-                      : current,
-                  )
-                }
+                onToggleApply={(nextApplied) => setAlbumFieldApplied('year', nextApplied)}
+                onChange={(value) => setAlbumTextField('year', value)}
               />
             </div>
 
@@ -1072,7 +1264,7 @@ export function LibraryPane({
               </button>
               <button
                 className="primary-button"
-                disabled={isApplyingAlbumEdit}
+                disabled={isApplyingAlbumEdit || !hasAlbumFieldsSelected}
                 onClick={() => void saveAlbumEditorChanges()}
                 type="button"
               >

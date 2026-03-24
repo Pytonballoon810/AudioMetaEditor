@@ -8,6 +8,8 @@ export type AlbumBulkEditableFields = Pick<
   'artist' | 'album' | 'producer' | 'composer' | 'genre' | 'year' | 'coverArt'
 >;
 
+export type AlbumBulkApplyFields = Partial<AlbumBulkEditableFields>;
+
 type UseMetadataActionsArgs = {
   activeItem: AudioLibraryItem | null;
   library: AudioLibraryItem[];
@@ -104,7 +106,7 @@ export function useMetadataActions({ activeItem, library, setLibrary, setStatus 
     }
   }
 
-  async function handleApplyAlbumFields(folderPath: string, metadata: AlbumBulkEditableFields) {
+  async function handleApplyAlbumFields(folderPath: string, metadata: AlbumBulkApplyFields) {
     const albumItems = library.filter((item) => item.directory === folderPath);
     if (albumItems.length === 0) {
       return;
