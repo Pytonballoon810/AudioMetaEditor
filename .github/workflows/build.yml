@@ -1,0 +1,129 @@
+name: Build Desktop App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CI: true
+  CSC_IDENTITY_AUTO_DISCOVERY: false
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm run tests
+
+  build-linux:
+    name: Build ${{ matrix.label }} package
+    runs-on: ubuntu-latest
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Ubuntu
+            npm_script: build:ubuntu
+            artifact_name: audio-meta-editor-ubuntu
+            artifact_path: dist/*.AppImage
+            needs_rpm_tools: false
+          - label: Debian
+            npm_script: build:debian
+            artifact_name: audio-meta-editor-debian
+            artifact_path: dist/*.deb
+            needs_rpm_tools: false
+          - label: Fedora
+            npm_script: build:fedora
+            artifact_name: audio-meta-editor-fedora
+            artifact_path: dist/*.rpm
+            needs_rpm_tools: true
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install RPM toolchain
+        if: matrix.needs_rpm_tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build ${{ matrix.label }} artifact
+        run: npm run ${{ matrix.npm_script }}
+
+      - name: Upload ${{ matrix.label }} artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+    needs: quality
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows artifact
+        run: npm run build:windows
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-meta-editor-windows
+          path: |
+            dist/*.exe
+          if-no-files-found: error
