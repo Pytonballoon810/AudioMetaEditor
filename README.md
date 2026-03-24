@@ -1,5 +1,7 @@
 # AudioMetaEditor
 
+![AudioMetaEditor promotional image showing the app UI with library, player, and metadata panes](./assets/SimpleDAWpromo.png)
+
 The DAW that is not really a DAW.
 
 AudioMetaEditor is a desktop audio workstation for people who do not need 600 tracks, 200 plugins, or a mixing console the size of a spaceship. It is built for focused audio metadata work with fast playback, waveform selection, album-level organization, and practical file operations.
