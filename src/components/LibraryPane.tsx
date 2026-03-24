@@ -739,34 +739,31 @@ export function LibraryPane({
       return;
     }
 
-    const payload: AlbumBulkEditFields = {};
+    // Always update the album's cover, regardless of the toggle
+    const albumPayload: AlbumBulkEditFields = {};
     if (editingAlbum.apply.artist) {
-      payload.artist = editingAlbum.draft.artist;
+      albumPayload.artist = editingAlbum.draft.artist;
     }
     if (editingAlbum.apply.album) {
-      payload.album = editingAlbum.draft.album;
+      albumPayload.album = editingAlbum.draft.album;
     }
     if (editingAlbum.apply.producer) {
-      payload.producer = editingAlbum.draft.producer;
+      albumPayload.producer = editingAlbum.draft.producer;
     }
     if (editingAlbum.apply.composer) {
-      payload.composer = editingAlbum.draft.composer;
+      albumPayload.composer = editingAlbum.draft.composer;
     }
     if (editingAlbum.apply.genre) {
-      payload.genre = editingAlbum.draft.genre;
+      albumPayload.genre = editingAlbum.draft.genre;
     }
     if (editingAlbum.apply.year) {
-      payload.year = editingAlbum.draft.year;
+      albumPayload.year = editingAlbum.draft.year;
     }
-    if (editingAlbum.apply.coverArt) {
-      payload.coverArt = editingAlbum.draft.coverArt;
-    }
+    // Always set coverArt for the album itself
+    albumPayload.coverArt = editingAlbum.draft.coverArt;
 
-    if (Object.keys(payload).length === 0 && editingAlbum.draft.coverArt) {
-      payload.coverArt = editingAlbum.draft.coverArt;
-    }
-
-    if (Object.keys(payload).length === 0) {
+    // If no fields are selected and no cover, do nothing
+    if (Object.keys(albumPayload).length === 0 || !editingAlbum.draft.coverArt) {
       setEditingAlbum(null);
       return;
     }
@@ -774,7 +771,14 @@ export function LibraryPane({
     setIsApplyingAlbumEdit(true);
 
     try {
-      await onApplyAlbumFields(editingAlbum.folderPath, payload);
+      // First, update the album's own cover (could be a separate API call if needed)
+      await onApplyAlbumFields(editingAlbum.folderPath, albumPayload);
+
+      // If the toggle is ON, also update all tracks' covers
+      if (editingAlbum.apply.coverArt) {
+        // Only update tracks' coverArt
+        await onApplyAlbumFields(editingAlbum.folderPath, { coverArt: editingAlbum.draft.coverArt });
+      }
       setEditingAlbum(null);
     } finally {
       setIsApplyingAlbumEdit(false);
