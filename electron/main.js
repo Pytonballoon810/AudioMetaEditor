@@ -2,7 +2,7 @@ const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu, screen } = require('electron');
 
 const { buildLibrary, editAudioSelection, exportAudioSegment, saveMetadata } = require('./media-service');
 const { readFileAsBase64WithLimit } = require('./file-io');
@@ -47,6 +47,99 @@ if (!singleInstanceLock) {
 let mainWindow = null;
 let pendingPaths = [];
 const MAX_AUDIO_BLOB_BYTES = 80 * 1024 * 1024;
+const DEFAULT_WINDOW_WIDTH = 1520;
+const DEFAULT_WINDOW_HEIGHT = 940;
+const MIN_WINDOW_WIDTH = 1120;
+const MIN_WINDOW_HEIGHT = 720;
+const WINDOW_STATE_FILE_PATH = path.join(app.getPath('userData'), 'window-state.json');
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function readWindowState() {
+  try {
+    if (!fsSync.existsSync(WINDOW_STATE_FILE_PATH)) {
+      return null;
+    }
+
+    const raw = fsSync.readFileSync(WINDOW_STATE_FILE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const bounds = parsed.bounds;
+    if (!bounds || typeof bounds !== 'object') {
+      return null;
+    }
+
+    const numericKeys = ['x', 'y', 'width', 'height'];
+    const hasAllNumbers = numericKeys.every((key) => Number.isFinite(bounds[key]));
+    if (!hasAllNumbers) {
+      return null;
+    }
+
+    return {
+      bounds: {
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Math.max(MIN_WINDOW_WIDTH, Math.round(bounds.width)),
+        height: Math.max(MIN_WINDOW_HEIGHT, Math.round(bounds.height)),
+      },
+      isMaximized: parsed.isMaximized === true,
+    };
+  } catch (error) {
+    console.warn('[window-state] Failed to read state:', error);
+    return null;
+  }
+}
+
+function writeWindowState(state) {
+  try {
+    fsSync.mkdirSync(path.dirname(WINDOW_STATE_FILE_PATH), { recursive: true });
+    fsSync.writeFileSync(WINDOW_STATE_FILE_PATH, JSON.stringify(state), 'utf8');
+  } catch (error) {
+    console.warn('[window-state] Failed to write state:', error);
+  }
+}
+
+function intersects(a, b) {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+}
+
+function isWindowBoundsVisible(bounds) {
+  return screen.getAllDisplays().some((display) => intersects(bounds, display.workArea));
+}
+
+function getRestoredWindowState() {
+  const state = readWindowState();
+  if (!state) {
+    return null;
+  }
+
+  const display = screen.getDisplayMatching(state.bounds);
+  const maxWidth = Math.max(MIN_WINDOW_WIDTH, display.workArea.width);
+  const maxHeight = Math.max(MIN_WINDOW_HEIGHT, display.workArea.height);
+  const width = clamp(state.bounds.width, MIN_WINDOW_WIDTH, maxWidth);
+  const height = clamp(state.bounds.height, MIN_WINDOW_HEIGHT, maxHeight);
+
+  const normalized = {
+    x: state.bounds.x,
+    y: state.bounds.y,
+    width,
+    height,
+  };
+
+  if (!isWindowBoundsVisible(normalized)) {
+    return null;
+  }
+
+  return {
+    bounds: normalized,
+    isMaximized: state.isMaximized,
+  };
+}
 
 function resolveRuntimeIconPath() {
   const byPlatform = {
@@ -163,14 +256,16 @@ function registerIpcHandler(channel, handler) {
 
 async function createWindow() {
   const runtimeIconPath = resolveRuntimeIconPath();
+  const restoredWindowState = getRestoredWindowState();
 
   mainWindow = new BrowserWindow({
-    width: 1520,
-    height: 940,
-    minWidth: 1120,
-    minHeight: 720,
+    width: DEFAULT_WINDOW_WIDTH,
+    height: DEFAULT_WINDOW_HEIGHT,
+    minWidth: MIN_WINDOW_WIDTH,
+    minHeight: MIN_WINDOW_HEIGHT,
     backgroundColor: '#121417',
     autoHideMenuBar: true,
+    ...(restoredWindowState ? restoredWindowState.bounds : {}),
     ...(runtimeIconPath ? { icon: runtimeIconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -183,6 +278,10 @@ async function createWindow() {
 
   if (process.platform !== 'darwin') {
     mainWindow.setMenuBarVisibility(false);
+  }
+
+  if (restoredWindowState?.isMaximized) {
+    mainWindow.maximize();
   }
 
   let altPressed = false;
@@ -213,6 +312,18 @@ async function createWindow() {
       mainWindow.webContents.send('app:open-paths', pendingPaths);
       pendingPaths = [];
     }
+  });
+
+  mainWindow.on('close', () => {
+    if (!mainWindow) {
+      return;
+    }
+
+    const bounds = mainWindow.isMaximized() ? mainWindow.getNormalBounds() : mainWindow.getBounds();
+    writeWindowState({
+      bounds,
+      isMaximized: mainWindow.isMaximized(),
+    });
   });
 
   mainWindow.on('closed', () => {
