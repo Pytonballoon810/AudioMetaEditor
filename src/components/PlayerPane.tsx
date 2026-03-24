@@ -1,6 +1,15 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { CropIcon, FirstBracketIcon, SaveIcon, ScissorIcon, SecondBracketIcon, Select02Icon } from '@hugeicons/core-free-icons';
+import {
+  CropIcon,
+  FirstBracketIcon,
+  RedoIcon,
+  SaveIcon,
+  ScissorIcon,
+  SecondBracketIcon,
+  Select02Icon,
+  UndoIcon,
+} from '@hugeicons/core-free-icons';
 import type { AudioLibraryItem } from '../types';
 import { formatBitrate, formatDuration } from '../lib/format';
 import { useWaveSurfer } from '../hooks/useWaveSurfer';
@@ -80,6 +89,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
+  const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
   const audioUrl = item ? item.path : null;
 
   const handleReady = useCallback((loadedDuration: number) => {
@@ -120,11 +130,13 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
       setCurrentTime(0);
       setDuration(0);
       setPendingEdits([]);
+      setRedoPendingEdits([]);
     }
   }, [item]);
 
   useEffect(() => {
     setPendingEdits([]);
+    setRedoPendingEdits([]);
   }, [item?.path]);
 
   const hasValidSelection = selection.end > selection.start + 0.01;
@@ -165,6 +177,37 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         label,
       },
     ]);
+    setRedoPendingEdits([]);
+  };
+
+  const undoPendingEdit = () => {
+    if (pendingEdits.length === 0 || isEditingSelection) {
+      return;
+    }
+
+    const nextPending = pendingEdits.slice(0, -1);
+    const removedEdit = pendingEdits[pendingEdits.length - 1];
+    if (!removedEdit) {
+      return;
+    }
+
+    setPendingEdits(nextPending);
+    setRedoPendingEdits((current) => [...current, removedEdit]);
+  };
+
+  const redoPendingEdit = () => {
+    if (redoPendingEdits.length === 0 || isEditingSelection) {
+      return;
+    }
+
+    const nextRedo = redoPendingEdits.slice(0, -1);
+    const restoredEdit = redoPendingEdits[redoPendingEdits.length - 1];
+    if (!restoredEdit) {
+      return;
+    }
+
+    setRedoPendingEdits(nextRedo);
+    setPendingEdits((current) => [...current, restoredEdit]);
   };
 
   const savePendingEdit = async () => {
@@ -237,6 +280,31 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             type="button"
           >
             <HugeiconsIcon icon={Select02Icon} size={18} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <span aria-hidden="true" className="daw-toolbar-divider" />
+
+        <div className="daw-toolbar-group">
+          <button
+            aria-label="Undo last pending waveform edit"
+            className="daw-tool-button"
+            disabled={pendingEdits.length === 0 || isEditingSelection}
+            onClick={undoPendingEdit}
+            title={pendingEdits.length > 0 ? 'Undo last pending edit' : 'No pending edit to undo'}
+            type="button"
+          >
+            <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label="Redo last undone waveform edit"
+            className="daw-tool-button"
+            disabled={redoPendingEdits.length === 0 || isEditingSelection}
+            onClick={redoPendingEdit}
+            title={redoPendingEdits.length > 0 ? 'Redo last undone edit' : 'No undone edit to redo'}
+            type="button"
+          >
+            <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
           </button>
         </div>
 

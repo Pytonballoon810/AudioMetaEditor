@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { MagicWand01Icon } from '@hugeicons/core-free-icons';
+import { MagicWand01Icon, RedoIcon, UndoIcon } from '@hugeicons/core-free-icons';
 import { type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import type { AudioLibraryItem, EditableMetadata, MetadataSuggestions } from '../types';
 import defaultCover from '../assets/defaultCover.png';
@@ -129,9 +129,66 @@ export function MetadataEditor({
   const [isAlbumCoverPickerOpen, setIsAlbumCoverPickerOpen] = useState(false);
   const [isTrackCoverPickerOpen, setIsTrackCoverPickerOpen] = useState(false);
   const [isWandActive, setIsWandActive] = useState(false);
+  const [coverUndoStack, setCoverUndoStack] = useState<Array<string | null>>([]);
+  const [coverRedoStack, setCoverRedoStack] = useState<Array<string | null>>([]);
   const coverCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const currentCoverArtRef = useRef<string | null>(null);
   const isWandDraggingRef = useRef(false);
   const hasWandEditsRef = useRef(false);
+
+  function applyCoverArt(nextCoverArt: string | null, trackHistory = true) {
+    const currentCoverArt = currentCoverArtRef.current;
+    if (nextCoverArt === currentCoverArt) {
+      return;
+    }
+
+    if (trackHistory) {
+      setCoverUndoStack((current) => [...current, currentCoverArt]);
+      setCoverRedoStack([]);
+    }
+
+    setDraft((current) => ({
+      ...current,
+      coverArt: nextCoverArt,
+    }));
+  }
+
+  function undoCoverArtEdit() {
+    if (coverUndoStack.length === 0) {
+      return;
+    }
+
+    const previousCoverArt = coverUndoStack[coverUndoStack.length - 1];
+    if (typeof previousCoverArt === 'undefined') {
+      return;
+    }
+
+    setCoverUndoStack((current) => current.slice(0, -1));
+    setCoverRedoStack((current) => [...current, currentCoverArtRef.current]);
+    setDraft((current) => ({
+      ...current,
+      coverArt: previousCoverArt,
+    }));
+  }
+
+  function redoCoverArtEdit() {
+    if (coverRedoStack.length === 0) {
+      return;
+    }
+
+    const nextCoverArt = coverRedoStack[coverRedoStack.length - 1];
+    if (typeof nextCoverArt === 'undefined') {
+      return;
+    }
+
+    setCoverRedoStack((current) => current.slice(0, -1));
+    setCoverUndoStack((current) => [...current, currentCoverArtRef.current]);
+    setDraft((current) => ({
+      ...current,
+      coverArt: nextCoverArt,
+    }));
+  }
 
   useEffect(() => {
     if (!item) {
@@ -155,7 +212,13 @@ export function MetadataEditor({
       coverArt: item.metadata.coverArt,
     });
     setIsWandActive(false);
+    setCoverUndoStack([]);
+    setCoverRedoStack([]);
   }, [item]);
+
+  useEffect(() => {
+    currentCoverArtRef.current = draft.coverArt;
+  }, [draft.coverArt]);
 
   useEffect(() => {
     const canvas = coverCanvasRef.current;
@@ -207,10 +270,11 @@ export function MetadataEditor({
 
     const reader = new FileReader();
     reader.onload = () => {
-      setDraft((current) => ({
-        ...current,
-        coverArt: typeof reader.result === 'string' ? reader.result : current.coverArt,
-      }));
+      if (typeof reader.result !== 'string') {
+        return;
+      }
+
+      applyCoverArt(reader.result);
     };
     reader.readAsDataURL(file);
   }
@@ -308,10 +372,7 @@ export function MetadataEditor({
     }
 
     const updatedCover = canvas.toDataURL('image/png');
-    setDraft((current) => ({
-      ...current,
-      coverArt: updatedCover,
-    }));
+    applyCoverArt(updatedCover);
     hasWandEditsRef.current = false;
   }
 
@@ -355,10 +416,7 @@ export function MetadataEditor({
         return;
       }
 
-      setDraft((current) => ({
-        ...current,
-        coverArt: firstAlbumCover,
-      }));
+      applyCoverArt(firstAlbumCover);
       setIsAlbumCoverPickerOpen(false);
       return;
     }
@@ -378,10 +436,7 @@ export function MetadataEditor({
         return;
       }
 
-      setDraft((current) => ({
-        ...current,
-        coverArt: firstTrackCover.coverArt,
-      }));
+      applyCoverArt(firstTrackCover.coverArt);
       setIsTrackCoverPickerOpen(false);
       return;
     }
@@ -447,30 +502,70 @@ export function MetadataEditor({
               ref={coverCanvasRef}
             />
           </div>
-          <div className="cover-actions">
-            <label className="secondary-button">
-              Replace artwork
-              <input accept="image/*" hidden onChange={onCoverChange} type="file" />
-            </label>
-            <button
-              aria-label={isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'}
-              className={`secondary-button cover-wand-button${isWandActive ? ' active' : ''}`}
-              disabled={!draft.coverArt}
-              onClick={() => {
-                if (isWandActive) {
-                  commitWandEditsToDraft();
+          <div aria-label="Cover editing toolbar" className="cover-edit-toolbar" role="toolbar">
+            <div className="daw-toolbar-group">
+              <button
+                aria-label="Undo cover edit"
+                className="daw-tool-button"
+                disabled={coverUndoStack.length === 0}
+                onClick={undoCoverArtEdit}
+                title={coverUndoStack.length > 0 ? 'Undo last cover edit' : 'No cover edit to undo'}
+                type="button"
+              >
+                <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
+              </button>
+              <button
+                aria-label="Redo cover edit"
+                className="daw-tool-button"
+                disabled={coverRedoStack.length === 0}
+                onClick={redoCoverArtEdit}
+                title={coverRedoStack.length > 0 ? 'Redo last undone cover edit' : 'No cover edit to redo'}
+                type="button"
+              >
+                <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
+              </button>
+            </div>
+
+            <span aria-hidden="true" className="daw-toolbar-divider" />
+
+            <div className="daw-toolbar-group">
+              <button
+                className="cover-toolbar-action"
+                onClick={() => coverInputRef.current?.click()}
+                title="Replace artwork"
+                type="button"
+              >
+                Replace
+              </button>
+              <input accept="image/*" hidden onChange={onCoverChange} ref={coverInputRef} type="file" />
+            </div>
+
+            <span aria-hidden="true" className="daw-toolbar-divider" />
+
+            <div className="daw-toolbar-group">
+              <button
+                aria-label={isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'}
+                className={`daw-tool-button daw-tool-button-accent${isWandActive ? ' cover-tool-active' : ''}`}
+                disabled={!draft.coverArt}
+                onClick={() => {
+                  if (isWandActive) {
+                    commitWandEditsToDraft();
+                  }
+                  setIsWandActive((current) => !current);
+                }}
+                title={
+                  draft.coverArt
+                    ? 'Magic wand: click and drag on similar colors to make them transparent'
+                    : 'Load artwork first to use the magic wand'
                 }
-                setIsWandActive((current) => !current);
-              }}
-              title={
-                draft.coverArt
-                  ? 'Magic wand: click and drag on similar colors to make them transparent'
-                  : 'Load artwork first to use the magic wand'
-              }
-              type="button"
-            >
-              <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
-            </button>
+                type="button"
+              >
+                <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
+              </button>
+            </div>
+          </div>
+
+          <div className="cover-actions">
             <button
               className="secondary-button"
               disabled={albumCoverOptions.length === 0}
@@ -497,7 +592,7 @@ export function MetadataEditor({
                   key={`album-cover-option-${index}`}
                   className="album-cover-option"
                   onClick={() => {
-                    setDraft((current) => ({ ...current, coverArt: cover }));
+                    applyCoverArt(cover);
                     setIsAlbumCoverPickerOpen(false);
                   }}
                   type="button"
@@ -515,7 +610,7 @@ export function MetadataEditor({
                   key={`track-cover-option-${option.coverArt}`}
                   className="track-cover-option"
                   onClick={() => {
-                    setDraft((current) => ({ ...current, coverArt: option.coverArt }));
+                    applyCoverArt(option.coverArt);
                     setIsTrackCoverPickerOpen(false);
                   }}
                   type="button"
