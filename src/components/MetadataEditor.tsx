@@ -583,7 +583,6 @@ export function MetadataEditor({
               Copy cover from other track
             </button>
           </div>
-          {draft.coverArt ? <p className="cover-editor-hint">Magic wand: click and drag to remove matching areas.</p> : null}
 
           {isAlbumCoverPickerOpen && albumCoverOptions.length > 1 ? (
             <div className="album-cover-picker" role="listbox">
