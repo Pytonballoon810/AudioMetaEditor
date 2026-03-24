@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Album01Icon, Copy01Icon, MagicWand01Icon, RedoIcon, UndoIcon } from '@hugeicons/core-free-icons';
+import { Album01Icon, Copy01Icon, MagicWand01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
 import { type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import type { AudioLibraryItem, EditableMetadata, MetadataSuggestions } from '../types';
 import defaultCover from '../assets/defaultCover.png';
@@ -530,13 +530,13 @@ export function MetadataEditor({
 
             <div className="daw-toolbar-group">
               <button
-                aria-label="Replace artwork"
-                className="cover-toolbar-action"
+                aria-label="Upload replacement artwork"
+                className="daw-tool-button"
                 onClick={() => coverInputRef.current?.click()}
-                title="Replace artwork"
+                title="Upload replacement artwork image"
                 type="button"
               >
-                Replace
+                <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
               </button>
               <input accept="image/*" hidden onChange={onCoverChange} ref={coverInputRef} type="file" />
             </div>
