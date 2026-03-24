@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Album01Icon, Copy01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
+import { Album01Icon, Copy01Icon, Folder01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import type { AudioLibraryItem, EditableMetadata } from '../types';
 import { formatDuration } from '../lib/format';
@@ -839,7 +839,11 @@ export function LibraryPane({
               onContextMenu={openAlbumContextMenu}
             >
               <div className="library-album-header-left">
-                {group.uniqueCovers.length > 0 ? (
+                {group.isRootPseudoAlbum ? (
+                  <div className="library-root-folder-icon" aria-hidden="true">
+                    <HugeiconsIcon icon={Folder01Icon} size={16} strokeWidth={1.9} />
+                  </div>
+                ) : group.uniqueCovers.length > 0 ? (
                   <div className="library-album-covers" aria-hidden="true">
                     {group.uniqueCovers.map((cover, index) => (
                       <img
