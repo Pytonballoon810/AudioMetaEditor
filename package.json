@@ -1,0 +1,112 @@
+{
+  "name": "audio-meta-editor",
+  "version": "0.2.0-rc.1",
+  "description": "Desktop audio player with waveform playback, metadata editing, and basic cutting tools.",
+  "homepage": "https://github.com/pytonballoon810/AudioMetaEditor",
+  "main": "electron/main.js",
+  "author": {
+    "name": "pytonballoon810",
+    "email": "pytonballoon810@users.noreply.github.com"
+  },
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:renderer": "vite --host 127.0.0.1 --port 5173 --strictPort",
+    "dev:electron": "wait-on http-get://127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "build": "vite build && electron-builder",
+    "build:debian": "vite build && electron-builder --linux deb",
+    "build:ubuntu": "vite build && electron-builder --linux AppImage",
+    "build:fedora": "vite build && electron-builder --linux rpm",
+    "build:windows": "vite build && electron-builder --win nsis",
+    "preview": "vite preview",
+    "tests": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --check",
+    "format:write": "prettier . --write"
+  },
+  "dependencies": {
+    "@hugeicons/core-free-icons": "^4.0.0",
+    "@hugeicons/react": "^1.1.6",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "music-metadata": "^11.12.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "wavesurfer.js": "^7.12.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1",
+    "globals": "^16.5.0",
+    "@eslint/js": "^9.39.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.1",
+    "vite": "^8.0.2",
+    "vitest": "^4.1.1",
+    "wait-on": "^9.0.4"
+  },
+  "build": {
+    "appId": "me.pytonballoon.audiometaeditor",
+    "productName": "AudioMetaEditor",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "AudioVideo",
+      "maintainer": "pytonballoon810 <pytonballoon810@users.noreply.github.com>",
+      "mimeTypes": [
+        "audio/mpeg",
+        "audio/wav",
+        "audio/x-wav"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "${productName}-${version}-setup-${arch}.${ext}"
+    },
+    "fileAssociations": [
+      {
+        "ext": "mp3",
+        "name": "MP3 Audio",
+        "mimeType": "audio/mpeg",
+        "role": "Viewer"
+      },
+      {
+        "ext": "wav",
+        "name": "WAV Audio",
+        "mimeType": "audio/wav",
+        "role": "Viewer"
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    }
+  }
+}
