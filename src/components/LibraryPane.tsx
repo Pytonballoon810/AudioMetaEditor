@@ -445,7 +445,7 @@ export function LibraryPane({
       return false;
     }
 
-    return Object.values(editingAlbum.apply).some(Boolean);
+    return Object.values(editingAlbum.apply).some(Boolean) || Boolean(editingAlbum.draft.coverArt);
   }, [editingAlbum]);
 
   function setAlbumFieldApplied(field: AlbumEditableFieldKey, isApplied: boolean) {
@@ -759,6 +759,10 @@ export function LibraryPane({
       payload.year = editingAlbum.draft.year;
     }
     if (editingAlbum.apply.coverArt) {
+      payload.coverArt = editingAlbum.draft.coverArt;
+    }
+
+    if (Object.keys(payload).length === 0 && editingAlbum.draft.coverArt) {
       payload.coverArt = editingAlbum.draft.coverArt;
     }
 
