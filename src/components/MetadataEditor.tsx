@@ -1,6 +1,10 @@
-import { type ChangeEvent, type ReactNode, useEffect, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { MagicWand01Icon } from '@hugeicons/core-free-icons';
+import { type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import type { AudioLibraryItem, EditableMetadata, MetadataSuggestions } from '../types';
 import defaultCover from '../assets/defaultCover.png';
+
+const MAGIC_WAND_TOLERANCE = 42;
 
 type TrackCoverOption = {
   coverArt: string;
@@ -117,10 +121,15 @@ export function MetadataEditor({
   const [draft, setDraft] = useState<EditableMetadata>(EMPTY_METADATA);
   const [isAlbumCoverPickerOpen, setIsAlbumCoverPickerOpen] = useState(false);
   const [isTrackCoverPickerOpen, setIsTrackCoverPickerOpen] = useState(false);
+  const [isWandActive, setIsWandActive] = useState(false);
+  const coverCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isWandDraggingRef = useRef(false);
+  const hasWandEditsRef = useRef(false);
 
   useEffect(() => {
     if (!item) {
       setDraft(EMPTY_METADATA);
+      setIsWandActive(false);
       return;
     }
 
@@ -138,7 +147,50 @@ export function MetadataEditor({
       comment: item.metadata.comment,
       coverArt: item.metadata.coverArt,
     });
+    setIsWandActive(false);
   }, [item]);
+
+  useEffect(() => {
+    const canvas = coverCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      return;
+    }
+
+    let isCancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (isCancelled || !coverCanvasRef.current) {
+        return;
+      }
+
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0);
+      hasWandEditsRef.current = false;
+    };
+
+    image.onerror = () => {
+      if (isCancelled || !coverCanvasRef.current) {
+        return;
+      }
+
+      if ((draft.coverArt || '') !== defaultCover) {
+        image.src = defaultCover;
+      }
+    };
+
+    image.src = draft.coverArt || defaultCover;
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [draft.coverArt]);
 
   async function onCoverChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -154,6 +206,134 @@ export function MetadataEditor({
       }));
     };
     reader.readAsDataURL(file);
+  }
+
+  function removeConnectedArea(clientX: number, clientY: number) {
+    if (!isWandActive || !draft.coverArt) {
+      return;
+    }
+
+    const canvas = coverCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(((clientX - rect.left) / rect.width) * canvas.width)));
+    const y = Math.max(
+      0,
+      Math.min(canvas.height - 1, Math.floor(((clientY - rect.top) / rect.height) * canvas.height)),
+    );
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    const pixelOffset = (y * width + x) * 4;
+    const sourceR = data[pixelOffset] ?? 0;
+    const sourceG = data[pixelOffset + 1] ?? 0;
+    const sourceB = data[pixelOffset + 2] ?? 0;
+    const sourceA = data[pixelOffset + 3] ?? 0;
+
+    if (sourceA === 0) {
+      return;
+    }
+
+    const toleranceSquared = MAGIC_WAND_TOLERANCE * MAGIC_WAND_TOLERANCE;
+    const alphaTolerance = 48;
+    const visited = new Uint8Array(width * height);
+    const stack = [y * width + x];
+
+    while (stack.length > 0) {
+      const index = stack.pop();
+      if (typeof index !== 'number' || visited[index] === 1) {
+        continue;
+      }
+
+      visited[index] = 1;
+      const offset = index * 4;
+      const red = data[offset] ?? 0;
+      const green = data[offset + 1] ?? 0;
+      const blue = data[offset + 2] ?? 0;
+      const alpha = data[offset + 3] ?? 0;
+      const deltaR = red - sourceR;
+      const deltaG = green - sourceG;
+      const deltaB = blue - sourceB;
+      const deltaA = Math.abs(alpha - sourceA);
+      const distanceSquared = deltaR * deltaR + deltaG * deltaG + deltaB * deltaB;
+
+      if (distanceSquared > toleranceSquared || deltaA > alphaTolerance) {
+        continue;
+      }
+
+      data[offset + 3] = 0;
+
+      const px = index % width;
+      const py = Math.floor(index / width);
+      if (px > 0) stack.push(index - 1);
+      if (px < width - 1) stack.push(index + 1);
+      if (py > 0) stack.push(index - width);
+      if (py < height - 1) stack.push(index + width);
+    }
+
+    context.putImageData(imageData, 0, 0);
+    hasWandEditsRef.current = true;
+  }
+
+  function commitWandEditsToDraft() {
+    if (!hasWandEditsRef.current) {
+      return;
+    }
+
+    const canvas = coverCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const updatedCover = canvas.toDataURL('image/png');
+    setDraft((current) => ({
+      ...current,
+      coverArt: updatedCover,
+    }));
+    hasWandEditsRef.current = false;
+  }
+
+  function handleCoverPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!isWandActive || !draft.coverArt) {
+      return;
+    }
+
+    isWandDraggingRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    removeConnectedArea(event.clientX, event.clientY);
+  }
+
+  function handleCoverPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!isWandActive || !isWandDraggingRef.current || !draft.coverArt) {
+      return;
+    }
+
+    removeConnectedArea(event.clientX, event.clientY);
+  }
+
+  function handleCoverPointerUp(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!isWandDraggingRef.current) {
+      return;
+    }
+
+    isWandDraggingRef.current = false;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    commitWandEditsToDraft();
   }
 
   function onCarryOverAlbumCover() {
@@ -249,19 +429,42 @@ export function MetadataEditor({
         }}
       >
         <div className="cover-card">
-          <img
-            alt="Album cover"
-            className="cover-image"
-            src={draft.coverArt || defaultCover}
-            onError={(e) => {
-              e.currentTarget.src = defaultCover;
-            }}
-          />
+          <div className={`cover-image-editor${isWandActive ? ' wand-active' : ''}`}>
+            <canvas
+              aria-label="Album cover editor"
+              className="cover-image-canvas"
+              onPointerDown={handleCoverPointerDown}
+              onPointerMove={handleCoverPointerMove}
+              onPointerUp={handleCoverPointerUp}
+              onPointerCancel={handleCoverPointerUp}
+              ref={coverCanvasRef}
+            />
+          </div>
           <div className="cover-actions">
             <label className="secondary-button">
               Replace artwork
               <input accept="image/*" hidden onChange={onCoverChange} type="file" />
             </label>
+            <button
+              aria-label={isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'}
+              className={`secondary-button cover-wand-button${isWandActive ? ' active' : ''}`}
+              disabled={!draft.coverArt}
+              onClick={() => {
+                if (isWandActive) {
+                  commitWandEditsToDraft();
+                }
+                setIsWandActive((current) => !current);
+              }}
+              title={
+                draft.coverArt
+                  ? 'Magic wand: click and drag on similar colors to make them transparent'
+                  : 'Load artwork first to use the magic wand'
+              }
+              type="button"
+            >
+              <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
+              <span>{isWandActive ? 'Wand on' : 'Magic wand'}</span>
+            </button>
             <button
               className="secondary-button"
               disabled={albumCoverOptions.length === 0}
@@ -279,6 +482,7 @@ export function MetadataEditor({
               Copy cover from other track
             </button>
           </div>
+          {draft.coverArt ? <p className="cover-editor-hint">Magic wand: click and drag to remove matching areas.</p> : null}
 
           {isAlbumCoverPickerOpen && albumCoverOptions.length > 1 ? (
             <div className="album-cover-picker" role="listbox">

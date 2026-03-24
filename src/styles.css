@@ -1018,7 +1018,6 @@ textarea {
 }
 
 .daw-toolbar-pending {
-  margin-left: 0.35rem;
   color: var(--muted);
   font-size: 0.78rem;
   white-space: nowrap;
@@ -1117,10 +1116,57 @@ textarea {
   justify-items: start;
 }
 
+.cover-image-editor {
+  aspect-ratio: 1;
+  border-radius: 24px;
+  max-width: 220px;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 16px 16px,
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 16px 16px,
+    rgba(255, 255, 255, 0.03);
+}
+
+.cover-image-editor.wand-active {
+  box-shadow: 0 0 0 2px rgba(255, 94, 168, 0.5);
+}
+
+.cover-image-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cover-image-editor.wand-active .cover-image-canvas {
+  cursor: crosshair;
+}
+
 .cover-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+}
+
+.cover-wand-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cover-wand-button.active {
+  background: linear-gradient(135deg, rgba(255, 94, 168, 0.3), rgba(117, 201, 255, 0.22));
+  border: 1px solid rgba(255, 94, 168, 0.7);
+}
+
+.cover-editor-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 
 .cover-actions .secondary-button {
