@@ -1,0 +1,292 @@
+import { useEffect, useRef, useState } from 'react';
+import WaveSurfer from 'wavesurfer.js';
+import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.js';
+import { requireAudioMetaApi } from '../services/audioMetaApi';
+import { endPerfTimer, logMemorySnapshot, startPerfTimer } from '../lib/performance';
+
+const IS_DEV = import.meta.env.DEV;
+
+function debugLog(...args: unknown[]) {
+  if (IS_DEV) {
+    console.log(...args);
+  }
+}
+
+type UseWaveSurferOptions = {
+  audioUrl: string | null;
+  onReady?: (duration: number) => void;
+  onTimeUpdate?: (currentTime: number) => void;
+};
+
+export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurferOptions) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const waveSurferRef = useRef<WaveSurfer | null>(null);
+  const regionsPluginRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null);
+  const selectionRef = useRef({ start: 0, end: 0 });
+  const durationRef = useRef(0);
+  const lastLoopAtRef = useRef(0);
+  const loadSequenceRef = useRef(0);
+  const loadingStartedAtRef = useRef(0);
+  const hideSpinnerTimerRef = useRef<number | null>(null);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isWaveformLoading, setIsWaveformLoading] = useState(false);
+
+  function clearWaveform(waveSurfer: WaveSurfer) {
+    (waveSurfer as WaveSurfer & { empty?: () => void }).empty?.();
+  }
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return undefined;
+    }
+
+    const regionsPlugin = RegionsPlugin.create();
+    regionsPluginRef.current = regionsPlugin;
+
+    const waveSurfer = WaveSurfer.create({
+      container: containerRef.current,
+      height: 240,
+      waveColor: '#6eb6ff',
+      progressColor: '#ff5ea8',
+      cursorColor: '#f4f1de',
+      barGap: 2,
+      barWidth: 2,
+      barRadius: 999,
+      normalize: true,
+      plugins: [regionsPlugin],
+    });
+
+    waveSurferRef.current = waveSurfer;
+
+    waveSurfer.on('ready', () => {
+      if (waveSurferRef.current !== waveSurfer || regionsPluginRef.current !== regionsPlugin) {
+        return;
+      }
+
+      const duration = waveSurfer.getDuration();
+      durationRef.current = duration;
+      regionsPlugin.clearRegions();
+      try {
+        regionsPlugin.addRegion({
+          id: 'selection',
+          start: 0,
+          end: duration,
+          drag: true,
+          resize: true,
+          color: 'rgba(255, 94, 168, 0.2)',
+        });
+      } catch (error) {
+        // Ready can race with teardown on rapid track switches.
+        console.warn('[useWaveSurfer] Ignoring stale region initialization:', error);
+        return;
+      }
+      const fullSelection = { start: 0, end: duration };
+      selectionRef.current = fullSelection;
+      setSelection(fullSelection);
+      onReady?.(duration);
+    });
+
+    waveSurfer.on('error', (error) => {
+      console.error('[useWaveSurfer] WaveSurfer error:', error);
+    });
+
+    waveSurfer.on('timeupdate', () => {
+      const currentTime = waveSurfer.getCurrentTime();
+      const { start, end } = selectionRef.current;
+      const duration = durationRef.current;
+      const epsilon = 0.03;
+      const hasPartialSelection = duration > epsilon && start > epsilon && end < duration - epsilon;
+
+      if (hasPartialSelection && end > start + epsilon && currentTime >= end - epsilon) {
+        const now = Date.now();
+        if (now - lastLoopAtRef.current > 60) {
+          lastLoopAtRef.current = now;
+          waveSurfer.seekTo(start / duration);
+          if (!waveSurfer.isPlaying()) {
+            void waveSurfer.play();
+          }
+          onTimeUpdate?.(start);
+          return;
+        }
+      }
+
+      onTimeUpdate?.(currentTime);
+    });
+
+    waveSurfer.on('play', () => setIsPlaying(true));
+    waveSurfer.on('pause', () => setIsPlaying(false));
+    waveSurfer.on('finish', () => setIsPlaying(false));
+
+    const handleRegionChange = (region: Region) => {
+      if (region.id === 'selection') {
+        const nextSelection = { start: region.start, end: region.end };
+        selectionRef.current = nextSelection;
+        setSelection(nextSelection);
+      }
+    };
+
+    regionsPlugin.on('region-update', handleRegionChange);
+    regionsPlugin.on('region-updated', handleRegionChange);
+
+    return () => {
+      if (hideSpinnerTimerRef.current !== null) {
+        window.clearTimeout(hideSpinnerTimerRef.current);
+        hideSpinnerTimerRef.current = null;
+      }
+      waveSurfer.destroy();
+      waveSurferRef.current = null;
+      regionsPluginRef.current = null;
+    };
+  }, [onReady, onTimeUpdate]);
+
+  useEffect(() => {
+    const waveSurfer = waveSurferRef.current;
+    if (!waveSurfer) {
+      return;
+    }
+
+    loadSequenceRef.current += 1;
+
+    // Clear old waveform immediately when switching tracks.
+    clearWaveform(waveSurfer);
+    regionsPluginRef.current?.clearRegions();
+    waveSurfer.stop();
+    waveSurfer.seekTo(0);
+    const clearedSelection = { start: 0, end: 0 };
+    selectionRef.current = clearedSelection;
+    durationRef.current = 0;
+    setSelection(clearedSelection);
+    setIsPlaying(false);
+
+    if (!audioUrl) {
+      if (hideSpinnerTimerRef.current !== null) {
+        window.clearTimeout(hideSpinnerTimerRef.current);
+        hideSpinnerTimerRef.current = null;
+      }
+      setIsWaveformLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    const currentLoadSequence = loadSequenceRef.current;
+    if (hideSpinnerTimerRef.current !== null) {
+      window.clearTimeout(hideSpinnerTimerRef.current);
+      hideSpinnerTimerRef.current = null;
+    }
+    loadingStartedAtRef.current = Date.now();
+    setIsWaveformLoading(true);
+
+    const loadAudio = async () => {
+      const loadStartedAt = startPerfTimer();
+      logMemorySnapshot('waveform:load:start');
+
+      try {
+        debugLog('[useWaveSurfer] Loading audio:', audioUrl);
+        const bridgeApi = requireAudioMetaApi();
+        const mediaUrl = await bridgeApi.loadAudioBlob(audioUrl);
+
+        // Check if component is still mounted and WaveSurfer instance still exists
+        if (!isMounted || !waveSurferRef.current) {
+          debugLog('[useWaveSurfer] Component unmounted or WaveSurfer destroyed, aborting load');
+          return;
+        }
+
+        debugLog('[useWaveSurfer] Media URL ready, loading into WaveSurfer');
+        await waveSurferRef.current.load(mediaUrl);
+
+        if (!isMounted || currentLoadSequence !== loadSequenceRef.current) {
+          return;
+        }
+
+        const elapsedMs = Date.now() - loadingStartedAtRef.current;
+        const minVisibleMs = 220;
+        const hideDelayMs = Math.max(0, minVisibleMs - elapsedMs);
+        hideSpinnerTimerRef.current = window.setTimeout(() => {
+          if (currentLoadSequence === loadSequenceRef.current) {
+            endPerfTimer('waveform:load', loadStartedAt);
+            logMemorySnapshot('waveform:load:end');
+            setIsWaveformLoading(false);
+          }
+        }, hideDelayMs);
+      } catch (error) {
+        if (currentLoadSequence === loadSequenceRef.current) {
+          endPerfTimer('waveform:load:error', loadStartedAt);
+          logMemorySnapshot('waveform:load:error');
+          setIsWaveformLoading(false);
+        }
+        console.error('[useWaveSurfer] Failed to load audio:', error);
+      }
+    };
+
+    loadAudio();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [audioUrl]);
+
+  return {
+    containerRef,
+    isPlaying,
+    isWaveformLoading,
+    selection,
+    playPause: () => {
+      const waveSurfer = waveSurferRef.current;
+      if (!waveSurfer) {
+        return;
+      }
+
+      const duration = durationRef.current;
+      const { start, end } = selectionRef.current;
+      const epsilon = 0.03;
+      const hasPartialSelection = duration > epsilon && start > epsilon && end < duration - epsilon;
+
+      if (!waveSurfer.isPlaying() && hasPartialSelection) {
+        const currentTime = waveSurfer.getCurrentTime();
+        if (currentTime < start || currentTime > end) {
+          waveSurfer.seekTo(start / duration);
+        }
+      }
+
+      waveSurfer.playPause();
+    },
+    seekTo: (time: number) => {
+      const waveSurfer = waveSurferRef.current;
+      if (!waveSurfer) {
+        return;
+      }
+
+      const duration = waveSurfer.getDuration();
+      if (!duration) {
+        return;
+      }
+
+      waveSurfer.seekTo(time / duration);
+    },
+    setSelection: (start: number, end: number) => {
+      const region = regionsPluginRef.current?.getRegions().find((item: Region) => item.id === 'selection');
+      if (!region) {
+        return;
+      }
+
+      const nextStart = Math.max(0, Math.min(start, end));
+      const nextEnd = Math.max(nextStart, end);
+
+      try {
+        region.setOptions({ start: nextStart, end: nextEnd });
+      } catch (error) {
+        debugLog('[useWaveSurfer] Ignoring stale region update:', error);
+        return;
+      }
+
+      const nextSelection = { start: nextStart, end: nextEnd };
+      selectionRef.current = nextSelection;
+      setSelection(nextSelection);
+    },
+    getVolume: () => waveSurferRef.current?.getVolume() ?? 0.5,
+    setVolume: (volume: number) => {
+      waveSurferRef.current?.setVolume(Math.max(0, Math.min(1, volume)));
+    },
+  };
+}

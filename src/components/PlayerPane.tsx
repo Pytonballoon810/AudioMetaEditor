@@ -1,0 +1,246 @@
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CropIcon, FirstBracketIcon, ScissorIcon, SecondBracketIcon, Select02Icon } from '@hugeicons/core-free-icons';
+import type { AudioLibraryItem } from '../types';
+import { formatBitrate, formatDuration } from '../lib/format';
+import { useWaveSurfer } from '../hooks/useWaveSurfer';
+
+export type PlayerPaneHandle = {
+  playPause: () => void;
+};
+
+type PlayerPaneProps = {
+  item: AudioLibraryItem | null;
+  onExportClip: (startTime: number, endTime: number) => Promise<void>;
+  onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
+  isExporting: boolean;
+  isEditingSelection: boolean;
+};
+
+export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
+  { item, onExportClip, onEditSelection, isExporting, isEditingSelection },
+  ref,
+) {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const audioUrl = item ? item.path : null;
+
+  const handleReady = useCallback((loadedDuration: number) => {
+    setDuration(loadedDuration);
+    setCurrentTime(0);
+  }, []);
+
+  const {
+    containerRef,
+    isPlaying,
+    isWaveformLoading,
+    playPause,
+    selection,
+    setSelection,
+    seekTo,
+    setVolume: setWaveSurferVolume,
+  } = useWaveSurfer({
+    audioUrl,
+    onReady: handleReady,
+    onTimeUpdate: setCurrentTime,
+  });
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      playPause,
+    }),
+    [playPause],
+  );
+
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    setWaveSurferVolume(newVolume);
+  };
+
+  useEffect(() => {
+    if (!item) {
+      setCurrentTime(0);
+      setDuration(0);
+    }
+  }, [item]);
+
+  const hasValidSelection = selection.end > selection.start + 0.01;
+  const canCutSelection =
+    hasValidSelection && duration > 0.01 && !(selection.start <= 0.01 && selection.end >= duration - 0.01);
+
+  const setSelectionStartToPlayhead = () => {
+    const nextStart = Math.max(0, Math.min(currentTime, selection.end));
+    setSelection(nextStart, Math.max(nextStart, selection.end));
+  };
+
+  const setSelectionEndToPlayhead = () => {
+    const nextEnd = Math.max(selection.start, Math.min(currentTime, duration || selection.end));
+    setSelection(selection.start, nextEnd);
+  };
+
+  const setSelectionToFullTrack = () => {
+    const fullDuration = duration || item?.metadata.duration || 0;
+    setSelection(0, fullDuration);
+  };
+
+  return (
+    <section className="panel player-panel">
+      <div className="hero-card">
+        <div>
+          <p className="eyebrow">Now playing</p>
+          <h1>{item?.metadata.title || item?.name || 'AudioMetaEditor'}</h1>
+          <p className="hero-subtitle">
+            {item
+              ? `${item.metadata.artist || 'Unknown artist'} • ${item.directory}`
+              : 'Load a file or a directory to start playback and editing.'}
+          </p>
+        </div>
+        <div className="hero-stats">
+          <span>{item?.extension.toUpperCase() || '--'}</span>
+          <span>{item ? formatBitrate(item.metadata.bitrate) : 'No file'}</span>
+          <span>{item ? `${item.metadata.sampleRate || 0} Hz` : 'Waveform idle'}</span>
+        </div>
+      </div>
+
+      <div aria-label="Waveform editing toolbar" className="wave-edit-toolbar" role="toolbar">
+        <div className="daw-toolbar-group">
+          <button
+            aria-label="Set selection start at playhead"
+            className="daw-tool-button"
+            disabled={!item}
+            onClick={setSelectionStartToPlayhead}
+            title="Set selection start at playhead"
+            type="button"
+          >
+            <HugeiconsIcon icon={FirstBracketIcon} size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label="Set selection end at playhead"
+            className="daw-tool-button"
+            disabled={!item}
+            onClick={setSelectionEndToPlayhead}
+            title="Set selection end at playhead"
+            type="button"
+          >
+            <HugeiconsIcon icon={SecondBracketIcon} size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label="Select full track"
+            className="daw-tool-button"
+            disabled={!item}
+            onClick={setSelectionToFullTrack}
+            title="Select full track"
+            type="button"
+          >
+            <HugeiconsIcon icon={Select02Icon} size={18} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <span aria-hidden="true" className="daw-toolbar-divider" />
+
+        <div className="daw-toolbar-group">
+          <button
+            aria-label={isEditingSelection ? 'Processing trim operation' : 'Trim to selection'}
+            className="daw-tool-button daw-tool-button-accent"
+            disabled={!item || !hasValidSelection || isEditingSelection}
+            onClick={() => void onEditSelection('trim', selection.start, selection.end)}
+            title={isEditingSelection ? 'Processing trim operation' : 'Trim to selection'}
+            type="button"
+          >
+            <HugeiconsIcon icon={CropIcon} size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label={isEditingSelection ? 'Processing cut operation' : 'Cut selection out'}
+            className="daw-tool-button daw-tool-button-accent"
+            disabled={!item || !canCutSelection || isEditingSelection}
+            onClick={() => void onEditSelection('cut', selection.start, selection.end)}
+            title={isEditingSelection ? 'Processing cut operation' : 'Cut selection out'}
+            type="button"
+          >
+            <HugeiconsIcon icon={ScissorIcon} size={18} strokeWidth={1.8} />
+          </button>
+        </div>
+      </div>
+
+      <div className="wave-shell">
+        <div className="wave-topline">
+          <span>{formatDuration(currentTime)}</span>
+          <span>{item ? formatDuration(duration || item.metadata.duration) : '00:00'}</span>
+        </div>
+        <div className="wave-area">
+          <div className="waveform" ref={containerRef} />
+          {item && isWaveformLoading ? (
+            <div className="waveform-loading" role="status" aria-live="polite">
+              <div className="waveform-spinner" aria-hidden="true" />
+              <span>Loading waveform...</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="transport-row">
+        <button className="primary-button transport-play-button" disabled={!item} onClick={playPause} type="button">
+          {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <button className="secondary-button" disabled={!item} onClick={() => seekTo(selection.start)} type="button">
+          Jump to selection
+        </button>
+        <div className="selection-grid">
+          <label>
+            Start
+            <input
+              min={0}
+              step={0.01}
+              type="number"
+              value={selection.start.toFixed(2)}
+              onChange={(event) =>
+                setSelection(Number(event.target.value), Math.max(Number(event.target.value), selection.end))
+              }
+            />
+          </label>
+          <label>
+            End
+            <input
+              min={selection.start}
+              step={0.01}
+              type="number"
+              value={selection.end.toFixed(2)}
+              onChange={(event) => setSelection(selection.start, Number(event.target.value))}
+            />
+          </label>
+        </div>
+        <button
+          className="accent-button"
+          disabled={!item || selection.end <= selection.start || isExporting}
+          onClick={() => void onExportClip(selection.start, selection.end)}
+          type="button"
+        >
+          {isExporting ? 'Exporting clip...' : 'Export selection'}
+        </button>
+      </div>
+
+      <div className="detail-strip">
+        <span>Codec: {item?.metadata.codec || 'Unknown'}</span>
+        <span>Duration: {item ? formatDuration(item.metadata.duration) : '--'}</span>
+        <span>Composer: {item?.metadata.composer || '—'}</span>
+        <span>Producer: {item?.metadata.producer || '—'}</span>
+        <div className="volume-control">
+          <label htmlFor="volume-slider">Volume</label>
+          <input
+            id="volume-slider"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={volume}
+            onChange={(e) => handleVolumeChange(Number(e.target.value))}
+            disabled={!item}
+          />
+          <span>{Math.round(volume * 100)}%</span>
+        </div>
+      </div>
+    </section>
+  );
+});
