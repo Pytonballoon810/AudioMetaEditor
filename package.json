@@ -75,6 +75,7 @@
         "deb",
         "rpm"
       ],
+      "icon": "build/icons/linux/512x512.png",
       "category": "AudioVideo",
       "maintainer": "pytonballoon810 <pytonballoon810@users.noreply.github.com>",
       "mimeTypes": [
@@ -83,10 +84,14 @@
         "audio/x-wav"
       ]
     },
+    "mac": {
+      "icon": "build/icons/mac/icon.icns"
+    },
     "win": {
       "target": [
         "nsis"
       ],
+      "icon": "build/icons/win/icon.ico",
       "artifactName": "${productName}-${version}-setup-${arch}.${ext}"
     },
     "fileAssociations": [
