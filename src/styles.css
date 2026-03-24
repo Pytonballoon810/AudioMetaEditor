@@ -1023,9 +1023,88 @@ textarea {
   white-space: nowrap;
 }
 
+.daw-toolbar-pending-wrap {
+  margin-left: 0.35rem;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.daw-toolbar-pending-popover {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.45rem);
+  min-width: 320px;
+  max-width: 420px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0.5rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(11, 16, 21, 0.96);
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.38);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  z-index: 8;
+}
+
+.daw-toolbar-pending-wrap:hover .daw-toolbar-pending-popover,
+.daw-toolbar-pending-wrap:focus-within .daw-toolbar-pending-popover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.daw-pending-row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.38rem 0.42rem;
+  border-radius: 8px;
+}
+
+.daw-pending-row + .daw-pending-row {
+  margin-top: 0.22rem;
+}
+
+.daw-pending-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.daw-pending-row strong {
+  font-size: 0.77rem;
+  color: var(--text);
+}
+
+.daw-pending-row span {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .wave-area {
   min-height: 240px;
   position: relative;
+}
+
+.wave-edit-guides {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 3;
+}
+
+.wave-edit-guide-segment {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(128, 136, 148, 0.36);
+  border-left: 1px dashed rgba(255, 255, 255, 0.25);
+  border-right: 1px dashed rgba(255, 255, 255, 0.25);
 }
 
 .waveform-loading {

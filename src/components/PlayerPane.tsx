@@ -24,6 +24,54 @@ type PendingWaveEdit = {
   label: string;
 };
 
+type RemovedRangeGuide = {
+  startTime: number;
+  endTime: number;
+  label: string;
+};
+
+function formatEditTime(seconds: number) {
+  return `${formatDuration(seconds)} (${seconds.toFixed(2)}s)`;
+}
+
+function buildRemovedRanges(edit: PendingWaveEdit, trackDuration: number): RemovedRangeGuide[] {
+  const normalizedStart = Math.max(0, Math.min(edit.startTime, trackDuration));
+  const normalizedEnd = Math.max(normalizedStart, Math.min(edit.endTime, trackDuration));
+
+  if (normalizedEnd <= normalizedStart) {
+    return [];
+  }
+
+  if (edit.mode === 'cut') {
+    return [
+      {
+        startTime: normalizedStart,
+        endTime: normalizedEnd,
+        label: `${edit.label} (${formatEditTime(normalizedStart)} - ${formatEditTime(normalizedEnd)})`,
+      },
+    ];
+  }
+
+  const removedRanges: RemovedRangeGuide[] = [];
+  if (normalizedStart > 0.01) {
+    removedRanges.push({
+      startTime: 0,
+      endTime: normalizedStart,
+      label: `Trim removes start (${formatEditTime(0)} - ${formatEditTime(normalizedStart)})`,
+    });
+  }
+
+  if (normalizedEnd < trackDuration - 0.01) {
+    removedRanges.push({
+      startTime: normalizedEnd,
+      endTime: trackDuration,
+      label: `Trim removes end (${formatEditTime(normalizedEnd)} - ${formatEditTime(trackDuration)})`,
+    });
+  }
+
+  return removedRanges;
+}
+
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
   { item, onExportClip, onEditSelection, isExporting, isEditingSelection },
   ref,
@@ -31,7 +79,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [pendingEdit, setPendingEdit] = useState<PendingWaveEdit | null>(null);
+  const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const audioUrl = item ? item.path : null;
 
   const handleReady = useCallback((loadedDuration: number) => {
@@ -71,12 +119,12 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     if (!item) {
       setCurrentTime(0);
       setDuration(0);
-      setPendingEdit(null);
+      setPendingEdits([]);
     }
   }, [item]);
 
   useEffect(() => {
-    setPendingEdit(null);
+    setPendingEdits([]);
   }, [item?.path]);
 
   const hasValidSelection = selection.end > selection.start + 0.01;
@@ -108,22 +156,36 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
       return;
     }
 
-    setPendingEdit({
-      mode,
-      startTime,
-      endTime,
-      label,
-    });
+    setPendingEdits((current) => [
+      ...current,
+      {
+        mode,
+        startTime,
+        endTime,
+        label,
+      },
+    ]);
   };
 
   const savePendingEdit = async () => {
-    if (!pendingEdit || isEditingSelection) {
+    if (pendingEdits.length === 0 || isEditingSelection) {
       return;
     }
 
-    await onEditSelection(pendingEdit.mode, pendingEdit.startTime, pendingEdit.endTime);
-    setPendingEdit(null);
+    const [nextEdit, ...remaining] = pendingEdits;
+    if (!nextEdit) {
+      return;
+    }
+
+    await onEditSelection(nextEdit.mode, nextEdit.startTime, nextEdit.endTime);
+    setPendingEdits(remaining);
   };
+
+  const firstPendingEdit = pendingEdits.length > 0 ? pendingEdits[0] : null;
+
+  const removedRangeGuides = effectiveDuration
+    ? pendingEdits.flatMap((edit) => buildRemovedRanges(edit, effectiveDuration))
+    : [];
 
   return (
     <section className="panel player-panel">
@@ -232,18 +294,38 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
 
         <div className="daw-toolbar-group">
           <button
-            aria-label={isEditingSelection ? 'Saving pending waveform edit' : 'Save pending waveform edit'}
+            aria-label={isEditingSelection ? 'Saving next pending waveform edit' : 'Save next pending waveform edit'}
             className="daw-tool-button daw-tool-button-save"
-            disabled={!pendingEdit || isEditingSelection}
+            disabled={pendingEdits.length === 0 || isEditingSelection}
             onClick={() => void savePendingEdit()}
-            title={pendingEdit ? `Save pending edit: ${pendingEdit.label}` : 'No pending edit to save'}
+            title={
+              firstPendingEdit ? `Save next pending edit: ${firstPendingEdit.label}` : 'No pending edit to save'
+            }
             type="button"
           >
             <HugeiconsIcon icon={SaveIcon} size={18} strokeWidth={1.8} />
           </button>
-          <span className="daw-toolbar-pending" role="status" aria-live="polite">
-            {pendingEdit ? `Pending: ${pendingEdit.label}` : 'No pending edit'}
-          </span>
+          <div className="daw-toolbar-pending-wrap" role="status" aria-live="polite">
+            <span className="daw-toolbar-pending">
+              {pendingEdits.length === 0
+                ? 'No pending edits'
+                : pendingEdits.length === 1 && firstPendingEdit
+                  ? `Pending: ${firstPendingEdit.label}`
+                  : `Pending edits: ${pendingEdits.length}`}
+            </span>
+            {pendingEdits.length > 0 ? (
+              <div className="daw-toolbar-pending-popover">
+                {pendingEdits.map((edit, index) => (
+                  <div key={`${edit.mode}-${edit.startTime}-${edit.endTime}-${index}`} className="daw-pending-row">
+                    <strong>{index + 1}. {edit.label}</strong>
+                    <span>
+                      {edit.mode.toUpperCase()} {formatEditTime(edit.startTime)} - {formatEditTime(edit.endTime)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -254,6 +336,23 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         </div>
         <div className="wave-area">
           <div className="waveform" ref={containerRef} />
+          {removedRangeGuides.length > 0 ? (
+            <div className="wave-edit-guides" aria-hidden="true">
+              {removedRangeGuides.map((guide, index) => {
+                const left = (guide.startTime / effectiveDuration) * 100;
+                const width = ((guide.endTime - guide.startTime) / effectiveDuration) * 100;
+
+                return (
+                  <div
+                    key={`${guide.startTime}-${guide.endTime}-${index}`}
+                    className="wave-edit-guide-segment"
+                    style={{ left: `${left}%`, width: `${width}%` }}
+                    title={guide.label}
+                  />
+                );
+              })}
+            </div>
+          ) : null}
           {item && isWaveformLoading ? (
             <div className="waveform-loading" role="status" aria-live="polite">
               <div className="waveform-spinner" aria-hidden="true" />
