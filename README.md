@@ -186,6 +186,7 @@ src/
 - `docs/migrations/0.2.0-rc.1.md`
 - `docs/release-readiness-checklist.md`
 - `docs/releases/0.2.0-rc.1.md`
+- `docs/releases/0.2.0-rc.2.md`
 - `docs/security-hardening-checklist.md`
 - `docs/validation.md`
 

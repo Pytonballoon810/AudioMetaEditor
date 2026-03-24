@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.0-rc.2] - 2026-03-24
+
+### Fixed
+
+- Resolved CSP regression that blocked WaveSurfer from loading `data:audio/*` URLs by allowing `data:` in `connect-src`.
+- Removed `frame-ancestors` from meta CSP to avoid ignored-directive noise and false confidence.
+
+### Added
+
+- Added CSP regression tests in `tests/csp.test.ts` to ensure:
+  - CSP meta remains present.
+  - `connect-src` includes `data:` for waveform `data:` fetches.
+  - `frame-ancestors` is not used in meta CSP.
+
 ## [0.2.0-rc.1] - 2026-03-24
 
 ### Added

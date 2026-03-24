@@ -1,6 +1,6 @@
 {
   "name": "audio-meta-editor",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "description": "Desktop audio player with waveform playback, metadata editing, and basic cutting tools.",
   "homepage": "https://github.com/pytonballoon810/AudioMetaEditor",
   "main": "electron/main.js",
