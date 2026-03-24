@@ -463,7 +463,6 @@ export function MetadataEditor({
               type="button"
             >
               <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
-              <span>{isWandActive ? 'Wand on' : 'Magic wand'}</span>
             </button>
             <button
               className="secondary-button"
