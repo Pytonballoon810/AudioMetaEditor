@@ -962,6 +962,7 @@ textarea {
 }
 
 .daw-tool-button {
+  box-sizing: border-box;
   width: 2.15rem;
   height: 2.15rem;
   border-radius: 0.48rem;
@@ -1198,25 +1199,40 @@ textarea {
   --cover-group-gap: 0.32rem;
   --cover-toolbar-pad-x: 0.65rem;
   --cover-divider-width: 1px;
-  --cover-replace-width: 4.5rem;
+  --cover-toolbar-edge-buffer: 2px;
   --cover-toolbar-comfort-width: 1.1rem;
+  --cover-card-pad-x: 0.8rem;
+  --cover-card-pad-y: 0.8rem;
   --cover-toolbar-min-width: calc(
     (var(--cover-tool-size) * 6) +
       (var(--cover-group-gap) * 2) +
-      var(--cover-replace-width) +
       (var(--cover-toolbar-gap) * 6) +
       (var(--cover-divider-width) * 3) +
-      (var(--cover-toolbar-pad-x) * 2)
+      (var(--cover-toolbar-pad-x) * 2) +
+      var(--cover-toolbar-edge-buffer)
   );
   display: grid;
+  box-sizing: border-box;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.72rem;
   justify-items: stretch;
-  width: min(100%, calc(var(--cover-toolbar-min-width) + var(--cover-toolbar-comfort-width)));
-  padding: 0.8rem;
+  width: min(
+    100%,
+    calc(
+      var(--cover-toolbar-min-width) +
+        var(--cover-toolbar-comfort-width) +
+        (var(--cover-card-pad-x) * 2)
+    )
+  );
+  padding: var(--cover-card-pad-y) var(--cover-card-pad-x);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012));
   margin-bottom: 0.8rem;
+}
+
+.cover-card > * {
+  min-width: 0;
 }
 
 .cover-image-editor {
@@ -1252,6 +1268,7 @@ textarea {
   width: 100%;
   max-width: 100%;
   align-self: stretch;
+  box-sizing: border-box;
   padding: 0.55rem var(--cover-toolbar-pad-x);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
@@ -1263,39 +1280,7 @@ textarea {
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.45rem;
-  overflow-x: hidden;
-}
-
-.cover-toolbar-action {
-  width: var(--cover-replace-width);
-  height: 2.15rem;
-  border-radius: 0.48rem;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(180deg, rgba(66, 76, 88, 0.86), rgba(35, 41, 48, 0.94));
-  color: #dbe4ee;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease,
-    transform 120ms ease,
-    color 120ms ease;
-}
-
-.cover-toolbar-action:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(158, 224, 255, 0.58);
-  background: linear-gradient(180deg, rgba(86, 98, 113, 0.9), rgba(42, 49, 58, 0.98));
-  color: #ffffff;
-}
-
-.cover-toolbar-action:focus-visible {
-  outline: 2px solid rgba(117, 201, 255, 0.72);
-  outline-offset: 1px;
+  overflow-x: clip;
 }
 
 .cover-tool-active {
