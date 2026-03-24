@@ -1,6 +1,6 @@
 # AudioMetaEditor
 
-![AudioMetaEditor promotional image showing the app UI with library, player, and metadata panes](./assets/SimpleDAWpromo.png)
+![AudioMetaEditor promotional image showing the app UI with library, player, and metadata panes](./src/assets/SimpleDAWpromo.png)
 
 The DAW that is not really a DAW.
 
