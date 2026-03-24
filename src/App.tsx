@@ -12,6 +12,27 @@ import { useLibraryDerivations } from './features/library/useLibraryDerivations'
 import { toUserErrorMessage } from './lib/errors';
 import { endPerfTimer, logMemorySnapshot, startPerfTimer } from './lib/performance';
 
+const LAYOUT_METADATA_WIDTH_KEY = 'audioMetaEditor:layout:metadataWidth';
+const LAYOUT_STATUS_HEIGHT_KEY = 'audioMetaEditor:layout:statusHeight';
+
+function readStoredDimension(key: string, min: number, max: number, fallback: number) {
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  const raw = window.localStorage.getItem(key);
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, Math.round(parsed)));
+}
+
 export default function App() {
   const MIN_METADATA_WIDTH = 320;
   const MAX_METADATA_WIDTH = 760;
@@ -23,8 +44,12 @@ export default function App() {
   const [status, setStatus] = useState('Open a file or directory to start.');
   const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState('');
-  const [metadataWidth, setMetadataWidth] = useState(400);
-  const [statusHeight, setStatusHeight] = useState(92);
+  const [metadataWidth, setMetadataWidth] = useState(() =>
+    readStoredDimension(LAYOUT_METADATA_WIDTH_KEY, MIN_METADATA_WIDTH, MAX_METADATA_WIDTH, 400),
+  );
+  const [statusHeight, setStatusHeight] = useState(() =>
+    readStoredDimension(LAYOUT_STATUS_HEIGHT_KEY, MIN_STATUS_HEIGHT, MAX_STATUS_HEIGHT, 92),
+  );
   const [isMetadataResizing, setIsMetadataResizing] = useState(false);
   const [isStatusResizing, setIsStatusResizing] = useState(false);
   const playerPaneRef = useRef<PlayerPaneHandle>(null);
@@ -85,6 +110,22 @@ export default function App() {
   const resetStatusHeight = () => {
     setStatusHeight(92);
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(LAYOUT_METADATA_WIDTH_KEY, String(Math.round(metadataWidth)));
+  }, [metadataWidth]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(LAYOUT_STATUS_HEIGHT_KEY, String(Math.round(statusHeight)));
+  }, [statusHeight]);
 
   useEffect(() => {
     if (!isMetadataResizing) {

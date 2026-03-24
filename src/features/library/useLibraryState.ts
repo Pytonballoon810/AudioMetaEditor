@@ -20,6 +20,7 @@ const MIN_LIBRARY_WIDTH = 280;
 const MAX_LIBRARY_WIDTH = 720;
 const LAST_OPENED_PATHS_KEY = 'audioMetaEditor:lastOpenedPaths';
 const LAST_ACTIVE_PATH_KEY = 'audioMetaEditor:lastActivePath';
+const LAYOUT_LIBRARY_WIDTH_KEY = 'audioMetaEditor:layout:libraryWidth';
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -59,12 +60,32 @@ function estimateLibraryWidth(items: AudioLibraryItem[]) {
   return clamp(Math.ceil(estimated), 320, MAX_LIBRARY_WIDTH);
 }
 
+function readStoredLibraryWidth() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = window.localStorage.getItem(LAYOUT_LIBRARY_WIDTH_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return clamp(Math.round(parsed), MIN_LIBRARY_WIDTH, MAX_LIBRARY_WIDTH);
+}
+
 export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
   const [library, setLibrary] = useState<AudioLibraryItem[]>([]);
   const [activePath, setActivePath] = useState<string | null>(null);
   const [loadedSourcePaths, setLoadedSourcePaths] = useState<string[]>([]);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
-  const [libraryWidth, setLibraryWidth] = useState(320);
+  const initialLibraryWidthRef = useRef<number | null>(readStoredLibraryWidth());
+  const hasUserLayoutPreferenceRef = useRef(initialLibraryWidthRef.current !== null);
+  const [libraryWidth, setLibraryWidth] = useState(initialLibraryWidthRef.current ?? 320);
   const [isLibraryResizing, setIsLibraryResizing] = useState(false);
   const layoutRef = useRef<HTMLElement | null>(null);
   const audioMetaApi = getAudioMetaApi();
@@ -92,7 +113,9 @@ export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
 
         setLibrary(items);
         setLoadedSourcePaths(paths);
-        setLibraryWidth(estimateLibraryWidth(items));
+        if (!hasUserLayoutPreferenceRef.current) {
+          setLibraryWidth(estimateLibraryWidth(items));
+        }
         setActivePath(nextActivePath);
         setStatus(
           items.length > 0
@@ -120,12 +143,22 @@ export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
 
   const startLibraryResize = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
+    hasUserLayoutPreferenceRef.current = true;
     setIsLibraryResizing(true);
   }, []);
 
   const resetLibraryWidth = useCallback(() => {
+    hasUserLayoutPreferenceRef.current = true;
     setLibraryWidth(estimateLibraryWidth(library));
   }, [library]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(LAYOUT_LIBRARY_WIDTH_KEY, String(Math.round(libraryWidth)));
+  }, [libraryWidth]);
 
   useEffect(() => {
     if (!isLibraryResizing) {
