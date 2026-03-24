@@ -938,10 +938,10 @@ textarea {
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 0.45rem;
   align-items: center;
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .daw-toolbar-group {
@@ -1033,7 +1033,7 @@ textarea {
 .daw-toolbar-pending-popover {
   position: absolute;
   left: 0;
-  top: calc(100% + 0.45rem);
+  bottom: calc(100% + 0.45rem);
   min-width: 320px;
   max-width: 420px;
   max-height: 220px;
