@@ -161,6 +161,11 @@ describe('cover art parsing and normalization', () => {
     expect(detectImageFormat(webp)).toEqual({ mimeType: 'image/webp', extension: 'webp' });
   });
 
+  it('detects png signature for fallback-extracted cover bytes', () => {
+    const extractedPngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+    expect(detectImageFormat(extractedPngBytes)).toEqual({ mimeType: 'image/png', extension: 'png' });
+  });
+
   it('normalizes cover art only for valid signatures', () => {
     const jpeg = { mimeType: 'image/png', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0]) };
     const invalid = { mimeType: 'image/png', buffer: Buffer.from([0x00, 0x01, 0x02, 0x03]) };

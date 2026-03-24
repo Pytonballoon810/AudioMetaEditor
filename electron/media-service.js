@@ -235,8 +235,31 @@ async function extractCoverArtFromVideoStreams(filePath) {
       return null;
     }
 
-    // Assume video streams in audio files are cover images and extract the best candidate.
-    const extractArgs = [
+    // Prefer copying the embedded picture bytes to avoid losing alpha in re-encode.
+    const copyArgs = [
+      '-v',
+      'error',
+      '-i',
+      filePath,
+      '-map',
+      `0:${candidate.index}`,
+      '-frames:v',
+      '1',
+      '-c:v',
+      'copy',
+      '-f',
+      'image2pipe',
+      'pipe:1',
+    ];
+
+    const copiedImageBuffer = await runCommandCapture(ffmpegPath, copyArgs, true);
+    const copiedDetected = detectImageFormat(copiedImageBuffer);
+    if (copiedImageBuffer?.length && copiedDetected?.mimeType) {
+      return bufferToDataUrl(copiedImageBuffer, copiedDetected.mimeType);
+    }
+
+    // Some formats/codecs cannot be piped as-is; transcode to PNG as fallback.
+    const transcodeArgs = [
       '-v',
       'error',
       '-i',
@@ -252,14 +275,14 @@ async function extractCoverArtFromVideoStreams(filePath) {
       'pipe:1',
     ];
 
-    const imageBuffer = await runCommandCapture(ffmpegPath, extractArgs, true);
-    if (!imageBuffer || imageBuffer.length === 0) {
+    const transcodedImageBuffer = await runCommandCapture(ffmpegPath, transcodeArgs, true);
+    if (!transcodedImageBuffer || transcodedImageBuffer.length === 0) {
       return null;
     }
 
-    const detected = detectImageFormat(imageBuffer);
+    const detected = detectImageFormat(transcodedImageBuffer);
     const mimeType = detected?.mimeType || 'image/png';
-    return bufferToDataUrl(imageBuffer, mimeType);
+    return bufferToDataUrl(transcodedImageBuffer, mimeType);
   } catch (error) {
     console.warn('[extractCoverArtFromVideoStreams] Unable to extract cover art for', filePath, error);
     return null;
