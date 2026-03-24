@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { LibraryPane } from './components/LibraryPane';
 import { MetadataEditor } from './components/MetadataEditor';
 import { PlayerPane, type PlayerPaneHandle } from './components/PlayerPane';
@@ -13,11 +13,22 @@ import { toUserErrorMessage } from './lib/errors';
 import { endPerfTimer, logMemorySnapshot, startPerfTimer } from './lib/performance';
 
 export default function App() {
+  const MIN_METADATA_WIDTH = 320;
+  const MAX_METADATA_WIDTH = 760;
+  const MIN_STATUS_HEIGHT = 56;
+  const MAX_STATUS_HEIGHT = 280;
+  const MIN_PLAYER_HEIGHT = 260;
+
   const startupTimerRef = useRef<number | null>(startPerfTimer());
   const [status, setStatus] = useState('Open a file or directory to start.');
   const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState('');
+  const [metadataWidth, setMetadataWidth] = useState(400);
+  const [statusHeight, setStatusHeight] = useState(92);
+  const [isMetadataResizing, setIsMetadataResizing] = useState(false);
+  const [isStatusResizing, setIsStatusResizing] = useState(false);
   const playerPaneRef = useRef<PlayerPaneHandle>(null);
+  const mainColumnRef = useRef<HTMLDivElement | null>(null);
   const {
     audioMetaApi,
     library,
@@ -27,6 +38,7 @@ export default function App() {
     loadedSourcePaths,
     setLoadedSourcePaths,
     isLoadingLibrary,
+    libraryWidth,
     setLibraryWidth,
     isLibraryResizing,
     layoutRef,
@@ -36,6 +48,108 @@ export default function App() {
     resetLibraryWidth,
     estimateLibraryWidthForItems,
   } = useLibraryState({ setStatus });
+
+  const isAnyResizing = isLibraryResizing || isMetadataResizing || isStatusResizing;
+
+  const composedLayoutStyle = useMemo(
+    () =>
+      ({
+        ...layoutStyle,
+        '--metadata-width': `${metadataWidth}px`,
+      }) as CSSProperties,
+    [layoutStyle, metadataWidth],
+  );
+
+  const mainColumnStyle = useMemo(
+    () =>
+      ({
+        '--status-height': `${statusHeight}px`,
+      }) as CSSProperties,
+    [statusHeight],
+  );
+
+  const startMetadataResize = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsMetadataResizing(true);
+  };
+
+  const resetMetadataWidth = () => {
+    setMetadataWidth(400);
+  };
+
+  const startStatusResize = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsStatusResizing(true);
+  };
+
+  const resetStatusHeight = () => {
+    setStatusHeight(92);
+  };
+
+  useEffect(() => {
+    if (!isMetadataResizing) {
+      return;
+    }
+
+    const onMouseMove = (event: MouseEvent) => {
+      const layout = layoutRef.current;
+      if (!layout) {
+        return;
+      }
+
+      const bounds = layout.getBoundingClientRect();
+      const desiredWidth = bounds.right - event.clientX;
+      const availableForMainAndMeta = bounds.width - libraryWidth - 12;
+      const maxByAvailableSpace = Math.max(MIN_METADATA_WIDTH, availableForMainAndMeta - 420);
+      const maxWidth = Math.min(MAX_METADATA_WIDTH, maxByAvailableSpace);
+      const nextWidth = Math.max(MIN_METADATA_WIDTH, Math.min(desiredWidth, maxWidth));
+      setMetadataWidth(nextWidth);
+    };
+
+    const onMouseUp = () => {
+      setIsMetadataResizing(false);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isMetadataResizing, layoutRef, libraryWidth]);
+
+  useEffect(() => {
+    if (!isStatusResizing) {
+      return;
+    }
+
+    const onMouseMove = (event: MouseEvent) => {
+      const mainColumn = mainColumnRef.current;
+      if (!mainColumn) {
+        return;
+      }
+
+      const bounds = mainColumn.getBoundingClientRect();
+      const desiredStatusHeight = bounds.bottom - event.clientY;
+      const maxByAvailableSpace = Math.max(MIN_STATUS_HEIGHT, bounds.height - MIN_PLAYER_HEIGHT - 12);
+      const maxHeight = Math.min(MAX_STATUS_HEIGHT, maxByAvailableSpace);
+      const nextHeight = Math.max(MIN_STATUS_HEIGHT, Math.min(desiredStatusHeight, maxHeight));
+      setStatusHeight(nextHeight);
+    };
+
+    const onMouseUp = () => {
+      setIsStatusResizing(false);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [isStatusResizing]);
 
   useDesktopBridgeSubscriptions({
     audioMetaApi,
@@ -156,7 +270,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className={`layout-grid${isLibraryResizing ? ' resizing' : ''}`} ref={layoutRef} style={layoutStyle}>
+      <main className={`layout-grid${isAnyResizing ? ' resizing' : ''}`} ref={layoutRef} style={composedLayoutStyle}>
         <LibraryPane
           items={library}
           currentPath={activeItem?.path ?? null}
@@ -173,7 +287,7 @@ export default function App() {
           role="separator"
         />
 
-        <div className="main-column">
+        <div className={`main-column${isStatusResizing ? ' resizing' : ''}`} ref={mainColumnRef} style={mainColumnStyle}>
           <PlayerPane
             ref={playerPaneRef}
             item={activeItem}
@@ -182,8 +296,25 @@ export default function App() {
             isEditingSelection={isEditingSelection}
             isExporting={isExporting}
           />
+          <div
+            aria-label="Resize status panel"
+            aria-orientation="horizontal"
+            className="status-resizer"
+            onDoubleClick={resetStatusHeight}
+            onMouseDown={startStatusResize}
+            role="separator"
+          />
           <div className="status-bar">{isLoadingLibrary ? 'Loading library...' : status}</div>
         </div>
+
+        <div
+          aria-label="Resize metadata panel"
+          aria-orientation="vertical"
+          className="metadata-resizer"
+          onDoubleClick={resetMetadataWidth}
+          onMouseDown={startMetadataResize}
+          role="separator"
+        />
 
         <MetadataEditor
           item={activeItem}

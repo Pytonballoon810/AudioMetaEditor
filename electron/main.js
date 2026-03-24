@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const fsSync = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu } = require('electron');
@@ -46,6 +47,22 @@ if (!singleInstanceLock) {
 let mainWindow = null;
 let pendingPaths = [];
 const MAX_AUDIO_BLOB_BYTES = 80 * 1024 * 1024;
+
+function resolveRuntimeIconPath() {
+  const byPlatform = {
+    linux: 'build/icons/linux/512x512.png',
+    win32: 'build/icons/win/icon.ico',
+    darwin: 'build/icons/mac/512x512.png',
+  };
+
+  const iconRelativePath = byPlatform[process.platform];
+  if (!iconRelativePath) {
+    return null;
+  }
+
+  const candidate = path.join(__dirname, '..', iconRelativePath);
+  return fsSync.existsSync(candidate) ? candidate : null;
+}
 
 async function moveFileWithFallback(sourcePath, destinationPath) {
   try {
@@ -145,6 +162,8 @@ function registerIpcHandler(channel, handler) {
 }
 
 async function createWindow() {
+  const runtimeIconPath = resolveRuntimeIconPath();
+
   mainWindow = new BrowserWindow({
     width: 1520,
     height: 940,
@@ -152,6 +171,7 @@ async function createWindow() {
     minHeight: 720,
     backgroundColor: '#121417',
     autoHideMenuBar: true,
+    ...(runtimeIconPath ? { icon: runtimeIconPath } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -223,6 +243,13 @@ app.on('second-instance', async (_event, argv) => {
 });
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin') {
+    const runtimeIconPath = resolveRuntimeIconPath();
+    if (runtimeIconPath) {
+      app.dock.setIcon(runtimeIconPath);
+    }
+  }
+
   protocol.handle('audio-meta', async (request) => {
     try {
       const filePath = decodeURIComponent(request.url.replace('audio-meta://', ''));

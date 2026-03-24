@@ -196,7 +196,12 @@ textarea {
   min-height: 0;
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(260px, var(--library-width, 320px)) 12px minmax(0, 1.5fr) minmax(320px, 400px);
+  grid-template-columns:
+    minmax(260px, var(--library-width, 320px))
+    12px
+    minmax(0, 1.5fr)
+    12px
+    minmax(320px, var(--metadata-width, 400px));
 }
 
 .layout-grid.resizing {
@@ -204,6 +209,13 @@ textarea {
 }
 
 .library-resizer {
+  position: relative;
+  cursor: col-resize;
+  border-radius: 12px;
+  margin: 0.35rem 0;
+}
+
+.metadata-resizer {
   position: relative;
   cursor: col-resize;
   border-radius: 12px;
@@ -220,15 +232,54 @@ textarea {
   transition: opacity 120ms ease;
 }
 
+.metadata-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 94, 168, 0.45), rgba(117, 201, 255, 0.35));
+  opacity: 0.28;
+  transition: opacity 120ms ease;
+}
+
 .library-resizer:hover::before,
-.layout-grid.resizing .library-resizer::before {
+.layout-grid.resizing .library-resizer::before,
+.metadata-resizer:hover::before,
+.layout-grid.resizing .metadata-resizer::before {
   opacity: 0.8;
 }
 
 .main-column {
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
   min-height: 0;
+  grid-template-rows: minmax(260px, 1fr) 12px minmax(56px, var(--status-height, 92px));
+}
+
+.main-column.resizing {
+  user-select: none;
+}
+
+.status-resizer {
+  position: relative;
+  cursor: row-resize;
+  border-radius: 10px;
+  margin: 0 0.35rem;
+}
+
+.status-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 94, 168, 0.45), rgba(117, 201, 255, 0.35));
+  opacity: 0.28;
+  transition: opacity 120ms ease;
+}
+
+.status-resizer:hover::before,
+.main-column.resizing .status-resizer::before {
+  opacity: 0.8;
 }
 
 .panel {
@@ -954,6 +1005,25 @@ textarea {
   color: #fff2f9;
 }
 
+.daw-tool-button-save {
+  border-color: rgba(129, 223, 170, 0.45);
+  background: linear-gradient(180deg, rgba(38, 76, 61, 0.9), rgba(30, 52, 44, 0.95));
+  color: #c6ffe0;
+}
+
+.daw-tool-button-save:hover:not(:disabled) {
+  border-color: rgba(165, 255, 203, 0.82);
+  background: linear-gradient(180deg, rgba(50, 97, 78, 0.92), rgba(35, 66, 54, 0.98));
+  color: #eafff3;
+}
+
+.daw-toolbar-pending {
+  margin-left: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 .wave-area {
   min-height: 240px;
   position: relative;
@@ -1247,6 +1317,10 @@ textarea {
     grid-template-columns: minmax(250px, var(--library-width, 320px)) 12px minmax(0, 1fr);
   }
 
+  .metadata-resizer {
+    display: none;
+  }
+
   .metadata-panel {
     grid-column: 1 / -1;
     min-height: 0;
@@ -1268,7 +1342,8 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .library-resizer {
+  .library-resizer,
+  .metadata-resizer {
     display: none;
   }
 

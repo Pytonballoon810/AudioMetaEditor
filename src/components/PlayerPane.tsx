@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { CropIcon, FirstBracketIcon, ScissorIcon, SecondBracketIcon, Select02Icon } from '@hugeicons/core-free-icons';
+import { CropIcon, FirstBracketIcon, SaveIcon, ScissorIcon, SecondBracketIcon, Select02Icon } from '@hugeicons/core-free-icons';
 import type { AudioLibraryItem } from '../types';
 import { formatBitrate, formatDuration } from '../lib/format';
 import { useWaveSurfer } from '../hooks/useWaveSurfer';
@@ -17,6 +17,13 @@ type PlayerPaneProps = {
   isEditingSelection: boolean;
 };
 
+type PendingWaveEdit = {
+  mode: 'trim' | 'cut';
+  startTime: number;
+  endTime: number;
+  label: string;
+};
+
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
   { item, onExportClip, onEditSelection, isExporting, isEditingSelection },
   ref,
@@ -24,6 +31,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [pendingEdit, setPendingEdit] = useState<PendingWaveEdit | null>(null);
   const audioUrl = item ? item.path : null;
 
   const handleReady = useCallback((loadedDuration: number) => {
@@ -63,12 +71,22 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     if (!item) {
       setCurrentTime(0);
       setDuration(0);
+      setPendingEdit(null);
     }
   }, [item]);
+
+  useEffect(() => {
+    setPendingEdit(null);
+  }, [item?.path]);
 
   const hasValidSelection = selection.end > selection.start + 0.01;
   const canCutSelection =
     hasValidSelection && duration > 0.01 && !(selection.start <= 0.01 && selection.end >= duration - 0.01);
+  const effectiveDuration = duration || item?.metadata.duration || 0;
+  const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
+  const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
+  const canCutAfterPlayhead =
+    Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
 
   const setSelectionStartToPlayhead = () => {
     const nextStart = Math.max(0, Math.min(currentTime, selection.end));
@@ -83,6 +101,28 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const setSelectionToFullTrack = () => {
     const fullDuration = duration || item?.metadata.duration || 0;
     setSelection(0, fullDuration);
+  };
+
+  const queueEdit = (mode: 'trim' | 'cut', startTime: number, endTime: number, label: string) => {
+    if (!item || endTime <= startTime + 0.01) {
+      return;
+    }
+
+    setPendingEdit({
+      mode,
+      startTime,
+      endTime,
+      label,
+    });
+  };
+
+  const savePendingEdit = async () => {
+    if (!pendingEdit || isEditingSelection) {
+      return;
+    }
+
+    await onEditSelection(pendingEdit.mode, pendingEdit.startTime, pendingEdit.endTime);
+    setPendingEdit(null);
   };
 
   return (
@@ -145,7 +185,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             aria-label={isEditingSelection ? 'Processing trim operation' : 'Trim to selection'}
             className="daw-tool-button daw-tool-button-accent"
             disabled={!item || !hasValidSelection || isEditingSelection}
-            onClick={() => void onEditSelection('trim', selection.start, selection.end)}
+            onClick={() => queueEdit('trim', selection.start, selection.end, 'Trim to selection')}
             title={isEditingSelection ? 'Processing trim operation' : 'Trim to selection'}
             type="button"
           >
@@ -155,12 +195,55 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             aria-label={isEditingSelection ? 'Processing cut operation' : 'Cut selection out'}
             className="daw-tool-button daw-tool-button-accent"
             disabled={!item || !canCutSelection || isEditingSelection}
-            onClick={() => void onEditSelection('cut', selection.start, selection.end)}
+            onClick={() => queueEdit('cut', selection.start, selection.end, 'Cut selection out')}
             title={isEditingSelection ? 'Processing cut operation' : 'Cut selection out'}
             type="button"
           >
             <HugeiconsIcon icon={ScissorIcon} size={18} strokeWidth={1.8} />
           </button>
+        </div>
+
+        <span aria-hidden="true" className="daw-toolbar-divider" />
+
+        <div className="daw-toolbar-group">
+          <button
+            aria-label={isEditingSelection ? 'Processing cut operation' : 'Remove audio before playhead'}
+            className="daw-tool-button daw-tool-button-accent"
+            disabled={!canCutBeforePlayhead || isEditingSelection}
+            onClick={() => queueEdit('cut', 0, clampedPlayhead, 'Remove audio before playhead')}
+            title={isEditingSelection ? 'Processing cut operation' : 'Remove audio before playhead'}
+            type="button"
+          >
+            <HugeiconsIcon icon={FirstBracketIcon} size={18} strokeWidth={1.8} />
+          </button>
+          <button
+            aria-label={isEditingSelection ? 'Processing cut operation' : 'Remove audio after playhead'}
+            className="daw-tool-button daw-tool-button-accent"
+            disabled={!canCutAfterPlayhead || isEditingSelection}
+            onClick={() => queueEdit('cut', clampedPlayhead, effectiveDuration, 'Remove audio after playhead')}
+            title={isEditingSelection ? 'Processing cut operation' : 'Remove audio after playhead'}
+            type="button"
+          >
+            <HugeiconsIcon icon={SecondBracketIcon} size={18} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <span aria-hidden="true" className="daw-toolbar-divider" />
+
+        <div className="daw-toolbar-group">
+          <button
+            aria-label={isEditingSelection ? 'Saving pending waveform edit' : 'Save pending waveform edit'}
+            className="daw-tool-button daw-tool-button-save"
+            disabled={!pendingEdit || isEditingSelection}
+            onClick={() => void savePendingEdit()}
+            title={pendingEdit ? `Save pending edit: ${pendingEdit.label}` : 'No pending edit to save'}
+            type="button"
+          >
+            <HugeiconsIcon icon={SaveIcon} size={18} strokeWidth={1.8} />
+          </button>
+          <span className="daw-toolbar-pending" role="status" aria-live="polite">
+            {pendingEdit ? `Pending: ${pendingEdit.label}` : 'No pending edit'}
+          </span>
         </div>
       </div>
 
