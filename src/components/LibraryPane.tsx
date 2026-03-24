@@ -269,6 +269,10 @@ export function LibraryPane({
         return;
       }
 
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+
       setIsAlbumModalCoverPickerOpen(false);
       setEditingAlbum(null);
     }
