@@ -91,12 +91,17 @@ function normalizeImageMimeType(format, buffer) {
   const raw = String(format || '')
     .trim()
     .toLowerCase();
+  const detected = detectImageFormat(toBinaryBuffer(buffer));
 
   if (raw.startsWith('image/')) {
-    if (raw === 'image/jpg') {
-      return 'image/jpeg';
+    const normalizedRaw = raw === 'image/jpg' ? 'image/jpeg' : raw;
+
+    // Some files carry incorrect format labels in tags; trust the byte signature when available.
+    if (detected?.mimeType && detected.mimeType !== normalizedRaw) {
+      return detected.mimeType;
     }
-    return raw;
+
+    return normalizedRaw;
   }
 
   const shorthands = {
@@ -108,11 +113,14 @@ function normalizeImageMimeType(format, buffer) {
   };
 
   if (shorthands[raw]) {
+    if (detected?.mimeType && detected.mimeType !== shorthands[raw]) {
+      return detected.mimeType;
+    }
+
     return shorthands[raw];
   }
 
   // Fall back to byte signature detection for non-standard/unknown tags.
-  const detected = detectImageFormat(toBinaryBuffer(buffer));
   return detected?.mimeType || null;
 }
 
@@ -499,7 +507,7 @@ async function saveMetadata(filePath, metadata) {
       '-c:a',
       'copy',
       '-c:v',
-      'mjpeg',
+      'copy',
       '-disposition:v:0',
       'attached_pic',
     );

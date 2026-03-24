@@ -132,6 +132,11 @@ describe('cover art parsing and normalization', () => {
     expect(normalizeImageMimeType('image/jpg', jpegBuffer)).toBe('image/jpeg');
   });
 
+  it('prefers detected image signature over incorrect declared format', () => {
+    const pngBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(normalizeImageMimeType('image/jpeg', pngBuffer)).toBe('image/png');
+  });
+
   it('parses valid data URLs', () => {
     const payload = Buffer.from([0xff, 0xd8, 0xff, 0xaa]).toString('base64');
     const parsed = parseDataUrl(`data:image/jpeg;base64,${payload}`);
