@@ -14,6 +14,7 @@ const {
   normalizeImageMimeType,
   bufferToDataUrl,
   parseDataUrl,
+  extensionFromMimeType,
   detectImageFormat,
   normalizeCoverArt,
   pickBestCoverPicture,
@@ -147,6 +148,14 @@ describe('cover art parsing and normalization', () => {
 
   it('returns null for invalid data URLs', () => {
     expect(parseDataUrl('not-a-data-url')).toBeNull();
+  });
+
+  it('maps image mime types to file extensions', () => {
+    expect(extensionFromMimeType('image/png')).toBe('png');
+    expect(extensionFromMimeType('image/jpeg')).toBe('jpg');
+    expect(extensionFromMimeType('image/jpg')).toBe('jpg');
+    expect(extensionFromMimeType('image/webp')).toBe('webp');
+    expect(extensionFromMimeType('application/json')).toBeNull();
   });
 
   it('detects png, jpeg, gif and webp signatures', () => {

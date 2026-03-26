@@ -12,6 +12,7 @@ type LibraryPaneProps = {
   onSelect: (item: AudioLibraryItem) => void;
   onApplyAlbumFields: (folderPath: string, metadata: AlbumBulkEditFields) => Promise<void>;
   onMoveTrackToAlbum: (item: AudioLibraryItem, targetDirectory: string) => Promise<void>;
+  onOpenFileLocation: (item: AudioLibraryItem) => Promise<void>;
 };
 
 export type AlbumBulkEditableValues = Pick<
@@ -245,6 +246,7 @@ export function LibraryPane({
   onSelect,
   onApplyAlbumFields,
   onMoveTrackToAlbum,
+  onOpenFileLocation,
 }: LibraryPaneProps) {
   const panelRef = useRef<HTMLElement | null>(null);
   const albumCoverInputRef = useRef<HTMLInputElement | null>(null);
@@ -667,8 +669,8 @@ export function LibraryPane({
       return;
     }
 
-    const menuWidth = 220;
-    const menuHeight = 118;
+    const menuWidth = 240;
+    const menuHeight = 170;
     const viewportPadding = 8;
     const localX = event.clientX - panelRect.left;
     const localY = event.clientY - panelRect.top;
@@ -1007,6 +1009,10 @@ export function LibraryPane({
             <button
               className="library-context-menu-option"
               disabled={isMovingTrack}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
               onClick={() =>
                 setTrackContextMenu((current) =>
                   current
@@ -1021,6 +1027,19 @@ export function LibraryPane({
               type="button"
             >
               Move to album...
+            </button>
+
+            <button
+              className="library-context-menu-option"
+              disabled={isMovingTrack}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={() => void onOpenFileLocation(trackContextMenu.item).finally(() => setTrackContextMenu(null))}
+              type="button"
+            >
+              Open file location
             </button>
 
             {trackContextMenu.showMoveTargets ? (
@@ -1053,6 +1072,10 @@ export function LibraryPane({
                 <button
                   className="library-context-menu-option track-context-target"
                   disabled={isMovingTrack}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
                   onClick={() =>
                     setTrackContextMenu((current) =>
                       current ? { ...current, showCreateAlbumInput: !current.showCreateAlbumInput } : current,
@@ -1084,6 +1107,10 @@ export function LibraryPane({
                     <button
                       className="library-context-menu-option track-context-create-action"
                       disabled={isMovingTrack || !trackContextMenu.newAlbumName.trim()}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
                       onClick={() => void moveTrackToNewAlbumInRoot()}
                       type="button"
                     >

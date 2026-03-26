@@ -2,9 +2,9 @@ const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu, screen } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu, screen, shell } = require('electron');
 
-const { buildLibrary, editAudioSelection, exportAudioSegment, saveMetadata } = require('./media-service');
+const { buildLibrary, editAudioSelection, exportAudioSegment, saveMetadata, __testables } = require('./media-service');
 const { readFileAsBase64WithLimit } = require('./file-io');
 const {
   getSupportedExtensionFromUrl,
@@ -22,7 +22,11 @@ const {
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateMoveTrackPayload,
+  validateOpenFileLocationPayload,
+  validateSaveCoverImagePayload,
 } = require('./ipc-validators');
+
+const { parseDataUrl, extensionFromMimeType } = __testables;
 
 // Prefer overlay scrollbars so classic arrow-button scrollbar widgets are not shown.
 app.commandLine.appendSwitch('enable-features', 'OverlayScrollbar,OverlayScrollbars');
@@ -565,6 +569,64 @@ app.whenReady().then(async () => {
       sourcePath,
       destinationPath,
     };
+  });
+
+  registerIpcHandler('track:open-file-location', async (_event, payload) => {
+    validateOpenFileLocationPayload(payload);
+    console.log('[backend-action] track:open-file-location:start', payload?.filePath);
+
+    const resolvedPath = path.resolve(payload.filePath);
+    const itemExists = fsSync.existsSync(resolvedPath);
+    if (!itemExists) {
+      throw new Error('The selected file no longer exists on disk.');
+    }
+
+    const shown = shell.showItemInFolder(resolvedPath);
+    if (!shown) {
+      throw new Error('Unable to open file location in the system file manager.');
+    }
+
+    console.log('[backend-action] track:open-file-location:done', resolvedPath);
+    return { revealedPath: resolvedPath };
+  });
+
+  registerIpcHandler('cover:save-image', async (_event, payload) => {
+    validateSaveCoverImagePayload(payload);
+    console.log('[backend-action] cover:save-image:start');
+
+    const parsed = parseDataUrl(payload.dataUrl);
+    if (!parsed?.buffer || !parsed?.mimeType) {
+      throw new Error('Invalid cover image data.');
+    }
+
+    const extension = extensionFromMimeType(parsed.mimeType);
+    if (!extension) {
+      throw new Error('Unsupported image format. Use PNG, JPEG, GIF, or WebP.');
+    }
+
+    const rawName = typeof payload.suggestedName === 'string' ? payload.suggestedName.trim() : '';
+    const safeBaseName = (rawName || 'cover')
+      .replace(/[<>:"/\\|?*]+/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const fileBaseName = safeBaseName || 'cover';
+    const defaultPath = path.join(app.getPath('downloads'), `${fileBaseName}.${extension}`);
+
+    const result = await dialog.showSaveDialog({
+      title: 'Save cover image',
+      defaultPath,
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }],
+    });
+
+    if (result.canceled || !result.filePath) {
+      console.log('[backend-action] cover:save-image:cancelled');
+      return null;
+    }
+
+    const outputPath = result.filePath;
+    await fs.writeFile(outputPath, parsed.buffer);
+    console.log('[backend-action] cover:save-image:done', outputPath);
+    return { outputPath };
   });
 
   createMenu();

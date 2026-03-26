@@ -1,6 +1,22 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Album01Icon, Copy01Icon, MagicWand01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
-import { type ChangeEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  Album01Icon,
+  Copy01Icon,
+  Download01Icon,
+  MagicWand01Icon,
+  RedoIcon,
+  UndoIcon,
+  Upload01Icon,
+} from '@hugeicons/core-free-icons';
+import {
+  type ChangeEvent,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import type { AudioLibraryItem, EditableMetadata, MetadataSuggestions } from '../types';
 import defaultCover from '../assets/defaultCover.png';
 
@@ -39,6 +55,7 @@ type MetadataEditorProps = {
   otherTrackCoverOptions: TrackCoverOption[];
   albumMismatchFields: AlbumMismatchFields;
   suggestions: MetadataSuggestions;
+  onSaveCoverImage: (coverDataUrl: string | null, suggestedName: string) => Promise<void>;
 };
 
 const EMPTY_METADATA: EditableMetadata = {
@@ -124,10 +141,12 @@ export function MetadataEditor({
   otherTrackCoverOptions,
   albumMismatchFields,
   suggestions,
+  onSaveCoverImage,
 }: MetadataEditorProps) {
   const [draft, setDraft] = useState<EditableMetadata>(EMPTY_METADATA);
   const [isAlbumCoverPickerOpen, setIsAlbumCoverPickerOpen] = useState(false);
   const [isTrackCoverPickerOpen, setIsTrackCoverPickerOpen] = useState(false);
+  const [coverContextMenu, setCoverContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isWandActive, setIsWandActive] = useState(false);
   const [coverUndoStack, setCoverUndoStack] = useState<Array<string | null>>([]);
   const [coverRedoStack, setCoverRedoStack] = useState<Array<string | null>>([]);
@@ -219,6 +238,21 @@ export function MetadataEditor({
   useEffect(() => {
     currentCoverArtRef.current = draft.coverArt;
   }, [draft.coverArt]);
+
+  useEffect(() => {
+    if (!coverContextMenu) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setCoverContextMenu(null);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [coverContextMenu]);
 
   useEffect(() => {
     const canvas = coverCanvasRef.current;
@@ -444,6 +478,18 @@ export function MetadataEditor({
     setIsTrackCoverPickerOpen((current) => !current);
   }
 
+  function openCoverContextMenu(event: ReactMouseEvent) {
+    event.preventDefault();
+
+    const menuWidth = 220;
+    const menuHeight = 56;
+    const viewportPadding = 8;
+    const x = Math.min(event.clientX, window.innerWidth - menuWidth - viewportPadding);
+    const y = Math.min(event.clientY, window.innerHeight - menuHeight - viewportPadding);
+
+    setCoverContextMenu({ x: Math.max(viewportPadding, x), y: Math.max(viewportPadding, y) });
+  }
+
   function renderFieldLabel(text: string, hasMismatch: boolean) {
     return (
       <span className="metadata-label-row">
@@ -495,6 +541,7 @@ export function MetadataEditor({
             <canvas
               aria-label="Album cover editor"
               className="cover-image-canvas"
+              onContextMenu={openCoverContextMenu}
               onPointerDown={handleCoverPointerDown}
               onPointerMove={handleCoverPointerMove}
               onPointerUp={handleCoverPointerUp}
@@ -544,6 +591,16 @@ export function MetadataEditor({
             <span aria-hidden="true" className="daw-toolbar-divider" />
 
             <div className="daw-toolbar-group">
+              <button
+                aria-label="Download cover image"
+                className="daw-tool-button"
+                disabled={!draft.coverArt}
+                onClick={() => void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover')}
+                title={draft.coverArt ? 'Download cover image to file' : 'No cover image to download'}
+                type="button"
+              >
+                <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
+              </button>
               <button
                 aria-label={isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'}
                 className={`daw-tool-button daw-tool-button-accent${isWandActive ? ' cover-tool-active' : ''}`}
@@ -715,6 +772,36 @@ export function MetadataEditor({
           </button>
         </div>
       </form>
+
+      {coverContextMenu ? (
+        <div
+          className="cover-context-menu-backdrop"
+          onClick={() => setCoverContextMenu(null)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            setCoverContextMenu(null);
+          }}
+          role="presentation"
+        >
+          <div
+            className="cover-context-menu"
+            onClick={(event) => event.stopPropagation()}
+            style={{ left: coverContextMenu.x, top: coverContextMenu.y }}
+          >
+            <button
+              className="library-context-menu-option"
+              disabled={!draft.coverArt}
+              onClick={() => {
+                void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover');
+                setCoverContextMenu(null);
+              }}
+              type="button"
+            >
+              Download cover image
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

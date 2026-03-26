@@ -65,6 +65,20 @@ function describeAction(callName, phase, args, result, error) {
     if (phase === 'done') return `Track move completed for ${name}.`;
   }
 
+  if (callName === 'openFileLocation') {
+    const filePath = args?.[0]?.filePath;
+    const name = fileNameFromPath(filePath);
+    if (phase === 'start') return `Opening file location for ${name} in your system file manager.`;
+    if (phase === 'done') return `Opened file location for ${name}.`;
+  }
+
+  if (callName === 'saveCoverImage') {
+    if (phase === 'start') return 'Opening save dialog for the current cover image.';
+    if (phase === 'done') {
+      return result ? `Cover image saved to ${result.outputPath}.` : 'Cover image save was cancelled by user.';
+    }
+  }
+
   if (callName === 'exportClip') {
     const filePath = args?.[0]?.filePath;
     const startTime = args?.[0]?.startTime;
@@ -127,6 +141,8 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   downloadFromUrl: (payload) => invokeLogged('downloadFromUrl', 'audio:download-from-url', payload),
   saveMetadata: (payload) => invokeLogged('saveMetadata', 'metadata:save', payload),
   moveTrackToAlbum: (payload) => invokeLogged('moveTrackToAlbum', 'track:move-to-album', payload),
+  openFileLocation: (payload) => invokeLogged('openFileLocation', 'track:open-file-location', payload),
+  saveCoverImage: (payload) => invokeLogged('saveCoverImage', 'cover:save-image', payload),
   exportClip: (payload) => invokeLogged('exportClip', 'audio:export-clip', payload),
   editSelection: (payload) => invokeLogged('editSelection', 'audio:edit-selection', payload),
   loadAudioBlob: async (filePath) => {

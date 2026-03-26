@@ -7,8 +7,143 @@ const os = require('node:os');
 const { spawn } = require('node:child_process');
 const { pipeline } = require('node:stream/promises');
 
-const ffmpegPath = require('ffmpeg-static');
+const ffmpegStaticPath = require('ffmpeg-static');
 const ffprobeStatic = require('ffprobe-static');
+
+function readMagicBytes(filePath, length = 4) {
+  try {
+    const fileDescriptor = nodeFs.openSync(filePath, 'r');
+    try {
+      const buffer = Buffer.alloc(length);
+      const bytesRead = nodeFs.readSync(fileDescriptor, buffer, 0, length, 0);
+      return buffer.subarray(0, bytesRead);
+    } finally {
+      nodeFs.closeSync(fileDescriptor);
+    }
+  } catch {
+    return null;
+  }
+}
+
+function isWindowsPortableExecutable(filePath) {
+  const magic = readMagicBytes(filePath, 2);
+  return Boolean(magic && magic.length >= 2 && magic[0] === 0x4d && magic[1] === 0x5a);
+}
+
+function findBinaryOnPath(binaryName, compatibilityCheck) {
+  const pathEntries = String(process.env.PATH || process.env.Path || '')
+    .split(path.delimiter)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  for (const entry of pathEntries) {
+    const candidate = path.join(entry, binaryName);
+    if (!nodeFs.existsSync(candidate)) {
+      continue;
+    }
+
+    if (compatibilityCheck && !compatibilityCheck(candidate)) {
+      continue;
+    }
+
+    return candidate;
+  }
+
+  return null;
+}
+
+function resolveBinaryPath(candidates, compatibilityCheck = null) {
+  for (const candidate of candidates) {
+    if (!candidate || !nodeFs.existsSync(candidate)) {
+      continue;
+    }
+
+    if (compatibilityCheck && !compatibilityCheck(candidate)) {
+      continue;
+    }
+
+    if (candidate && nodeFs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function deriveFfmpegCandidates(basePath) {
+  if (!basePath) {
+    return [];
+  }
+
+  const candidates = [basePath];
+
+  if (basePath.endsWith('.exe')) {
+    candidates.push(basePath.slice(0, -4));
+  }
+
+  const directory = path.dirname(basePath);
+  if (directory) {
+    candidates.push(path.join(directory, 'ffmpeg'));
+    candidates.push(path.join(directory, 'ffmpeg.exe'));
+  }
+
+  return candidates;
+}
+
+function ensureWindowsExecutableBinary(binaryPath) {
+  if (!binaryPath) {
+    return null;
+  }
+
+  const shimDirectory = path.join(os.tmpdir(), 'audio-meta-editor', 'ffmpeg-static');
+  const shimPath = path.join(shimDirectory, `${path.basename(binaryPath)}.exe`);
+
+  try {
+    nodeFs.mkdirSync(shimDirectory, { recursive: true });
+    const sourceStats = nodeFs.statSync(binaryPath);
+    let needsCopy = true;
+
+    try {
+      const shimStats = nodeFs.statSync(shimPath);
+      needsCopy = shimStats.size !== sourceStats.size || shimStats.mtimeMs < sourceStats.mtimeMs;
+    } catch {
+      needsCopy = true;
+    }
+
+    if (needsCopy) {
+      nodeFs.copyFileSync(binaryPath, shimPath);
+      try {
+        nodeFs.chmodSync(shimPath, 0o755);
+      } catch {
+        // Best effort; Windows ignores chmod but keep for parity.
+      }
+    }
+
+    return shimPath;
+  } catch (error) {
+    console.warn('[ffmpeg] Failed to prepare Windows shim executable:', error);
+    return binaryPath;
+  }
+}
+
+const windowsCompatibilityCheck = process.platform === 'win32' ? isWindowsPortableExecutable : null;
+
+const resolvedFfmpegPath = resolveBinaryPath(deriveFfmpegCandidates(ffmpegStaticPath), windowsCompatibilityCheck);
+const ffmpegPathFromPath = findBinaryOnPath(process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg', windowsCompatibilityCheck);
+const ffmpegBasePath = resolvedFfmpegPath || ffmpegPathFromPath;
+const ffmpegPath =
+  process.platform === 'win32' && ffmpegBasePath && !ffmpegBasePath.toLowerCase().endsWith('.exe')
+    ? ensureWindowsExecutableBinary(ffmpegBasePath)
+    : ffmpegBasePath;
+
+const ffprobePath = resolveBinaryPath([ffprobeStatic?.path], windowsCompatibilityCheck);
+
+if (!resolvedFfmpegPath && ffmpegStaticPath && process.platform === 'win32') {
+  console.warn(
+    '[ffmpeg] Ignoring incompatible ffmpeg-static binary for Windows. Falling back to PATH lookup or shim if available.',
+    ffmpegStaticPath,
+  );
+}
 
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav']);
 
@@ -220,7 +355,6 @@ function getBestVideoCoverCandidate(streams = []) {
 }
 
 async function extractCoverArtFromVideoStreams(filePath) {
-  const ffprobePath = ffprobeStatic?.path;
   if (!ffprobePath || !ffmpegPath) {
     return null;
   }
@@ -383,6 +517,19 @@ function parseDataUrl(dataUrl) {
   };
 }
 
+function extensionFromMimeType(mimeType) {
+  if (!mimeType) {
+    return null;
+  }
+
+  const normalized = String(mimeType).trim().toLowerCase();
+  if (normalized === 'image/jpeg' || normalized === 'image/jpg') return 'jpg';
+  if (normalized === 'image/png') return 'png';
+  if (normalized === 'image/gif') return 'gif';
+  if (normalized === 'image/webp') return 'webp';
+  return null;
+}
+
 function detectImageFormat(buffer) {
   if (!buffer || buffer.length < 4) {
     return null;
@@ -450,7 +597,9 @@ function normalizeCoverArt(coverArt) {
 
 function runFfmpeg(args) {
   if (!ffmpegPath) {
-    throw new Error('ffmpeg binary was not found.');
+    throw new Error(
+      'ffmpeg binary was not found. Reinstall dependencies for this platform (delete node_modules + package-lock.json, then run npm install) or install ffmpeg in PATH.',
+    );
   }
 
   console.log('[system-call]', ffmpegPath, args.join(' '));
@@ -507,7 +656,8 @@ async function saveMetadata(filePath, metadata) {
   const tempOutput = path.join(os.tmpdir(), `${path.basename(filePath, extension)}-${Date.now()}${extension}`);
   const parsedCoverArt = parseDataUrl(metadata.coverArt);
   const coverArt = normalizeCoverArt(parsedCoverArt);
-  const tempCoverPath = coverArt ? path.join(os.tmpdir(), `cover-${Date.now()}.${coverArt.extension}`) : null;
+  const tempCoverSourcePath = coverArt ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${coverArt.extension}`) : null;
+  const tempCoverPath = coverArt ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
   const args = ['-y', '-i', ffmpegInputPath];
 
   if (parsedCoverArt && !coverArt) {
@@ -518,22 +668,30 @@ async function saveMetadata(filePath, metadata) {
     await copyFileWithFallback(filePath, tempInput);
   }
 
-  if (tempCoverPath && extension === '.mp3') {
-    await fs.writeFile(tempCoverPath, coverArt.buffer);
-    args.push(
-      '-i',
-      tempCoverPath,
-      '-map',
-      '0:a',
-      '-map',
-      '1:v',
-      '-c:a',
-      'copy',
-      '-c:v',
-      'copy',
-      '-disposition:v:0',
-      'attached_pic',
-    );
+  if (extension === '.mp3') {
+    // Always remap MP3 output from audio stream, then optionally attach a normalized JPEG cover.
+    // This prevents stale/unsupported artwork payloads and improves external server compatibility.
+    args.push('-map', '0:a', '-c:a', 'copy');
+
+    if (tempCoverSourcePath && tempCoverPath) {
+      await fs.writeFile(tempCoverSourcePath, coverArt.buffer);
+      await runFfmpeg(['-y', '-i', tempCoverSourcePath, '-frames:v', '1', '-q:v', '2', tempCoverPath]);
+
+      args.push(
+        '-i',
+        tempCoverPath,
+        '-map',
+        '1:v',
+        '-c:v',
+        'mjpeg',
+        '-metadata:s:v',
+        'title=Album cover',
+        '-metadata:s:v',
+        'comment=Cover (front)',
+        '-disposition:v:0',
+        'attached_pic',
+      );
+    }
   } else {
     args.push('-map', '0', '-c', 'copy');
   }
@@ -573,6 +731,9 @@ async function saveMetadata(filePath, metadata) {
       await fs.rm(tempInput, { force: true });
     }
     await fs.rm(tempOutput, { force: true });
+    if (tempCoverSourcePath) {
+      await fs.rm(tempCoverSourcePath, { force: true });
+    }
     if (tempCoverPath) {
       await fs.rm(tempCoverPath, { force: true });
     }
@@ -580,11 +741,7 @@ async function saveMetadata(filePath, metadata) {
 
   const extracted = await extractMetadata(filePath);
   if (metadata.coverArt && !extracted.coverArt) {
-    console.warn(
-      '[backend-action] saveMetadata:cover-missing-after-write, using requested cover in returned payload',
-      filePath,
-    );
-    extracted.coverArt = metadata.coverArt;
+    console.warn('[backend-action] saveMetadata:cover-missing-after-write', filePath);
   }
 
   console.log('[backend-action] saveMetadata:done', filePath);
@@ -661,6 +818,8 @@ module.exports = {
   editAudioSelection,
   isSupportedAudioFile,
   saveMetadata,
+  parseDataUrl,
+  extensionFromMimeType,
   __testables: {
     scanDirectory,
     coerceSingleValue,
@@ -669,6 +828,7 @@ module.exports = {
     normalizeImageMimeType,
     bufferToDataUrl,
     parseDataUrl,
+    extensionFromMimeType,
     detectImageFormat,
     normalizeCoverArt,
     pickBestCoverPicture,

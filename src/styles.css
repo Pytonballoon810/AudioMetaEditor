@@ -677,6 +677,25 @@ textarea {
   font-weight: 600;
 }
 
+.cover-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+}
+
+.cover-context-menu {
+  position: absolute;
+  min-width: 190px;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.35rem;
+  background: rgba(24, 32, 40, 0.98);
+  border: 1px solid rgba(255, 94, 168, 0.42);
+  border-radius: 12px;
+  box-shadow: 0 18px 28px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+}
+
 .album-edit-backdrop {
   position: fixed;
   inset: 0;
@@ -718,11 +737,13 @@ textarea {
 .album-edit-cover-card {
   display: grid;
   gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
 }
 
 .album-edit-cover-image-wrap {
-  width: 140px;
-  height: 140px;
+  width: 132px;
+  height: 132px;
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -742,7 +763,19 @@ textarea {
 }
 
 .album-edit-cover-toolbar {
-  width: min(100%, 21.5rem);
+  width: 132px;
+  max-width: 132px;
+  justify-content: center;
+  flex-wrap: wrap;
+  row-gap: 0.28rem;
+}
+
+.album-edit-cover-toolbar .daw-toolbar-divider {
+  display: none;
+}
+
+.album-edit-cover-toolbar .daw-toolbar-group {
+  display: contents;
 }
 
 .album-edit-grid {
@@ -1323,7 +1356,7 @@ textarea {
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.45rem;
-  overflow-x: clip;
+  overflow-x: auto;
 }
 
 .cover-tool-active {

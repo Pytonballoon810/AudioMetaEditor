@@ -77,6 +77,26 @@ function validateMoveTrackPayload(payload) {
   assertString(payload.targetDirectory, 'payload.targetDirectory');
 }
 
+function validateOpenFileLocationPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('payload must be an object.');
+  }
+
+  assertString(payload.filePath, 'payload.filePath');
+}
+
+function validateSaveCoverImagePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('payload must be an object.');
+  }
+
+  assertString(payload.dataUrl, 'payload.dataUrl');
+
+  if (payload.suggestedName !== undefined && typeof payload.suggestedName !== 'string') {
+    throw new Error('payload.suggestedName must be a string when provided.');
+  }
+}
+
 module.exports = {
   validateLibraryLoadPayload,
   validateMetadataSavePayload,
@@ -85,4 +105,6 @@ module.exports = {
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateMoveTrackPayload,
+  validateOpenFileLocationPayload,
+  validateSaveCoverImagePayload,
 };

@@ -10,6 +10,8 @@ const {
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateMoveTrackPayload,
+  validateOpenFileLocationPayload,
+  validateSaveCoverImagePayload,
 } = require('../electron/ipc-validators');
 
 describe('ipc validators', () => {
@@ -67,5 +69,20 @@ describe('ipc validators', () => {
     expect(() => validateMoveTrackPayload({ filePath: '/tmp/a.mp3', targetDirectory: '/tmp/Album' })).not.toThrow();
     expect(() => validateMoveTrackPayload({ filePath: '/tmp/a.mp3' })).toThrow(/targetDirectory/);
     expect(() => validateMoveTrackPayload(undefined)).toThrow(/payload/);
+  });
+
+  it('validates open file location payload', () => {
+    expect(() => validateOpenFileLocationPayload({ filePath: '/tmp/a.mp3' })).not.toThrow();
+    expect(() => validateOpenFileLocationPayload({ filePath: '' })).toThrow(/filePath/);
+    expect(() => validateOpenFileLocationPayload(null)).toThrow(/payload/);
+  });
+
+  it('validates save cover image payload', () => {
+    expect(() => validateSaveCoverImagePayload({ dataUrl: 'data:image/png;base64,AA==' })).not.toThrow();
+    expect(() => validateSaveCoverImagePayload({ dataUrl: 'data:image/png;base64,AA==', suggestedName: 'cover' })).not.toThrow();
+    expect(() => validateSaveCoverImagePayload({ dataUrl: '' })).toThrow(/dataUrl/);
+    expect(() => validateSaveCoverImagePayload({ dataUrl: 'data:image/png;base64,AA==', suggestedName: 42 })).toThrow(
+      /suggestedName/,
+    );
   });
 });

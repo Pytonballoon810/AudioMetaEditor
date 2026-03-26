@@ -167,6 +167,48 @@ export function useTransportActions({
     }
   }
 
+  async function handleOpenFileLocation(item: AudioLibraryItem) {
+    if (!audioMetaApi || typeof audioMetaApi.openFileLocation !== 'function') {
+      setStatus(`Open location API is unavailable. ${DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE}`);
+      return;
+    }
+
+    try {
+      await requireAudioMetaApi().openFileLocation({ filePath: item.path });
+      setStatus(`Opened file location for ${item.name}.`);
+    } catch (error) {
+      setStatus(toUserErrorMessage(error, 'Unable to open file location.'));
+    }
+  }
+
+  async function handleSaveCoverImage(coverDataUrl: string | null, suggestedName: string) {
+    if (!coverDataUrl) {
+      setStatus('No cover image available to download.');
+      return;
+    }
+
+    if (!audioMetaApi || typeof audioMetaApi.saveCoverImage !== 'function') {
+      setStatus(`Cover download API is unavailable. ${DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE}`);
+      return;
+    }
+
+    try {
+      const result = await requireAudioMetaApi().saveCoverImage({
+        dataUrl: coverDataUrl,
+        suggestedName,
+      });
+
+      if (!result) {
+        setStatus('Cover image download cancelled.');
+        return;
+      }
+
+      setStatus(`Saved cover image to ${result.outputPath}.`);
+    } catch (error) {
+      setStatus(toUserErrorMessage(error, 'Unable to save cover image.'));
+    }
+  }
+
   return {
     isExporting,
     isEditingSelection,
@@ -175,5 +217,7 @@ export function useTransportActions({
     handleEditSelection,
     handleMoveTrackToAlbum,
     handleDownloadFromUrl,
+    handleOpenFileLocation,
+    handleSaveCoverImage,
   };
 }

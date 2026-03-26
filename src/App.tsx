@@ -235,6 +235,8 @@ export default function App() {
     handleEditSelection,
     handleMoveTrackToAlbum,
     handleDownloadFromUrl,
+    handleOpenFileLocation,
+    handleSaveCoverImage,
   } = useTransportActions({
     activeItem,
     activePath,
@@ -317,6 +319,7 @@ export default function App() {
           currentPath={activeItem?.path ?? null}
           onApplyAlbumFields={handleApplyAlbumFields}
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
+          onOpenFileLocation={handleOpenFileLocation}
           onSelect={(item) => setActivePath(item.path)}
         />
         <div
@@ -368,6 +371,7 @@ export default function App() {
           otherTrackCoverOptions={activeOtherTrackCoverOptions}
           albumMismatchFields={activeAlbumMismatchFields}
           suggestions={metadataSuggestions}
+          onSaveCoverImage={handleSaveCoverImage}
         />
       </main>
 

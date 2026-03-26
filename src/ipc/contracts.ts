@@ -18,6 +18,10 @@ export type SaveMetadataResult = {
 export type MoveTrackToAlbumPayload = { filePath: string; targetDirectory: string };
 export type MoveTrackToAlbumResult = { sourcePath: string; destinationPath: string };
 
+export type OpenFileLocationPayload = { filePath: string };
+export type SaveCoverImagePayload = { dataUrl: string; suggestedName?: string };
+export type SaveCoverImageResult = { outputPath: string } | null;
+
 export type ExportClipPayload = { filePath: string; startTime: number; endTime: number };
 export type ExportClipResult = { outputPath: string } | null;
 
@@ -31,6 +35,8 @@ export interface AudioMetaApi {
   downloadFromUrl: (payload: DownloadFromUrlPayload) => Promise<DownloadFromUrlResult>;
   saveMetadata: (payload: SaveMetadataPayload) => Promise<SaveMetadataResult>;
   moveTrackToAlbum: (payload: MoveTrackToAlbumPayload) => Promise<MoveTrackToAlbumResult>;
+  openFileLocation: (payload: OpenFileLocationPayload) => Promise<{ revealedPath: string }>;
+  saveCoverImage: (payload: SaveCoverImagePayload) => Promise<SaveCoverImageResult>;
   exportClip: (payload: ExportClipPayload) => Promise<ExportClipResult>;
   editSelection: (payload: EditSelectionPayload) => Promise<EditSelectionResult>;
   loadAudioBlob: (filePath: string) => Promise<string>;
