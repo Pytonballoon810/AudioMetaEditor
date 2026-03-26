@@ -604,7 +604,10 @@ app.whenReady().then(async () => {
 
     const shown = shell.showItemInFolder(resolvedPath);
     if (!shown) {
-      throw new Error('Unable to open file location in the system file manager.');
+      const opened = await shell.openPath(path.dirname(resolvedPath));
+      if (opened) {
+        throw new Error('Unable to open file location in the system file manager.');
+      }
     }
 
     console.log('[backend-action] track:open-file-location:done', resolvedPath);

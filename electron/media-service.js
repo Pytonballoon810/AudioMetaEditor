@@ -295,6 +295,47 @@ function pictureToDataUrl(picture) {
   return `data:${mimeType};base64,${binary.toString('base64')}`;
 }
 
+function getCoverSidecarCandidates(filePath) {
+  return ['jpg', 'jpeg', 'png', 'webp', 'gif'].map((extension) => `${filePath}.cover.${extension}`);
+}
+
+async function removeCoverSidecars(filePath) {
+  const candidates = getCoverSidecarCandidates(filePath);
+  await Promise.all(candidates.map((candidate) => fs.rm(candidate, { force: true })));
+}
+
+async function writeCoverSidecar(filePath, coverArt) {
+  await removeCoverSidecars(filePath);
+
+  if (!coverArt?.buffer || !coverArt?.extension) {
+    return null;
+  }
+
+  const sidecarPath = `${filePath}.cover.${coverArt.extension}`;
+  await fs.writeFile(sidecarPath, coverArt.buffer);
+  return sidecarPath;
+}
+
+async function readCoverFromSidecar(filePath) {
+  const candidates = getCoverSidecarCandidates(filePath);
+
+  for (const candidate of candidates) {
+    try {
+      const buffer = await fs.readFile(candidate);
+      const detected = detectImageFormat(buffer);
+      if (!detected?.mimeType) {
+        continue;
+      }
+
+      return bufferToDataUrl(buffer, detected.mimeType);
+    } catch {
+      // Try next sidecar candidate.
+    }
+  }
+
+  return null;
+}
+
 function pickBestCoverPicture(pictures = []) {
   if (!Array.isArray(pictures) || pictures.length === 0) {
     return null;
@@ -451,6 +492,7 @@ async function extractMetadata(filePath) {
   const common = parsed.common;
   const metadataCoverArt = pictureToDataUrl(pickBestCoverPicture(common.picture));
   const fallbackCoverArt = metadataCoverArt ? null : await extractCoverArtFromVideoStreams(filePath);
+  const sidecarCoverArt = metadataCoverArt || fallbackCoverArt ? null : await readCoverFromSidecar(filePath);
 
   return {
     title: common.title || path.basename(filePath, path.extname(filePath)),
@@ -464,7 +506,7 @@ async function extractMetadata(filePath) {
     track: common.track?.no ? String(common.track.no) : '',
     disc: common.disk?.no ? String(common.disk.no) : '',
     comment: coerceSingleValue(common.comment),
-    coverArt: metadataCoverArt || fallbackCoverArt,
+    coverArt: metadataCoverArt || fallbackCoverArt || sidecarCoverArt,
     duration: parsed.format.duration || 0,
     sampleRate: parsed.format.sampleRate || 0,
     bitrate: parsed.format.bitrate || 0,
@@ -729,6 +771,7 @@ async function saveMetadata(filePath, metadata) {
   const coverArt = normalizeCoverArt(parsedCoverArt);
   const tempCoverSourcePath = coverArt ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${coverArt.extension}`) : null;
   const tempCoverPath = coverArt ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
+  const supportsEmbeddedCover = extension === '.mp3';
   const backupPath = await createSafetyBackup(filePath);
   let commitSucceeded = false;
   const args = ['-y', '-i', ffmpegInputPath];
@@ -754,7 +797,7 @@ async function saveMetadata(filePath, metadata) {
     await copyFileWithFallback(filePath, tempInput);
   }
 
-  if (extension === '.mp3') {
+  if (supportsEmbeddedCover) {
     // Always remap MP3 output from audio stream, then optionally attach a normalized JPEG cover.
     // This prevents stale/unsupported artwork payloads and improves external server compatibility.
     args.push('-map', '0:a', '-c:a', 'copy');
@@ -812,6 +855,15 @@ async function saveMetadata(filePath, metadata) {
     await runFfmpeg(args);
     // Overwrite through copy fallback for cross-device and mount compatibility.
     await copyFileWithFallback(tempOutput, filePath);
+
+    if (supportsEmbeddedCover) {
+      await removeCoverSidecars(filePath);
+    } else if (coverArt) {
+      const sidecarPath = await writeCoverSidecar(filePath, coverArt);
+      console.log('[metadata-debug] saveMetadata:sidecar-cover-written', { filePath, sidecarPath });
+    } else {
+      await removeCoverSidecars(filePath);
+    }
 
     const sourceStatsAfter = await fs.stat(filePath);
     if (!sourceStatsAfter.isFile() || sourceStatsAfter.size <= 0) {
@@ -952,6 +1004,10 @@ module.exports = {
     bufferToDataUrl,
     parseDataUrl,
     extensionFromMimeType,
+    getCoverSidecarCandidates,
+    readCoverFromSidecar,
+    writeCoverSidecar,
+    removeCoverSidecars,
     detectImageFormat,
     normalizeCoverArt,
     pickBestCoverPicture,
