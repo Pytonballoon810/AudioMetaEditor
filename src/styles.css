@@ -1322,17 +1322,41 @@ textarea {
 
 .metadata-form {
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
   flex: 1;
   min-height: 0;
   overflow: auto;
   align-content: start;
+  padding: 0 1.25rem 1.25rem;
 }
 
 .metadata-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
+  padding-top: 0.7rem;
+  padding-bottom: 0.25rem;
+  margin-top: 0.35rem;
+  background: transparent;
+  border-top: 0;
+}
+
+.metadata-actions > button {
+  width: 100%;
+  justify-self: stretch;
+  min-height: 2.8rem;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .metadata-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cover-card {
