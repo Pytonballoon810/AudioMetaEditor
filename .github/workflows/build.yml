@@ -94,7 +94,7 @@ jobs:
         run: npm ci
 
       - name: Build ${{ matrix.label }} artifact
-        run: npm run ${{ matrix.npm_script }}
+        run: npm run ${{ matrix.npm_script }} -- --publish never
 
       - name: Upload ${{ matrix.label }} artifact
         uses: actions/upload-artifact@v4
@@ -122,7 +122,7 @@ jobs:
         run: npm ci
 
       - name: Build Windows artifact
-        run: npm run build:windows
+        run: npm run build:windows -- --publish never
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
