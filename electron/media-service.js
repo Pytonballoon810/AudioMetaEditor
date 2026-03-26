@@ -653,22 +653,53 @@ function requiresLocalFfmpegInput(filePath) {
 }
 
 async function copyFileWithFallback(sourcePath, destinationPath) {
+  const sourceStats = await fs.stat(sourcePath);
+  if (!sourceStats.isFile()) {
+    throw new Error(`Source path is not a file: ${sourcePath}`);
+  }
+
   try {
     await fs.copyFile(sourcePath, destinationPath);
-    return;
   } catch (error) {
     const retryableCodes = new Set(['ENOTSUP', 'EXDEV', 'EOPNOTSUPP']);
     if (!retryableCodes.has(error?.code)) {
       throw error;
     }
+
+    // Some virtual/network mounts (e.g. GVFS SMB) do not support copy_file_range.
+    await pipeline(nodeFs.createReadStream(sourcePath), nodeFs.createWriteStream(destinationPath));
   }
 
-  // Some virtual/network mounts (e.g. GVFS SMB) do not support copy_file_range.
-  await pipeline(nodeFs.createReadStream(sourcePath), nodeFs.createWriteStream(destinationPath));
+  const destinationStats = await fs.stat(destinationPath);
+  if (!destinationStats.isFile() || destinationStats.size !== sourceStats.size) {
+    await fs.rm(destinationPath, { force: true });
+    throw new Error(
+      `Copied file validation failed for ${destinationPath} (expected ${sourceStats.size} bytes, got ${destinationStats.size} bytes).`,
+    );
+  }
+}
+
+async function createSafetyBackup(filePath) {
+  const backupPath = `${filePath}.backup-${Date.now()}`;
+  await copyFileWithFallback(filePath, backupPath);
+  return backupPath;
+}
+
+async function restoreFromSafetyBackup(filePath, backupPath) {
+  await copyFileWithFallback(backupPath, filePath);
+}
+
+function runDataSafetyHook(phase, details) {
+  console.log('[data-safety-hook]', phase, details);
 }
 
 async function saveMetadata(filePath, metadata) {
   console.log('[backend-action] saveMetadata:start', filePath);
+  const sourceStatsBefore = await fs.stat(filePath);
+  if (!sourceStatsBefore.isFile()) {
+    throw new Error('Metadata can only be saved for regular files.');
+  }
+
   const extension = path.extname(filePath).toLowerCase();
   // Some virtual/network mounts need local staging before ffmpeg can read reliably.
   const shouldStageInput = requiresLocalFfmpegInput(filePath);
@@ -681,7 +712,15 @@ async function saveMetadata(filePath, metadata) {
   const coverArt = normalizeCoverArt(parsedCoverArt);
   const tempCoverSourcePath = coverArt ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${coverArt.extension}`) : null;
   const tempCoverPath = coverArt ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
+  const backupPath = await createSafetyBackup(filePath);
+  let commitSucceeded = false;
   const args = ['-y', '-i', ffmpegInputPath];
+
+  runDataSafetyHook('pre-write', {
+    filePath,
+    backupPath,
+    sizeBytes: sourceStatsBefore.size,
+  });
 
   if (parsedCoverArt && !coverArt) {
     console.warn('[saveMetadata] Ignoring invalid cover art payload for', filePath);
@@ -749,6 +788,39 @@ async function saveMetadata(filePath, metadata) {
     await runFfmpeg(args);
     // Overwrite through copy fallback for cross-device and mount compatibility.
     await copyFileWithFallback(tempOutput, filePath);
+
+    const sourceStatsAfter = await fs.stat(filePath);
+    if (!sourceStatsAfter.isFile() || sourceStatsAfter.size <= 0) {
+      throw new Error('Saved file failed validation after metadata write.');
+    }
+
+    const extracted = await extractMetadata(filePath);
+    if (metadata.coverArt && !extracted.coverArt) {
+      console.warn('[backend-action] saveMetadata:cover-missing-after-write', filePath);
+    }
+
+    runDataSafetyHook('post-write-validated', {
+      filePath,
+      sizeBytes: sourceStatsAfter.size,
+    });
+
+    commitSucceeded = true;
+    console.log('[backend-action] saveMetadata:done', filePath);
+    return extracted;
+  } catch (error) {
+    runDataSafetyHook('rollback-start', { filePath, backupPath });
+    try {
+      await restoreFromSafetyBackup(filePath, backupPath);
+      runDataSafetyHook('rollback-complete', { filePath, backupPath });
+    } catch (restoreError) {
+      throw new Error(
+        `Metadata save failed and rollback also failed for ${filePath}: ${
+          restoreError instanceof Error ? restoreError.message : String(restoreError)
+        }`,
+      );
+    }
+
+    throw error;
   } finally {
     if (tempInput) {
       await fs.rm(tempInput, { force: true });
@@ -760,15 +832,11 @@ async function saveMetadata(filePath, metadata) {
     if (tempCoverPath) {
       await fs.rm(tempCoverPath, { force: true });
     }
-  }
 
-  const extracted = await extractMetadata(filePath);
-  if (metadata.coverArt && !extracted.coverArt) {
-    console.warn('[backend-action] saveMetadata:cover-missing-after-write', filePath);
+    if (backupPath && commitSucceeded) {
+      await fs.rm(backupPath, { force: true });
+    }
   }
-
-  console.log('[backend-action] saveMetadata:done', filePath);
-  return extracted;
 }
 
 async function exportAudioSegment(filePath, startTime, endTime, outputPath) {
@@ -859,6 +927,9 @@ module.exports = {
     pickBestCoverPicture,
     getBestVideoCoverCandidate,
     copyFileWithFallback,
+    createSafetyBackup,
+    restoreFromSafetyBackup,
+    runDataSafetyHook,
     requiresLocalFfmpegInput,
     pictureToDataUrl,
   },

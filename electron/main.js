@@ -162,8 +162,13 @@ function resolveRuntimeIconPath() {
 }
 
 async function moveFileWithFallback(sourcePath, destinationPath) {
+  const sourceStats = await fs.stat(sourcePath);
   try {
     await fs.rename(sourcePath, destinationPath);
+    const destinationStats = await fs.stat(destinationPath);
+    if (destinationStats.size !== sourceStats.size) {
+      throw new Error('Moved file size mismatch after rename operation.');
+    }
     return;
   } catch (error) {
     if (!(error && typeof error === 'object' && 'code' in error) || error.code !== 'EXDEV') {
@@ -172,6 +177,11 @@ async function moveFileWithFallback(sourcePath, destinationPath) {
   }
 
   await fs.copyFile(sourcePath, destinationPath);
+  const destinationStats = await fs.stat(destinationPath);
+  if (destinationStats.size !== sourceStats.size) {
+    await fs.rm(destinationPath, { force: true });
+    throw new Error('Moved file size mismatch after cross-device copy operation. Source was not removed.');
+  }
   await fs.unlink(sourcePath);
 }
 
@@ -556,6 +566,11 @@ app.whenReady().then(async () => {
     console.log('[backend-action] track:move-to-album:start', payload?.filePath, '->', payload?.targetDirectory);
     const sourcePath = path.resolve(payload.filePath);
     const destinationDirectory = path.resolve(payload.targetDirectory);
+
+    const sourceStats = await fs.stat(sourcePath);
+    if (!sourceStats.isFile()) {
+      throw new Error('Only files can be moved to album folders.');
+    }
 
     await fs.mkdir(destinationDirectory, { recursive: true });
 
