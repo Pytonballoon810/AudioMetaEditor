@@ -331,7 +331,11 @@ export default function App() {
           role="separator"
         />
 
-        <div className={`main-column${isStatusResizing ? ' resizing' : ''}`} ref={mainColumnRef} style={mainColumnStyle}>
+        <div
+          className={`main-column${isStatusResizing ? ' resizing' : ''}`}
+          ref={mainColumnRef}
+          style={mainColumnStyle}
+        >
           <PlayerPane
             ref={playerPaneRef}
             item={activeItem}

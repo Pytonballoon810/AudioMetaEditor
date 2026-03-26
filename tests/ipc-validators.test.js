@@ -79,7 +79,9 @@ describe('ipc validators', () => {
 
   it('validates save cover image payload', () => {
     expect(() => validateSaveCoverImagePayload({ dataUrl: 'data:image/png;base64,AA==' })).not.toThrow();
-    expect(() => validateSaveCoverImagePayload({ dataUrl: 'data:image/png;base64,AA==', suggestedName: 'cover' })).not.toThrow();
+    expect(() =>
+      validateSaveCoverImagePayload({ dataUrl: 'data:image/png;base64,AA==', suggestedName: 'cover' }),
+    ).not.toThrow();
     expect(() => validateSaveCoverImagePayload({ dataUrl: '' })).toThrow(/dataUrl/);
     expect(() => validateSaveCoverImagePayload({ dataUrl: 'data:image/png;base64,AA==', suggestedName: 42 })).toThrow(
       /suggestedName/,

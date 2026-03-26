@@ -1155,87 +1155,100 @@ export function LibraryPane({
                 />
               </div>
 
-                <div aria-label="Album artwork toolbar" className="cover-edit-toolbar album-edit-cover-toolbar" role="toolbar">
-                  <div className="daw-toolbar-group">
-                    <button
-                      aria-label="Undo album cover edit"
-                      className="daw-tool-button"
-                      disabled={editingAlbum.coverHistory.undo.length === 0}
-                      onClick={undoAlbumCoverEdit}
-                      title={editingAlbum.coverHistory.undo.length > 0 ? 'Undo last album cover edit' : 'No cover edit to undo'}
-                      type="button"
-                    >
-                      <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
-                    </button>
-                    <button
-                      aria-label="Redo album cover edit"
-                      className="daw-tool-button"
-                      disabled={editingAlbum.coverHistory.redo.length === 0}
-                      onClick={redoAlbumCoverEdit}
-                      title={editingAlbum.coverHistory.redo.length > 0 ? 'Redo last undone album cover edit' : 'No cover edit to redo'}
-                      type="button"
-                    >
-                      <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
-                    </button>
-                  </div>
-
-                  <span aria-hidden="true" className="daw-toolbar-divider" />
-
-                  <div className="daw-toolbar-group">
-                    <button
-                      aria-label="Upload replacement album artwork"
-                      className="daw-tool-button"
-                      onClick={() => albumCoverInputRef.current?.click()}
-                      title="Upload replacement album artwork image"
-                      type="button"
-                    >
-                      <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
-                    </button>
-                    <input accept="image/*" hidden onChange={onAlbumCoverChange} ref={albumCoverInputRef} type="file" />
-                  </div>
-
-                  <span aria-hidden="true" className="daw-toolbar-divider" />
-
-                  <div className="daw-toolbar-group">
-                    <button
-                      aria-label="Remove album cover"
-                      className="daw-tool-button"
-                      onClick={() => setAlbumCover(null)}
-                      title="Remove album cover"
-                      type="button"
-                    >
-                      X
-                    </button>
-                  </div>
-
-                  <span aria-hidden="true" className="daw-toolbar-divider" />
-
-                  <div className="daw-toolbar-group">
-                    <button
-                      aria-label="Use cover from other album or track"
-                      className="daw-tool-button"
-                      disabled={albumModalCoverSourceOptions.length === 0}
-                      onClick={onUseCoverFromOtherAlbumOrTrack}
-                      title="Use cover from other album or track"
-                      type="button"
-                    >
-                      <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
-                    </button>
-                    <button
-                      aria-label="Keep existing covers unchanged"
-                      className={`daw-tool-button${editingAlbum.apply.coverArt ? '' : ' cover-tool-active'}`}
-                      onClick={() => setAlbumFieldApplied('coverArt', !editingAlbum.apply.coverArt)}
-                      title={editingAlbum.apply.coverArt ? 'Apply edited album cover to tracks' : "Don't change track covers"}
-                      type="button"
-                    >
-                      <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
-                    </button>
-                  </div>
+              <div
+                aria-label="Album artwork toolbar"
+                className="cover-edit-toolbar album-edit-cover-toolbar"
+                role="toolbar"
+              >
+                <div className="daw-toolbar-group">
+                  <button
+                    aria-label="Undo album cover edit"
+                    className="daw-tool-button"
+                    disabled={editingAlbum.coverHistory.undo.length === 0}
+                    onClick={undoAlbumCoverEdit}
+                    title={
+                      editingAlbum.coverHistory.undo.length > 0 ? 'Undo last album cover edit' : 'No cover edit to undo'
+                    }
+                    type="button"
+                  >
+                    <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
+                  </button>
+                  <button
+                    aria-label="Redo album cover edit"
+                    className="daw-tool-button"
+                    disabled={editingAlbum.coverHistory.redo.length === 0}
+                    onClick={redoAlbumCoverEdit}
+                    title={
+                      editingAlbum.coverHistory.redo.length > 0
+                        ? 'Redo last undone album cover edit'
+                        : 'No cover edit to redo'
+                    }
+                    type="button"
+                  >
+                    <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
+                  </button>
                 </div>
 
-                <p className="cover-editor-hint">
-                  Cover apply mode: {editingAlbum.apply.coverArt ? 'Apply this artwork to album tracks.' : "Don't change track covers."}
-                </p>
+                <span aria-hidden="true" className="daw-toolbar-divider" />
+
+                <div className="daw-toolbar-group">
+                  <button
+                    aria-label="Upload replacement album artwork"
+                    className="daw-tool-button"
+                    onClick={() => albumCoverInputRef.current?.click()}
+                    title="Upload replacement album artwork image"
+                    type="button"
+                  >
+                    <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
+                  </button>
+                  <input accept="image/*" hidden onChange={onAlbumCoverChange} ref={albumCoverInputRef} type="file" />
+                </div>
+
+                <span aria-hidden="true" className="daw-toolbar-divider" />
+
+                <div className="daw-toolbar-group">
+                  <button
+                    aria-label="Remove album cover"
+                    className="daw-tool-button"
+                    onClick={() => setAlbumCover(null)}
+                    title="Remove album cover"
+                    type="button"
+                  >
+                    X
+                  </button>
+                </div>
+
+                <span aria-hidden="true" className="daw-toolbar-divider" />
+
+                <div className="daw-toolbar-group">
+                  <button
+                    aria-label="Use cover from other album or track"
+                    className="daw-tool-button"
+                    disabled={albumModalCoverSourceOptions.length === 0}
+                    onClick={onUseCoverFromOtherAlbumOrTrack}
+                    title="Use cover from other album or track"
+                    type="button"
+                  >
+                    <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
+                  </button>
+                  <button
+                    aria-label="Keep existing covers unchanged"
+                    className={`daw-tool-button${editingAlbum.apply.coverArt ? '' : ' cover-tool-active'}`}
+                    onClick={() => setAlbumFieldApplied('coverArt', !editingAlbum.apply.coverArt)}
+                    title={
+                      editingAlbum.apply.coverArt ? 'Apply edited album cover to tracks' : "Don't change track covers"
+                    }
+                    type="button"
+                  >
+                    <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
+                  </button>
+                </div>
+              </div>
+
+              <p className="cover-editor-hint">
+                Cover apply mode:{' '}
+                {editingAlbum.apply.coverArt ? 'Apply this artwork to album tracks.' : "Don't change track covers."}
+              </p>
 
               {isAlbumModalCoverPickerOpen && albumModalCoverSourceOptions.length > 1 ? (
                 <div className="track-cover-picker" role="listbox">

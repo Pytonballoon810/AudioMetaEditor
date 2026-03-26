@@ -145,8 +145,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const effectiveDuration = duration || item?.metadata.duration || 0;
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
   const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
-  const canCutAfterPlayhead =
-    Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
+  const canCutAfterPlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
 
   const setSelectionStartToPlayhead = () => {
     const nextStart = Math.max(0, Math.min(currentTime, selection.end));
@@ -366,9 +365,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             className="daw-tool-button daw-tool-button-save"
             disabled={pendingEdits.length === 0 || isEditingSelection}
             onClick={() => void savePendingEdit()}
-            title={
-              firstPendingEdit ? `Save next pending edit: ${firstPendingEdit.label}` : 'No pending edit to save'
-            }
+            title={firstPendingEdit ? `Save next pending edit: ${firstPendingEdit.label}` : 'No pending edit to save'}
             type="button"
           >
             <HugeiconsIcon icon={SaveIcon} size={18} strokeWidth={1.8} />
@@ -385,7 +382,9 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               <div className="daw-toolbar-pending-popover">
                 {pendingEdits.map((edit, index) => (
                   <div key={`${edit.mode}-${edit.startTime}-${edit.endTime}-${index}`} className="daw-pending-row">
-                    <strong>{index + 1}. {edit.label}</strong>
+                    <strong>
+                      {index + 1}. {edit.label}
+                    </strong>
                     <span>
                       {edit.mode.toUpperCase()} {formatEditTime(edit.startTime)} - {formatEditTime(edit.endTime)}
                     </span>

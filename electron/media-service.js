@@ -129,7 +129,10 @@ function ensureWindowsExecutableBinary(binaryPath) {
 const windowsCompatibilityCheck = process.platform === 'win32' ? isWindowsPortableExecutable : null;
 
 const resolvedFfmpegPath = resolveBinaryPath(deriveFfmpegCandidates(ffmpegStaticPath), windowsCompatibilityCheck);
-const ffmpegPathFromPath = findBinaryOnPath(process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg', windowsCompatibilityCheck);
+const ffmpegPathFromPath = findBinaryOnPath(
+  process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg',
+  windowsCompatibilityCheck,
+);
 const ffmpegBasePath = resolvedFfmpegPath || ffmpegPathFromPath;
 const ffmpegPath =
   process.platform === 'win32' && ffmpegBasePath && !ffmpegBasePath.toLowerCase().endsWith('.exe')

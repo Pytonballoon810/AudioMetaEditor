@@ -78,7 +78,9 @@ function SuggestionInput({ id, label, value, suggestions, onChange }: Suggestion
   const [isFiltering, setIsFiltering] = useState(false);
   const normalizedQuery = value.trim().toLowerCase();
   const filteredSuggestions = (
-    isFiltering && normalizedQuery ? suggestions.filter((item) => item.toLowerCase().includes(normalizedQuery)) : suggestions
+    isFiltering && normalizedQuery
+      ? suggestions.filter((item) => item.toLowerCase().includes(normalizedQuery))
+      : suggestions
   ).slice(0, 8);
 
   return (
@@ -595,14 +597,18 @@ export function MetadataEditor({
                 aria-label="Download cover image"
                 className="daw-tool-button"
                 disabled={!draft.coverArt}
-                onClick={() => void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover')}
+                onClick={() =>
+                  void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover')
+                }
                 title={draft.coverArt ? 'Download cover image to file' : 'No cover image to download'}
                 type="button"
               >
                 <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
               </button>
               <button
-                aria-label={isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'}
+                aria-label={
+                  isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'
+                }
                 className={`daw-tool-button daw-tool-button-accent${isWandActive ? ' cover-tool-active' : ''}`}
                 disabled={!draft.coverArt}
                 onClick={() => {

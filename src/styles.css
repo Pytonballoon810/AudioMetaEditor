@@ -1280,12 +1280,8 @@ textarea {
   --cover-card-pad-x: 0.8rem;
   --cover-card-pad-y: 0.8rem;
   --cover-toolbar-min-width: calc(
-    (var(--cover-tool-size) * 6) +
-      (var(--cover-group-gap) * 2) +
-      (var(--cover-toolbar-gap) * 6) +
-      (var(--cover-divider-width) * 3) +
-      (var(--cover-toolbar-pad-x) * 2) +
-      var(--cover-toolbar-edge-buffer)
+    (var(--cover-tool-size) * 6) + (var(--cover-group-gap) * 2) + (var(--cover-toolbar-gap) * 6) +
+      (var(--cover-divider-width) * 3) + (var(--cover-toolbar-pad-x) * 2) + var(--cover-toolbar-edge-buffer)
   );
   display: grid;
   box-sizing: border-box;
@@ -1294,11 +1290,7 @@ textarea {
   justify-items: stretch;
   width: min(
     100%,
-    calc(
-      var(--cover-toolbar-min-width) +
-        var(--cover-toolbar-comfort-width) +
-        (var(--cover-card-pad-x) * 2)
-    )
+    calc(var(--cover-toolbar-min-width) + var(--cover-toolbar-comfort-width) + (var(--cover-card-pad-x) * 2))
   );
   padding: var(--cover-card-pad-y) var(--cover-card-pad-x);
   border-radius: 16px;
