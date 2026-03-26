@@ -121,6 +121,17 @@ function isSameDirectoryPath(leftPath: string, rightPath: string) {
   return normalizePathForUiComparison(leftPath) === normalizePathForUiComparison(rightPath);
 }
 
+function clampMenuToViewport(clientX: number, clientY: number, menuWidth: number, menuHeight: number) {
+  const viewportPadding = 8;
+  const maxX = Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding);
+  const maxY = Math.max(viewportPadding, window.innerHeight - menuHeight - viewportPadding);
+
+  return {
+    x: Math.min(Math.max(viewportPadding, clientX), maxX),
+    y: Math.min(Math.max(viewportPadding, clientY), maxY),
+  };
+}
+
 function normalizeAlbumValue(rawValue: string) {
   const value = rawValue.trim();
   return value || '(empty)';
@@ -656,20 +667,7 @@ export function LibraryPane({
 
   function openAlbumContextMenu(event: ReactMouseEvent) {
     event.preventDefault();
-
-    const panelRect = panelRef.current?.getBoundingClientRect();
-    if (!panelRect) {
-      return;
-    }
-
-    // Keep the menu pinned to the cursor and inside the viewport.
-    const menuWidth = 170;
-    const menuHeight = 96;
-    const viewportPadding = 8;
-    const localX = event.clientX - panelRect.left;
-    const localY = event.clientY - panelRect.top;
-    const x = Math.min(Math.max(viewportPadding, localX), panelRect.width - menuWidth - viewportPadding);
-    const y = Math.min(Math.max(viewportPadding, localY), panelRect.height - menuHeight - viewportPadding);
+    const { x, y } = clampMenuToViewport(event.clientX, event.clientY, 170, 96);
 
     setTrackContextMenu(null);
     setAlbumContextMenu({ x, y });
@@ -679,18 +677,9 @@ export function LibraryPane({
     event.preventDefault();
     event.stopPropagation();
 
-    const panelRect = panelRef.current?.getBoundingClientRect();
-    if (!panelRect) {
-      return;
-    }
-
-    const menuWidth = 240;
-    const menuHeight = 170;
-    const viewportPadding = 8;
-    const localX = event.clientX - panelRect.left;
-    const localY = event.clientY - panelRect.top;
-    const x = Math.min(Math.max(viewportPadding, localX), panelRect.width - menuWidth - viewportPadding);
-    const y = Math.min(Math.max(viewportPadding, localY), panelRect.height - menuHeight - viewportPadding);
+    // Use a larger estimate to avoid clipping when the move submenu is expanded near screen bottom.
+    const estimatedMenuHeight = 380;
+    const { x, y } = clampMenuToViewport(event.clientX, event.clientY, 240, estimatedMenuHeight);
 
     setAlbumContextMenu(null);
     setTrackContextMenu({
@@ -1095,31 +1084,33 @@ export function LibraryPane({
                   );
                 })}
 
-                <button
-                  className="library-context-menu-option track-context-target"
-                  disabled={isMovingTrack}
-                  onClick={() => void moveTrackToPickedDirectory()}
-                  type="button"
-                >
-                  Pick a different path...
-                </button>
+                <div className="track-context-submenu-actions">
+                  <button
+                    className="library-context-menu-option track-context-target"
+                    disabled={isMovingTrack}
+                    onClick={() => void moveTrackToPickedDirectory()}
+                    type="button"
+                  >
+                    Pick a different path...
+                  </button>
 
-                <button
-                  className="library-context-menu-option track-context-target"
-                  disabled={isMovingTrack}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  onClick={() =>
-                    setTrackContextMenu((current) =>
-                      current ? { ...current, showCreateAlbumInput: !current.showCreateAlbumInput } : current,
-                    )
-                  }
-                  type="button"
-                >
-                  Create new album...
-                </button>
+                  <button
+                    className="library-context-menu-option track-context-target"
+                    disabled={isMovingTrack}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClick={() =>
+                      setTrackContextMenu((current) =>
+                        current ? { ...current, showCreateAlbumInput: !current.showCreateAlbumInput } : current,
+                      )
+                    }
+                    type="button"
+                  >
+                    Create new album...
+                  </button>
+                </div>
 
                 {trackContextMenu.showCreateAlbumInput ? (
                   <div className="track-context-create-form">

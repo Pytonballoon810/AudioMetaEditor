@@ -653,7 +653,7 @@ textarea {
 }
 
 .library-context-menu-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 40;
 }
@@ -698,8 +698,16 @@ textarea {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: grid;
   gap: 0.15rem;
-  max-height: 240px;
+  max-height: min(48vh, 280px);
   overflow: auto;
+}
+
+.track-context-submenu-actions {
+  margin-top: 0.3rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  display: grid;
+  gap: 0.18rem;
 }
 
 .track-context-target {
