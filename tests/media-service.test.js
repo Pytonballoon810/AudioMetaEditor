@@ -21,6 +21,8 @@ const {
   getBestVideoCoverCandidate,
   pictureToDataUrl,
   requiresLocalFfmpegInput,
+  normalizeDirectoryPathForComparison,
+  isSameDirectoryPath,
 } = mediaService.__testables;
 
 describe('isSupportedAudioFile', () => {
@@ -65,6 +67,25 @@ describe('scanDirectory', () => {
     expect(result).not.toContain(txtPath);
 
     await fs.rm(root, { recursive: true, force: true });
+  });
+});
+
+describe('root pseudo-folder path comparison', () => {
+  it('normalizes trailing slashes and casing for Windows-style paths', () => {
+    expect(normalizeDirectoryPathForComparison('F:\\Music\\Album\\', 'win32')).toBe('f:\\music\\album');
+    expect(normalizeDirectoryPathForComparison('f:\\music\\album', 'win32')).toBe('f:\\music\\album');
+  });
+
+  it('treats Windows directory paths as equal when only casing differs', () => {
+    expect(isSameDirectoryPath('F:\\Music', 'f:\\music', 'win32')).toBe(true);
+  });
+
+  it('treats Windows directory paths as equal when only trailing slash differs', () => {
+    expect(isSameDirectoryPath('F:\\Music\\Album\\', 'F:\\Music\\Album', 'win32')).toBe(true);
+  });
+
+  it('keeps POSIX comparison case-sensitive', () => {
+    expect(isSameDirectoryPath('/music/Album', '/music/album', 'linux')).toBe(false);
   });
 });
 

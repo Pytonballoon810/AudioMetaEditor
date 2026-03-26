@@ -178,6 +178,25 @@ async function scanDirectory(directoryPath) {
   return results;
 }
 
+function normalizeDirectoryPathForComparison(directoryPath, platform = process.platform) {
+  if (typeof directoryPath !== 'string' || directoryPath.trim() === '') {
+    return '';
+  }
+
+  const pathApi = platform === 'win32' ? path.win32 : path.posix;
+  const resolved = pathApi.resolve(directoryPath);
+  const withoutTrailingSeparator = resolved.replace(/[\\/]+$/, '');
+
+  return platform === 'win32' ? withoutTrailingSeparator.toLowerCase() : withoutTrailingSeparator;
+}
+
+function isSameDirectoryPath(leftPath, rightPath, platform = process.platform) {
+  return (
+    normalizeDirectoryPathForComparison(leftPath, platform) ===
+    normalizeDirectoryPathForComparison(rightPath, platform)
+  );
+}
+
 function coerceSingleValue(value) {
   if (Array.isArray(value)) {
     return value.filter(Boolean).join(', ');
@@ -460,14 +479,15 @@ async function buildLibrary(pathsToScan) {
   for (const selectedPath of pathsToScan) {
     const stats = await fs.stat(selectedPath);
     if (stats.isDirectory()) {
+      const rootDirectory = path.resolve(selectedPath);
       const nested = await scanDirectory(selectedPath);
       for (const nestedPath of nested) {
         if (!seen.has(nestedPath)) {
           seen.add(nestedPath);
           files.push({
             path: nestedPath,
-            openedDirectoryRoot: selectedPath,
-            isInOpenedDirectoryRoot: path.dirname(nestedPath) === selectedPath,
+            openedDirectoryRoot: rootDirectory,
+            isInOpenedDirectoryRoot: isSameDirectoryPath(path.dirname(nestedPath), rootDirectory),
           });
         }
       }
@@ -825,6 +845,8 @@ module.exports = {
   extensionFromMimeType,
   __testables: {
     scanDirectory,
+    normalizeDirectoryPathForComparison,
+    isSameDirectoryPath,
     coerceSingleValue,
     detectProducerTag,
     toBinaryBuffer,
