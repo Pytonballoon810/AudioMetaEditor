@@ -742,6 +742,7 @@ async function saveMetadata(filePath, metadata) {
   const backupPath = await createSafetyBackup(filePath);
   let commitSucceeded = false;
   const args = ['-y', '-i', ffmpegInputPath];
+  const outputArgs = [];
 
   runDataSafetyHook('pre-write', {
     filePath,
@@ -767,15 +768,15 @@ async function saveMetadata(filePath, metadata) {
   if (supportsEmbeddedCover) {
     // Always remap MP3 output from audio stream, then optionally attach a normalized JPEG cover.
     // This prevents stale/unsupported artwork payloads and improves external server compatibility.
-    args.push('-map', '0:a', '-c:a', 'copy');
+    outputArgs.push('-map', '0:a', '-c:a', 'copy');
 
     if (tempCoverSourcePath && tempCoverPath) {
       await fs.writeFile(tempCoverSourcePath, coverArt.buffer);
       await runFfmpeg(['-y', '-i', tempCoverSourcePath, '-frames:v', '1', '-q:v', '2', tempCoverPath]);
 
-      args.push(
-        '-i',
-        tempCoverPath,
+      args.push('-i', tempCoverPath);
+
+      outputArgs.push(
         '-map',
         '1:v',
         '-c:v',
@@ -789,11 +790,11 @@ async function saveMetadata(filePath, metadata) {
       );
 
       if (extension === '.wav') {
-        args.push('-write_id3v2', '1', '-id3v2_version', '3');
+        outputArgs.push('-write_id3v2', '1', '-id3v2_version', '3');
       }
     }
   } else {
-    args.push('-map', '0', '-c', 'copy');
+    outputArgs.push('-map', '0', '-c', 'copy');
   }
 
   const metadataMap = {
@@ -812,15 +813,15 @@ async function saveMetadata(filePath, metadata) {
 
   for (const [key, value] of Object.entries(metadataMap)) {
     if (value) {
-      args.push('-metadata', `${key}=${value}`);
+      outputArgs.push('-metadata', `${key}=${value}`);
     }
   }
 
   if (extension === '.mp3') {
-    args.push('-id3v2_version', '3');
+    outputArgs.push('-id3v2_version', '3');
   }
 
-  args.push(tempOutput);
+  args.push(...outputArgs, tempOutput);
 
   try {
     await runFfmpeg(args);
