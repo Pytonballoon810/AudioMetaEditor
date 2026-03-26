@@ -123,14 +123,22 @@ function isSameDirectoryPath(leftPath: string, rightPath: string) {
   return normalizePathForUiComparison(leftPath) === normalizePathForUiComparison(rightPath);
 }
 
-function clampMenuToViewport(clientX: number, clientY: number, menuWidth: number, menuHeight: number) {
-  const viewportPadding = 8;
-  const maxX = Math.max(viewportPadding, window.innerWidth - menuWidth - viewportPadding);
-  const maxY = Math.max(viewportPadding, window.innerHeight - menuHeight - viewportPadding);
+function clampMenuToPanel(
+  panelRect: DOMRect,
+  anchorX: number,
+  anchorY: number,
+  menuWidth: number,
+  menuHeight: number,
+) {
+  const panelPadding = 8;
+  const localX = anchorX - panelRect.left;
+  const localY = anchorY - panelRect.top;
+  const maxX = Math.max(panelPadding, panelRect.width - menuWidth - panelPadding);
+  const maxY = Math.max(panelPadding, panelRect.height - menuHeight - panelPadding);
 
   return {
-    x: Math.min(Math.max(viewportPadding, clientX), maxX),
-    y: Math.min(Math.max(viewportPadding, clientY), maxY),
+    x: Math.min(Math.max(panelPadding, localX), maxX),
+    y: Math.min(Math.max(panelPadding, localY), maxY),
   };
 }
 
@@ -669,7 +677,12 @@ export function LibraryPane({
 
   function openAlbumContextMenu(event: ReactMouseEvent) {
     event.preventDefault();
-    const { x, y } = clampMenuToViewport(event.clientX, event.clientY, 170, 96);
+    const panelRect = panelRef.current?.getBoundingClientRect();
+    if (!panelRect) {
+      return;
+    }
+
+    const { x, y } = clampMenuToPanel(panelRect, event.clientX, event.clientY, 170, 96);
 
     setTrackContextMenu(null);
     setAlbumContextMenu({ x, y });
@@ -679,9 +692,13 @@ export function LibraryPane({
     event.preventDefault();
     event.stopPropagation();
 
-    // Use a larger estimate to avoid clipping when the move submenu is expanded near screen bottom.
-    const estimatedMenuHeight = 380;
-    const { x, y } = clampMenuToViewport(event.clientX, event.clientY, 240, estimatedMenuHeight);
+    const panelRect = panelRef.current?.getBoundingClientRect();
+    if (!panelRect) {
+      return;
+    }
+
+    const collapsedMenuHeight = 170;
+    const { x, y } = clampMenuToPanel(panelRect, event.clientX, event.clientY, 240, collapsedMenuHeight);
 
     setAlbumContextMenu(null);
     setTrackContextMenu({
@@ -1052,7 +1069,10 @@ export function LibraryPane({
                             ? 560
                             : 470
                           : 170;
-                        const repositioned = clampMenuToViewport(current.anchorX, current.anchorY, 240, estimatedHeight);
+                        const panelRect = panelRef.current?.getBoundingClientRect();
+                        const repositioned = panelRect
+                          ? clampMenuToPanel(panelRect, current.anchorX, current.anchorY, 240, estimatedHeight)
+                          : { x: current.x, y: current.y };
 
                         return {
                           ...current,
@@ -1126,12 +1146,10 @@ export function LibraryPane({
                           ? (() => {
                               const nextShowCreateAlbumInput = !current.showCreateAlbumInput;
                               const estimatedHeight = nextShowCreateAlbumInput ? 560 : 470;
-                              const repositioned = clampMenuToViewport(
-                                current.anchorX,
-                                current.anchorY,
-                                240,
-                                estimatedHeight,
-                              );
+                              const panelRect = panelRef.current?.getBoundingClientRect();
+                              const repositioned = panelRect
+                                ? clampMenuToPanel(panelRect, current.anchorX, current.anchorY, 240, estimatedHeight)
+                                : { x: current.x, y: current.y };
 
                               return {
                                 ...current,

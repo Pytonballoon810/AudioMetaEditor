@@ -657,7 +657,7 @@ textarea {
 }
 
 .library-context-menu-backdrop {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 40;
 }
