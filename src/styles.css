@@ -500,6 +500,12 @@ textarea {
   cursor: pointer;
 }
 
+.library-album-header.active {
+  background: linear-gradient(135deg, rgba(117, 201, 255, 0.12), rgba(255, 94, 168, 0.2));
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
 .library-album-name-button,
 .library-album-collapse-button {
   border: none;

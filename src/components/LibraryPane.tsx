@@ -876,13 +876,16 @@ export function LibraryPane({
       </div>
 
       <div className="library-list" role="list">
-        {groupedItems.map((group) => (
-          <section className="library-album-group" key={group.groupKey}>
-            <div
-              className="library-album-header"
-              onClick={() => toggleAlbumCollapsed(group.groupKey)}
-              onContextMenu={openAlbumContextMenu}
-            >
+        {groupedItems.map((group) => {
+          const isActiveGroup = Boolean(currentPath && group.items.some((track) => track.path === currentPath));
+
+          return (
+            <section className="library-album-group" key={group.groupKey}>
+              <div
+                className={`library-album-header${isActiveGroup ? ' active' : ''}`}
+                onClick={() => toggleAlbumCollapsed(group.groupKey)}
+                onContextMenu={openAlbumContextMenu}
+              >
               <div className="library-album-header-left">
                 {group.isRootPseudoAlbum ? (
                   <div className="library-root-folder-icon" aria-hidden="true">
@@ -933,48 +936,49 @@ export function LibraryPane({
                   </span>
                 </button>
               </span>
-            </div>
-            {group.hasAlbumNameDiscrepancy ? (
-              <p className="library-album-warning">
-                Album metadata mismatch on {group.mismatchCount} track{group.mismatchCount === 1 ? '' : 's'} in this
-                folder.
-              </p>
-            ) : null}
+              </div>
+              {group.hasAlbumNameDiscrepancy ? (
+                <p className="library-album-warning">
+                  Album metadata mismatch on {group.mismatchCount} track{group.mismatchCount === 1 ? '' : 's'} in this
+                  folder.
+                </p>
+              ) : null}
 
-            {!collapsedAlbums[group.groupKey]
-              ? group.items.map((item) => {
-                  const isActive = item.path === currentPath;
-                  const hasMismatch = group.mismatchedTrackPaths.has(item.path);
-                  return (
-                    <button
-                      key={item.path}
-                      className={`library-item${isActive ? ' active' : ''}`}
-                      onContextMenu={(event) => openTrackContextMenu(event, item)}
-                      onClick={() => onSelect(item)}
-                      type="button"
-                    >
-                      <div>
-                        <strong>{item.metadata.title || item.name}</strong>
-                        <p>{item.metadata.artist || 'Unknown artist'}</p>
-                      </div>
-                      <div className="library-meta">
-                        <span>{item.extension.toUpperCase()}</span>
-                        <span>{formatDuration(item.metadata.duration)}</span>
-                        {hasMismatch ? (
-                          <span
-                            className="library-warning-icon"
-                            title="Track album tag differs from the rest of this folder"
-                          >
-                            ⚠
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-                  );
-                })
-              : null}
-          </section>
-        ))}
+              {!collapsedAlbums[group.groupKey]
+                ? group.items.map((item) => {
+                    const isActive = item.path === currentPath;
+                    const hasMismatch = group.mismatchedTrackPaths.has(item.path);
+                    return (
+                      <button
+                        key={item.path}
+                        className={`library-item${isActive ? ' active' : ''}`}
+                        onContextMenu={(event) => openTrackContextMenu(event, item)}
+                        onClick={() => onSelect(item)}
+                        type="button"
+                      >
+                        <div>
+                          <strong>{item.metadata.title || item.name}</strong>
+                          <p>{item.metadata.artist || 'Unknown artist'}</p>
+                        </div>
+                        <div className="library-meta">
+                          <span>{item.extension.toUpperCase()}</span>
+                          <span>{formatDuration(item.metadata.duration)}</span>
+                          {hasMismatch ? (
+                            <span
+                              className="library-warning-icon"
+                              title="Track album tag differs from the rest of this folder"
+                            >
+                              ⚠
+                            </span>
+                          ) : null}
+                        </div>
+                      </button>
+                    );
+                  })
+                : null}
+            </section>
+          );
+        })}
 
         {groupedItems.length === 0 ? (
           <p className="empty-state">
