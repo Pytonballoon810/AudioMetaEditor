@@ -56,7 +56,7 @@ export function useDesktopBridgeSubscriptions({
       setLibrary(payload.items);
       setLibraryWidth(estimateLibraryWidthForItems(payload.items));
       setActivePath((current) => {
-        if (current && payload.items.some((item) => item.path === current)) {
+        if (current) {
           return current;
         }
 

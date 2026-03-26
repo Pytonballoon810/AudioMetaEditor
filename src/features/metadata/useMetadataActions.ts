@@ -31,7 +31,21 @@ export function useMetadataActions({ activeItem, library, setLibrary, setStatus 
 
     try {
       const api = requireAudioMetaApi();
+      if (metadata.coverArt && typeof metadata.coverArt === 'string') {
+        console.log('[metadata-debug] save-track:cover-art-payload', {
+          filePath: activeItem.path,
+          coverPrefix: metadata.coverArt.slice(0, 40),
+          payloadLength: metadata.coverArt.length,
+        });
+      }
       const result = await api.saveMetadata({ filePath: activeItem.path, metadata });
+
+      if (metadata.coverArt && !result.metadata.coverArt) {
+        console.warn('[metadata-debug] save-track:cover-missing-after-save', {
+          filePath: activeItem.path,
+        });
+      }
+
       setLibrary((current) =>
         current.map((item) => (item.path === result.filePath ? { ...item, metadata: result.metadata } : item)),
       );

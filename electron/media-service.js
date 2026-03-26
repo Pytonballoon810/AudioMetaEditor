@@ -705,6 +705,13 @@ function runDataSafetyHook(phase, details) {
 
 async function saveMetadata(filePath, metadata) {
   console.log('[backend-action] saveMetadata:start', filePath);
+  if (metadata?.coverArt) {
+    console.log('[metadata-debug] saveMetadata:cover-art-received', {
+      filePath,
+      isDataUrl: typeof metadata.coverArt === 'string' && metadata.coverArt.startsWith('data:'),
+      payloadLength: typeof metadata.coverArt === 'string' ? metadata.coverArt.length : 0,
+    });
+  }
   const sourceStatsBefore = await fs.stat(filePath);
   if (!sourceStatsBefore.isFile()) {
     throw new Error('Metadata can only be saved for regular files.');
@@ -734,6 +741,13 @@ async function saveMetadata(filePath, metadata) {
 
   if (parsedCoverArt && !coverArt) {
     console.warn('[saveMetadata] Ignoring invalid cover art payload for', filePath);
+  } else if (coverArt) {
+    console.log('[metadata-debug] saveMetadata:normalized-cover-art', {
+      filePath,
+      mimeType: coverArt.mimeType,
+      extension: coverArt.extension,
+      sizeBytes: coverArt.buffer.length,
+    });
   }
 
   if (tempInput) {
@@ -807,6 +821,12 @@ async function saveMetadata(filePath, metadata) {
     const extracted = await extractMetadata(filePath);
     if (metadata.coverArt && !extracted.coverArt) {
       console.warn('[backend-action] saveMetadata:cover-missing-after-write', filePath);
+    } else if (metadata.coverArt && extracted.coverArt) {
+      console.log('[metadata-debug] saveMetadata:cover-present-after-write', {
+        filePath,
+        extractedPrefix: extracted.coverArt.slice(0, 30),
+        extractedLength: extracted.coverArt.length,
+      });
     }
 
     runDataSafetyHook('post-write-validated', {

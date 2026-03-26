@@ -105,6 +105,16 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
         return;
       }
 
+      if (
+        error &&
+        typeof error === 'object' &&
+        'message' in error &&
+        String((error as { message: string }).message).includes('PIPELINE_ERROR_READ')
+      ) {
+        debugLog('[useWaveSurfer] Ignoring transient pipeline read error during source reload:', error);
+        return;
+      }
+
       console.error('[useWaveSurfer] WaveSurfer error:', error);
     });
 
@@ -228,6 +238,19 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       } catch (error) {
         if (isAbortLikeError(error)) {
           debugLog('[useWaveSurfer] Load aborted due to track switch; ignoring.');
+          if (currentLoadSequence === loadSequenceRef.current) {
+            setIsWaveformLoading(false);
+          }
+          return;
+        }
+
+        if (
+          error &&
+          typeof error === 'object' &&
+          'message' in error &&
+          String((error as { message: string }).message).includes('PIPELINE_ERROR_READ')
+        ) {
+          debugLog('[useWaveSurfer] Ignoring transient FFmpegDemuxer read error during reload.');
           if (currentLoadSequence === loadSequenceRef.current) {
             setIsWaveformLoading(false);
           }
