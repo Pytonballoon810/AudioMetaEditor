@@ -88,6 +88,8 @@ type AlbumContextMenuState = {
 };
 
 type TrackContextMenuState = {
+  anchorX: number;
+  anchorY: number;
   x: number;
   y: number;
   item: AudioLibraryItem;
@@ -683,6 +685,8 @@ export function LibraryPane({
 
     setAlbumContextMenu(null);
     setTrackContextMenu({
+      anchorX: event.clientX,
+      anchorY: event.clientY,
       x,
       y,
       item,
@@ -1040,11 +1044,24 @@ export function LibraryPane({
               onClick={() =>
                 setTrackContextMenu((current) =>
                   current
-                    ? {
-                        ...current,
-                        showMoveTargets: !current.showMoveTargets,
-                        showCreateAlbumInput: current.showMoveTargets ? false : current.showCreateAlbumInput,
-                      }
+                    ? (() => {
+                        const nextShowMoveTargets = !current.showMoveTargets;
+                        const nextShowCreateAlbumInput = nextShowMoveTargets ? current.showCreateAlbumInput : false;
+                        const estimatedHeight = nextShowMoveTargets
+                          ? nextShowCreateAlbumInput
+                            ? 560
+                            : 470
+                          : 170;
+                        const repositioned = clampMenuToViewport(current.anchorX, current.anchorY, 240, estimatedHeight);
+
+                        return {
+                          ...current,
+                          x: repositioned.x,
+                          y: repositioned.y,
+                          showMoveTargets: nextShowMoveTargets,
+                          showCreateAlbumInput: nextShowCreateAlbumInput,
+                        };
+                      })()
                     : current,
                 )
               }
@@ -1053,18 +1070,20 @@ export function LibraryPane({
               Move to album...
             </button>
 
-            <button
-              className="library-context-menu-option"
-              disabled={isMovingTrack}
-              onMouseDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-              onClick={() => void onOpenFileLocation(trackContextMenu.item).finally(() => setTrackContextMenu(null))}
-              type="button"
-            >
-              Open file location
-            </button>
+            {!trackContextMenu.showMoveTargets ? (
+              <button
+                className="library-context-menu-option"
+                disabled={isMovingTrack}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onClick={() => void onOpenFileLocation(trackContextMenu.item).finally(() => setTrackContextMenu(null))}
+                type="button"
+              >
+                Open file location
+              </button>
+            ) : null}
 
             {trackContextMenu.showMoveTargets ? (
               <div className="track-context-submenu">
@@ -1103,7 +1122,25 @@ export function LibraryPane({
                     }}
                     onClick={() =>
                       setTrackContextMenu((current) =>
-                        current ? { ...current, showCreateAlbumInput: !current.showCreateAlbumInput } : current,
+                        current
+                          ? (() => {
+                              const nextShowCreateAlbumInput = !current.showCreateAlbumInput;
+                              const estimatedHeight = nextShowCreateAlbumInput ? 560 : 470;
+                              const repositioned = clampMenuToViewport(
+                                current.anchorX,
+                                current.anchorY,
+                                240,
+                                estimatedHeight,
+                              );
+
+                              return {
+                                ...current,
+                                x: repositioned.x,
+                                y: repositioned.y,
+                                showCreateAlbumInput: nextShowCreateAlbumInput,
+                              };
+                            })()
+                          : current,
                       )
                     }
                     type="button"
