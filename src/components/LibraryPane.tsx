@@ -1,6 +1,14 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Album01Icon, Copy01Icon, Folder01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import type { AudioLibraryItem, EditableMetadata } from '../types';
 import { formatDuration } from '../lib/format';
 import { requireAudioMetaApi } from '../services/audioMetaApi';
@@ -282,6 +290,7 @@ export function LibraryPane({
   onReloadLibrary,
 }: LibraryPaneProps) {
   const panelRef = useRef<HTMLElement | null>(null);
+  const trackSubmenuRef = useRef<HTMLDivElement | null>(null);
   const albumMenuRef = useRef<HTMLDivElement | null>(null);
   const trackMenuRef = useRef<HTMLDivElement | null>(null);
   const albumCoverInputRef = useRef<HTMLInputElement | null>(null);
@@ -344,6 +353,17 @@ export function LibraryPane({
       window.removeEventListener('pointerdown', handleGlobalPointerDown);
     };
   }, [albumContextMenu, trackContextMenu]);
+
+  useLayoutEffect(() => {
+    if (!trackContextMenu?.showCreateAlbumInput) {
+      return;
+    }
+
+    trackSubmenuRef.current?.scrollTo({
+      top: trackSubmenuRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [trackContextMenu?.showCreateAlbumInput]);
 
   const activeSortLabel = useMemo(
     () => SORT_OPTIONS.find((option) => option.value === sortMethod)?.label || 'Sort',
@@ -768,6 +788,7 @@ export function LibraryPane({
     }
 
     await moveTrackToDirectory(destination);
+    setTrackContextMenu(null);
   }
 
   async function moveTrackToNewAlbumInRoot() {
@@ -786,6 +807,7 @@ export function LibraryPane({
     const normalizedRoot = rootDirectory.replace(/[\\/]+$/, '');
     const targetDirectory = `${normalizedRoot}${separator}${albumName}`;
     await moveTrackToDirectory(targetDirectory);
+    setTrackContextMenu(null);
   }
 
   async function saveAlbumEditorChanges() {
@@ -1135,7 +1157,7 @@ export function LibraryPane({
             ) : null}
 
             {trackContextMenu.showMoveTargets ? (
-              <div className="track-context-submenu">
+              <div className="track-context-submenu" ref={trackSubmenuRef}>
                 {groupedItems.map((group) => {
                   const isCurrentFolder = group.folderPath === trackContextMenu.item.directory;
                   return (

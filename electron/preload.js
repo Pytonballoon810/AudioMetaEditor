@@ -166,5 +166,10 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
     apiLogListeners.add(callback);
     return () => apiLogListeners.delete(callback);
   },
+  onLibraryProgress: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('library:progress', listener);
+    return () => ipcRenderer.removeListener('library:progress', listener);
+  },
   toMediaUrl: (filePath) => `audio-meta://${encodeURIComponent(filePath)}`,
 });

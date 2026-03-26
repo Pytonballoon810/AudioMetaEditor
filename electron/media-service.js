@@ -472,7 +472,7 @@ async function extractMetadata(filePath) {
   };
 }
 
-async function buildLibrary(pathsToScan) {
+async function buildLibrary(pathsToScan, onProgress) {
   const seen = new Set();
   const files = [];
 
@@ -504,22 +504,32 @@ async function buildLibrary(pathsToScan) {
     }
   }
 
-  const items = await Promise.all(
-    files
-      .sort((left, right) => left.path.localeCompare(right.path))
-      .map(async (file) => {
-        const metadata = await extractMetadata(file.path);
-        return {
-          path: file.path,
-          name: path.basename(file.path),
-          directory: path.dirname(file.path),
-          extension: path.extname(file.path).slice(1).toLowerCase(),
-          openedDirectoryRoot: file.openedDirectoryRoot,
-          isInOpenedDirectoryRoot: file.isInOpenedDirectoryRoot,
-          metadata,
-        };
-      }),
-  );
+  const sortedFiles = files.sort((left, right) => left.path.localeCompare(right.path));
+  const items = [];
+
+  for (let index = 0; index < sortedFiles.length; index += 1) {
+    const file = sortedFiles[index];
+    const metadata = await extractMetadata(file.path);
+    const nextItem = {
+      path: file.path,
+      name: path.basename(file.path),
+      directory: path.dirname(file.path),
+      extension: path.extname(file.path).slice(1).toLowerCase(),
+      openedDirectoryRoot: file.openedDirectoryRoot,
+      isInOpenedDirectoryRoot: file.isInOpenedDirectoryRoot,
+      metadata,
+    };
+
+    items.push(nextItem);
+
+    if (typeof onProgress === 'function') {
+      onProgress({
+        loaded: index + 1,
+        total: sortedFiles.length,
+        items: [...items],
+      });
+    }
+  }
 
   return items;
 }

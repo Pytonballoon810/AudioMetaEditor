@@ -195,6 +195,10 @@ export default function App() {
   useDesktopBridgeSubscriptions({
     audioMetaApi,
     loadPaths,
+    setLibrary,
+    setActivePath,
+    setLibraryWidth,
+    estimateLibraryWidthForItems,
     setStatus,
   });
 

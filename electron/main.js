@@ -410,7 +410,13 @@ app.whenReady().then(async () => {
   registerIpcHandler('library:load', async (_event, pathsToScan) => {
     validateLibraryLoadPayload(pathsToScan);
     console.log('[backend-action] library:load:start', Array.isArray(pathsToScan) ? pathsToScan.length : 0);
-    const result = await buildLibrary(pathsToScan);
+    const result = await buildLibrary(pathsToScan, (progress) => {
+      try {
+        _event.sender.send('library:progress', progress);
+      } catch (error) {
+        console.warn('[backend-action] library:load:progress-send-failed', error);
+      }
+    });
     console.log('[backend-action] library:load:done', result.length);
     return result;
   });
