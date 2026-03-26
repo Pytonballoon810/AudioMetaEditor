@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.js';
-import { requireAudioMetaApi } from '../services/audioMetaApi';
+import { getCachedAudioBlob, preloadAudioBlob } from '../services/audioMetaApi';
 import { endPerfTimer, logMemorySnapshot, startPerfTimer } from '../lib/performance';
 
 const IS_DEV = import.meta.env.DEV;
@@ -183,8 +183,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
 
       try {
         debugLog('[useWaveSurfer] Loading audio:', audioUrl);
-        const bridgeApi = requireAudioMetaApi();
-        const mediaUrl = await bridgeApi.loadAudioBlob(audioUrl);
+        const mediaUrl = getCachedAudioBlob(audioUrl) || (await preloadAudioBlob(audioUrl));
 
         // Check if component is still mounted and WaveSurfer instance still exists
         if (!isMounted || !waveSurferRef.current) {

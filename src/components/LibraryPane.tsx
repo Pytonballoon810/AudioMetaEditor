@@ -11,7 +11,7 @@ import {
 } from 'react';
 import type { AudioLibraryItem, EditableMetadata } from '../types';
 import { formatDuration } from '../lib/format';
-import { requireAudioMetaApi } from '../services/audioMetaApi';
+import { preloadAudioBlob, requireAudioMetaApi } from '../services/audioMetaApi';
 import defaultCover from '../assets/defaultCover.png';
 
 type LibraryPaneProps = {
@@ -640,10 +640,27 @@ export function LibraryPane({
   }
 
   function toggleAlbumCollapsed(folderPath: string) {
-    setCollapsedAlbums((current) => ({
-      ...current,
-      [folderPath]: !current[folderPath],
-    }));
+    setCollapsedAlbums((current) => {
+      const isCurrentlyCollapsed = current[folderPath] ?? true;
+      const nextIsCollapsed = !isCurrentlyCollapsed;
+
+      if (!nextIsCollapsed) {
+        const targetGroup = groupedItems.find((group) => group.groupKey === folderPath);
+        if (targetGroup) {
+          const preloadTargets = targetGroup.items.slice(0, 6);
+          preloadTargets.forEach((track) => {
+            void preloadAudioBlob(track.path).catch(() => {
+              // Best-effort warm cache only.
+            });
+          });
+        }
+      }
+
+      return {
+        ...current,
+        [folderPath]: nextIsCollapsed,
+      };
+    });
   }
 
   function openAlbumEditor(folderPath: string, folderName: string, albumItems: AudioLibraryItem[]) {
@@ -720,6 +737,14 @@ export function LibraryPane({
       nextState[group.groupKey] = false;
     });
     setCollapsedAlbums(nextState);
+
+    groupedItems.forEach((group) => {
+      group.items.slice(0, 3).forEach((track) => {
+        void preloadAudioBlob(track.path).catch(() => {
+          // Best-effort warm cache only.
+        });
+      });
+    });
   }
 
   function openAlbumContextMenu(event: ReactMouseEvent) {
@@ -937,6 +962,7 @@ export function LibraryPane({
       <div className="library-list" role="list">
         {groupedItems.map((group) => {
           const isActiveGroup = Boolean(currentPath && group.items.some((track) => track.path === currentPath));
+          const isGroupCollapsed = collapsedAlbums[group.groupKey] ?? true;
 
           return (
             <section className="library-album-group" key={group.groupKey}>
@@ -945,56 +971,56 @@ export function LibraryPane({
                 onClick={() => toggleAlbumCollapsed(group.groupKey)}
                 onContextMenu={openAlbumContextMenu}
               >
-              <div className="library-album-header-left">
-                {group.isRootPseudoAlbum ? (
-                  <div className="library-root-folder-icon" aria-hidden="true">
-                    <HugeiconsIcon icon={Folder01Icon} size={16} strokeWidth={1.9} />
-                  </div>
-                ) : group.uniqueCovers.length > 0 ? (
-                  <div className="library-album-covers" aria-hidden="true">
-                    {group.uniqueCovers.map((cover, index) => (
-                      <img
-                        key={`${group.folderPath}-cover-${index}`}
-                        className="library-album-cover"
-                        src={cover ?? undefined}
-                        alt=""
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="library-album-covers placeholder" aria-hidden="true" />
-                )}
-                <button
-                  className="library-album-name-button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openAlbumEditor(group.folderPath, group.folderName, group.items);
-                  }}
-                  title="Edit album metadata for all tracks in this folder"
-                  type="button"
-                >
-                  <strong>{group.folderName}</strong>
-                </button>
-              </div>
-              <span className="library-album-meta">
-                {group.items.length} tracks
-                <button
-                  className="library-album-collapse-button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    toggleAlbumCollapsed(group.groupKey);
-                  }}
-                  title={collapsedAlbums[group.groupKey] ? 'Expand album tracks' : 'Collapse album tracks'}
-                  type="button"
-                >
-                  <span
-                    className={`library-album-chevron${collapsedAlbums[group.groupKey] ? '' : ' open'}`}
-                    aria-hidden="true"
+                <div className="library-album-header-left">
+                  {group.isRootPseudoAlbum ? (
+                    <div className="library-root-folder-icon" aria-hidden="true">
+                      <HugeiconsIcon icon={Folder01Icon} size={16} strokeWidth={1.9} />
+                    </div>
+                  ) : group.uniqueCovers.length > 0 ? (
+                    <div className="library-album-covers" aria-hidden="true">
+                      {group.uniqueCovers.map((cover, index) => (
+                        <img
+                          key={`${group.folderPath}-cover-${index}`}
+                          className="library-album-cover"
+                          src={cover ?? undefined}
+                          alt=""
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="library-album-covers placeholder" aria-hidden="true" />
+                  )}
+                  <button
+                    className="library-album-name-button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openAlbumEditor(group.folderPath, group.folderName, group.items);
+                    }}
+                    title="Edit album metadata for all tracks in this folder"
+                    type="button"
                   >
-                    ▾
-                  </span>
-                </button>
-              </span>
+                    <strong>{group.folderName}</strong>
+                  </button>
+                </div>
+                <span className="library-album-meta">
+                  {group.items.length} tracks
+                  <button
+                    className="library-album-collapse-button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleAlbumCollapsed(group.groupKey);
+                    }}
+                    title={isGroupCollapsed ? 'Expand album tracks' : 'Collapse album tracks'}
+                    type="button"
+                  >
+                    <span
+                      className={`library-album-chevron${isGroupCollapsed ? '' : ' open'}`}
+                      aria-hidden="true"
+                    >
+                      ▾
+                    </span>
+                  </button>
+                </span>
               </div>
               {group.hasAlbumNameDiscrepancy ? (
                 <p className="library-album-warning">
@@ -1003,7 +1029,7 @@ export function LibraryPane({
                 </p>
               ) : null}
 
-              {!collapsedAlbums[group.groupKey]
+              {!isGroupCollapsed
                 ? group.items.map((item) => {
                     const isActive = item.path === currentPath;
                     const hasMismatch = group.mismatchedTrackPaths.has(item.path);
