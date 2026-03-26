@@ -12,6 +12,18 @@ function debugLog(...args: unknown[]) {
   }
 }
 
+function isAbortLikeError(error: unknown) {
+  if (!error) {
+    return false;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+  const name = error instanceof Error ? error.name.toLowerCase() : '';
+
+  return name.includes('abort') || lower.includes('abort');
+}
+
 type UseWaveSurferOptions = {
   audioUrl: string | null;
   onReady?: (duration: number) => void;
@@ -88,6 +100,11 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     });
 
     waveSurfer.on('error', (error) => {
+      if (isAbortLikeError(error)) {
+        debugLog('[useWaveSurfer] Ignoring expected waveform abort:', error);
+        return;
+      }
+
       console.error('[useWaveSurfer] WaveSurfer error:', error);
     });
 
@@ -209,6 +226,14 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
           }
         }, hideDelayMs);
       } catch (error) {
+        if (isAbortLikeError(error)) {
+          debugLog('[useWaveSurfer] Load aborted due to track switch; ignoring.');
+          if (currentLoadSequence === loadSequenceRef.current) {
+            setIsWaveformLoading(false);
+          }
+          return;
+        }
+
         if (currentLoadSequence === loadSequenceRef.current) {
           endPerfTimer('waveform:load:error', loadStartedAt);
           logMemorySnapshot('waveform:load:error');
