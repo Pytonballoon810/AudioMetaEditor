@@ -282,6 +282,8 @@ export function LibraryPane({
   onReloadLibrary,
 }: LibraryPaneProps) {
   const panelRef = useRef<HTMLElement | null>(null);
+  const albumMenuRef = useRef<HTMLDivElement | null>(null);
+  const trackMenuRef = useRef<HTMLDivElement | null>(null);
   const albumCoverInputRef = useRef<HTMLInputElement | null>(null);
   const [sortMethod, setSortMethod] = useState<LibrarySortMethod>('folder-asc');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
@@ -317,6 +319,31 @@ export function LibraryPane({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [editingAlbum, isApplyingAlbumEdit]);
+
+  useEffect(() => {
+    if (!albumContextMenu && !trackContextMenu) {
+      return;
+    }
+
+    function handleGlobalPointerDown(event: PointerEvent) {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) {
+        return;
+      }
+
+      if (albumMenuRef.current?.contains(targetNode) || trackMenuRef.current?.contains(targetNode)) {
+        return;
+      }
+
+      setAlbumContextMenu(null);
+      setTrackContextMenu(null);
+    }
+
+    window.addEventListener('pointerdown', handleGlobalPointerDown);
+    return () => {
+      window.removeEventListener('pointerdown', handleGlobalPointerDown);
+    };
+  }, [albumContextMenu, trackContextMenu]);
 
   const activeSortLabel = useMemo(
     () => SORT_OPTIONS.find((option) => option.value === sortMethod)?.label || 'Sort',
@@ -1010,6 +1037,7 @@ export function LibraryPane({
           <div
             className="library-context-menu"
             onClick={(event) => event.stopPropagation()}
+            ref={albumMenuRef}
             style={{ left: albumContextMenu.x, top: albumContextMenu.y }}
           >
             <button
@@ -1049,6 +1077,7 @@ export function LibraryPane({
           <div
             className="library-context-menu track-context-menu"
             onClick={(event) => event.stopPropagation()}
+            ref={trackMenuRef}
             style={{ left: trackContextMenu.x, top: trackContextMenu.y }}
           >
             <button
