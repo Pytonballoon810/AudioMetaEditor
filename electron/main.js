@@ -271,6 +271,17 @@ function registerIpcHandler(channel, handler) {
 async function createWindow() {
   const runtimeIconPath = resolveRuntimeIconPath();
   const restoredWindowState = getRestoredWindowState();
+  const customFrameOptions =
+    process.platform === 'win32'
+      ? {
+          titleBarStyle: 'hidden',
+          titleBarOverlay: {
+            color: '#101416',
+            symbolColor: '#eef4f3',
+            height: 40,
+          },
+        }
+      : {};
 
   mainWindow = new BrowserWindow({
     width: DEFAULT_WINDOW_WIDTH,
@@ -281,6 +292,7 @@ async function createWindow() {
     autoHideMenuBar: true,
     ...(restoredWindowState ? restoredWindowState.bounds : {}),
     ...(runtimeIconPath ? { icon: runtimeIconPath } : {}),
+    ...customFrameOptions,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
