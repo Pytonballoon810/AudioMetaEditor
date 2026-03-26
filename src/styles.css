@@ -115,12 +115,32 @@ textarea {
   overflow: hidden;
 }
 
+.window-drag-region {
+  position: fixed;
+  top: env(titlebar-area-y, 0px);
+  left: env(titlebar-area-x, 0px);
+  width: env(titlebar-area-width, 100vw);
+  height: env(titlebar-area-height, 40px);
+  -webkit-app-region: drag;
+  pointer-events: none;
+  z-index: 50;
+}
+
 .topbar {
   align-items: center;
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.25rem;
+  -webkit-app-region: no-drag;
+}
+
+.topbar button,
+.topbar input,
+.topbar textarea,
+.topbar select,
+.topbar a {
+  -webkit-app-region: no-drag;
 }
 
 .topbar h1,

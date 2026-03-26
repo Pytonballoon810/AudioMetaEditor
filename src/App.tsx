@@ -308,6 +308,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <div aria-hidden="true" className="window-drag-region" />
       <header className="topbar">
         <div>
           <p className="eyebrow">Desktop audio workstation</p>
