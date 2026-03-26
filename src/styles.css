@@ -307,6 +307,48 @@ textarea {
   padding: 0.4rem 0.7rem;
 }
 
+.library-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.library-reload-button {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.library-reload-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(117, 201, 255, 0.6);
+  background: rgba(117, 201, 255, 0.16);
+}
+
+.library-reload-button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.library-reload-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(117, 201, 255, 0.28);
+  border-top-color: var(--cool);
+  animation: waveform-spin 0.8s linear infinite;
+}
+
 .library-panel,
 .metadata-panel {
   display: flex;

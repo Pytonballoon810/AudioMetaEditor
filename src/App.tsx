@@ -293,6 +293,15 @@ export default function App() {
     }
   }
 
+  async function handleReloadLibrary() {
+    if (loadedSourcePaths.length === 0) {
+      setStatus('Open a file or directory first.');
+      return;
+    }
+
+    await loadPaths(loadedSourcePaths, activePath);
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -317,9 +326,11 @@ export default function App() {
         <LibraryPane
           items={library}
           currentPath={activeItem?.path ?? null}
+          isLoading={isLoadingLibrary}
           onApplyAlbumFields={handleApplyAlbumFields}
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
           onOpenFileLocation={handleOpenFileLocation}
+          onReloadLibrary={handleReloadLibrary}
           onSelect={(item) => setActivePath(item.path)}
         />
         <div

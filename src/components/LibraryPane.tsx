@@ -9,10 +9,12 @@ import defaultCover from '../assets/defaultCover.png';
 type LibraryPaneProps = {
   items: AudioLibraryItem[];
   currentPath: string | null;
+  isLoading: boolean;
   onSelect: (item: AudioLibraryItem) => void;
   onApplyAlbumFields: (folderPath: string, metadata: AlbumBulkEditFields) => Promise<void>;
   onMoveTrackToAlbum: (item: AudioLibraryItem, targetDirectory: string) => Promise<void>;
   onOpenFileLocation: (item: AudioLibraryItem) => Promise<void>;
+  onReloadLibrary: () => Promise<void>;
 };
 
 export type AlbumBulkEditableValues = Pick<
@@ -243,10 +245,12 @@ function AlbumEditSuggestionInput({
 export function LibraryPane({
   items,
   currentPath,
+  isLoading,
   onSelect,
   onApplyAlbumFields,
   onMoveTrackToAlbum,
   onOpenFileLocation,
+  onReloadLibrary,
 }: LibraryPaneProps) {
   const panelRef = useRef<HTMLElement | null>(null);
   const albumCoverInputRef = useRef<HTMLInputElement | null>(null);
@@ -794,7 +798,23 @@ export function LibraryPane({
           <p className="eyebrow">Library</p>
           <h2>Current queue</h2>
         </div>
-        <span className="pill">{items.length} files</span>
+        <div className="library-heading-actions">
+          <span className="pill">{items.length} files</span>
+          <button
+            aria-label={isLoading ? 'Reindexing library…' : 'Reload and reindex loaded tracks'}
+            className="library-reload-button"
+            disabled={isLoading || items.length === 0}
+            onClick={() => void onReloadLibrary()}
+            title={isLoading ? 'Reindexing…' : 'Reload and reindex loaded tracks'}
+            type="button"
+          >
+            {isLoading ? (
+              <span aria-hidden="true" className="library-reload-spinner" />
+            ) : (
+              <HugeiconsIcon aria-hidden="true" icon={RedoIcon} size={16} strokeWidth={1.9} />
+            )}
+          </button>
+        </div>
       </div>
 
       <div className="library-toolbar">
