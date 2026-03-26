@@ -304,38 +304,6 @@ async function removeCoverSidecars(filePath) {
   await Promise.all(candidates.map((candidate) => fs.rm(candidate, { force: true })));
 }
 
-async function writeCoverSidecar(filePath, coverArt) {
-  await removeCoverSidecars(filePath);
-
-  if (!coverArt?.buffer || !coverArt?.extension) {
-    return null;
-  }
-
-  const sidecarPath = `${filePath}.cover.${coverArt.extension}`;
-  await fs.writeFile(sidecarPath, coverArt.buffer);
-  return sidecarPath;
-}
-
-async function readCoverFromSidecar(filePath) {
-  const candidates = getCoverSidecarCandidates(filePath);
-
-  for (const candidate of candidates) {
-    try {
-      const buffer = await fs.readFile(candidate);
-      const detected = detectImageFormat(buffer);
-      if (!detected?.mimeType) {
-        continue;
-      }
-
-      return bufferToDataUrl(buffer, detected.mimeType);
-    } catch {
-      // Try next sidecar candidate.
-    }
-  }
-
-  return null;
-}
-
 function pickBestCoverPicture(pictures = []) {
   if (!Array.isArray(pictures) || pictures.length === 0) {
     return null;
@@ -492,7 +460,6 @@ async function extractMetadata(filePath) {
   const common = parsed.common;
   const metadataCoverArt = pictureToDataUrl(pickBestCoverPicture(common.picture));
   const fallbackCoverArt = metadataCoverArt ? null : await extractCoverArtFromVideoStreams(filePath);
-  const sidecarCoverArt = metadataCoverArt || fallbackCoverArt ? null : await readCoverFromSidecar(filePath);
 
   return {
     title: common.title || path.basename(filePath, path.extname(filePath)),
@@ -506,7 +473,7 @@ async function extractMetadata(filePath) {
     track: common.track?.no ? String(common.track.no) : '',
     disc: common.disk?.no ? String(common.disk.no) : '',
     comment: coerceSingleValue(common.comment),
-    coverArt: metadataCoverArt || fallbackCoverArt || sidecarCoverArt,
+    coverArt: metadataCoverArt || fallbackCoverArt,
     duration: parsed.format.duration || 0,
     sampleRate: parsed.format.sampleRate || 0,
     bitrate: parsed.format.bitrate || 0,
@@ -771,7 +738,7 @@ async function saveMetadata(filePath, metadata) {
   const coverArt = normalizeCoverArt(parsedCoverArt);
   const tempCoverSourcePath = coverArt ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${coverArt.extension}`) : null;
   const tempCoverPath = coverArt ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
-  const supportsEmbeddedCover = extension === '.mp3';
+  const supportsEmbeddedCover = extension === '.mp3' || extension === '.wav';
   const backupPath = await createSafetyBackup(filePath);
   let commitSucceeded = false;
   const args = ['-y', '-i', ffmpegInputPath];
@@ -820,6 +787,10 @@ async function saveMetadata(filePath, metadata) {
         '-disposition:v:0',
         'attached_pic',
       );
+
+      if (extension === '.wav') {
+        args.push('-write_id3v2', '1', '-id3v2_version', '3');
+      }
     }
   } else {
     args.push('-map', '0', '-c', 'copy');
@@ -856,14 +827,7 @@ async function saveMetadata(filePath, metadata) {
     // Overwrite through copy fallback for cross-device and mount compatibility.
     await copyFileWithFallback(tempOutput, filePath);
 
-    if (supportsEmbeddedCover) {
-      await removeCoverSidecars(filePath);
-    } else if (coverArt) {
-      const sidecarPath = await writeCoverSidecar(filePath, coverArt);
-      console.log('[metadata-debug] saveMetadata:sidecar-cover-written', { filePath, sidecarPath });
-    } else {
-      await removeCoverSidecars(filePath);
-    }
+    await removeCoverSidecars(filePath);
 
     const sourceStatsAfter = await fs.stat(filePath);
     if (!sourceStatsAfter.isFile() || sourceStatsAfter.size <= 0) {
@@ -872,7 +836,10 @@ async function saveMetadata(filePath, metadata) {
 
     const extracted = await extractMetadata(filePath);
     if (metadata.coverArt && !extracted.coverArt) {
-      console.warn('[backend-action] saveMetadata:cover-missing-after-write', filePath);
+      console.warn('[backend-action] saveMetadata:cover-missing-after-write', filePath, {
+        extension,
+        hint: 'container may not support embedded artwork in a way external tools read',
+      });
     } else if (metadata.coverArt && extracted.coverArt) {
       console.log('[metadata-debug] saveMetadata:cover-present-after-write', {
         filePath,
@@ -1005,8 +972,6 @@ module.exports = {
     parseDataUrl,
     extensionFromMimeType,
     getCoverSidecarCandidates,
-    readCoverFromSidecar,
-    writeCoverSidecar,
     removeCoverSidecars,
     detectImageFormat,
     normalizeCoverArt,
