@@ -113,6 +113,14 @@ function folderNameFromPath(directoryPath: string) {
   return parts[parts.length - 1] || directoryPath;
 }
 
+function normalizePathForUiComparison(pathValue: string) {
+  return pathValue.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+}
+
+function isSameDirectoryPath(leftPath: string, rightPath: string) {
+  return normalizePathForUiComparison(leftPath) === normalizePathForUiComparison(rightPath);
+}
+
 function normalizeAlbumValue(rawValue: string) {
   const value = rawValue.trim();
   return value || '(empty)';
@@ -332,7 +340,10 @@ export function LibraryPane({
     >();
 
     filteredItems.forEach((item) => {
-      const isRootPseudoAlbum = Boolean(item.openedDirectoryRoot && item.isInOpenedDirectoryRoot);
+      const isRootPseudoAlbum = Boolean(
+        item.openedDirectoryRoot &&
+          (item.isInOpenedDirectoryRoot || isSameDirectoryPath(item.directory, item.openedDirectoryRoot)),
+      );
       const groupKey = isRootPseudoAlbum ? `root::${item.openedDirectoryRoot}` : item.directory;
       const group = groups.get(groupKey) ?? {
         groupKey,
