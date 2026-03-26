@@ -738,7 +738,7 @@ async function saveMetadata(filePath, metadata) {
   const coverArt = normalizeCoverArt(parsedCoverArt);
   const tempCoverSourcePath = coverArt ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${coverArt.extension}`) : null;
   const tempCoverPath = coverArt ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
-  const supportsEmbeddedCover = extension === '.mp3' || extension === '.wav';
+  const supportsEmbeddedCover = extension === '.mp3';
   const backupPath = await createSafetyBackup(filePath);
   let commitSucceeded = false;
   const args = ['-y', '-i', ffmpegInputPath];
@@ -789,12 +789,16 @@ async function saveMetadata(filePath, metadata) {
         'attached_pic',
       );
 
-      if (extension === '.wav') {
-        outputArgs.push('-write_id3v2', '1', '-id3v2_version', '3');
-      }
     }
   } else {
     outputArgs.push('-map', '0', '-c', 'copy');
+
+    if (metadata.coverArt) {
+      console.warn('[saveMetadata] Embedded cover art is not supported for this container; skipping cover write.', {
+        filePath,
+        extension,
+      });
+    }
   }
 
   const metadataMap = {
