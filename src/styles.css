@@ -1660,6 +1660,37 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 20px;
   color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-height: 100%;
+  padding: 0.6rem 0.85rem;
+}
+
+.status-bar-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status-copy-button {
+  flex-shrink: 0;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-copy-button:hover:not(:disabled) {
+  border-color: rgba(117, 201, 255, 0.62);
+  background: rgba(117, 201, 255, 0.16);
 }
 
 .empty-state {

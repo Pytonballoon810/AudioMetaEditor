@@ -11,6 +11,7 @@ type UseDesktopBridgeSubscriptionsArgs = {
   setLibraryWidth: (width: number) => void;
   estimateLibraryWidthForItems: (items: AudioLibraryItem[]) => number;
   setStatus: (message: string) => void;
+  onApiLogPayload?: (payload: ApiLogPayload) => void;
 };
 
 export function useDesktopBridgeSubscriptions({
@@ -21,6 +22,7 @@ export function useDesktopBridgeSubscriptions({
   setLibraryWidth,
   estimateLibraryWidthForItems,
   setStatus,
+  onApiLogPayload,
 }: UseDesktopBridgeSubscriptionsArgs) {
   useEffect(() => {
     if (!audioMetaApi?.onOpenPaths) {
@@ -42,10 +44,11 @@ export function useDesktopBridgeSubscriptions({
 
     const dispose = audioMetaApi.onApiLog((payload: ApiLogPayload) => {
       setStatus(payload.message);
+      onApiLogPayload?.(payload);
     });
 
     return dispose;
-  }, [audioMetaApi, setStatus]);
+  }, [audioMetaApi, onApiLogPayload, setStatus]);
 
   useEffect(() => {
     if (!audioMetaApi?.onLibraryProgress) {

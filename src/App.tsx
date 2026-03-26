@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEve
 import { LibraryPane } from './components/LibraryPane';
 import { MetadataEditor } from './components/MetadataEditor';
 import { PlayerPane, type PlayerPaneHandle } from './components/PlayerPane';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Copy01Icon } from '@hugeicons/core-free-icons';
 import { requireAudioMetaApi } from './services/audioMetaApi';
 import { useLibraryState } from './features/library/useLibraryState';
 import { useSessionRestore } from './features/library/useSessionRestore';
@@ -52,6 +54,7 @@ export default function App() {
   );
   const [isMetadataResizing, setIsMetadataResizing] = useState(false);
   const [isStatusResizing, setIsStatusResizing] = useState(false);
+  const [lastErrorStatus, setLastErrorStatus] = useState<string | null>(null);
   const playerPaneRef = useRef<PlayerPaneHandle>(null);
   const mainColumnRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -200,6 +203,11 @@ export default function App() {
     setLibraryWidth,
     estimateLibraryWidthForItems,
     setStatus,
+    onApiLogPayload: (payload) => {
+      if (payload.level === 'error') {
+        setLastErrorStatus(payload.message);
+      }
+    },
   });
 
   useSessionRestore({
@@ -306,6 +314,27 @@ export default function App() {
     await loadPaths(loadedSourcePaths, activePath);
   }
 
+  function truncateStatusMessage(message: string, maxLength = 110) {
+    if (message.length <= maxLength) {
+      return message;
+    }
+
+    return `${message.slice(0, maxLength - 1)}…`;
+  }
+
+  async function copyLastErrorStatus() {
+    if (!lastErrorStatus) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(lastErrorStatus);
+      setStatus('Copied error message to clipboard.');
+    } catch {
+      setStatus('Unable to copy error message.');
+    }
+  }
+
   return (
     <div className="app-shell">
       <div aria-hidden="true" className="window-drag-region" />
@@ -368,7 +397,20 @@ export default function App() {
             onMouseDown={startStatusResize}
             role="separator"
           />
-          <div className="status-bar">{isLoadingLibrary ? 'Loading library...' : status}</div>
+          <div className="status-bar" title={isLoadingLibrary ? 'Loading library...' : status}>
+            <span className="status-bar-text">{truncateStatusMessage(isLoadingLibrary ? 'Loading library...' : status)}</span>
+            {lastErrorStatus ? (
+              <button
+                aria-label="Copy latest error message"
+                className="status-copy-button"
+                onClick={() => void copyLastErrorStatus()}
+                title="Copy latest error message"
+                type="button"
+              >
+                <HugeiconsIcon icon={Copy01Icon} size={16} strokeWidth={1.9} />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div
