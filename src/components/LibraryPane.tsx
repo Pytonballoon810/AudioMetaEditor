@@ -8,6 +8,7 @@ import {
   useState,
   type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from 'react';
 import type { AudioLibraryItem, EditableMetadata } from '../types';
 import { formatDuration } from '../lib/format';
@@ -18,6 +19,7 @@ type LibraryPaneProps = {
   items: AudioLibraryItem[];
   currentPath: string | null;
   isLoading: boolean;
+  loadingProgress: { loaded: number; total: number } | null;
   onSelect: (item: AudioLibraryItem) => void;
   onApplyAlbumFields: (folderPath: string, metadata: AlbumBulkEditFields) => Promise<void>;
   onMoveTrackToAlbum: (item: AudioLibraryItem, targetDirectory: string) => Promise<void>;
@@ -279,16 +281,52 @@ function AlbumEditSuggestionInput({
   );
 }
 
+type CoverToolbarButtonProps = {
+  ariaLabel: string;
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  className?: string;
+  children: ReactNode;
+};
+
+function CoverToolbarButton({
+  ariaLabel,
+  title,
+  onClick,
+  disabled = false,
+  className = 'daw-tool-button',
+  children,
+}: CoverToolbarButtonProps) {
+  return (
+    <button
+      aria-label={ariaLabel}
+      className={className}
+      disabled={disabled}
+      onClick={onClick}
+      title={title}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
 export function LibraryPane({
   items,
   currentPath,
   isLoading,
+  loadingProgress,
   onSelect,
   onApplyAlbumFields,
   onMoveTrackToAlbum,
   onOpenFileLocation,
   onReloadLibrary,
 }: LibraryPaneProps) {
+    const progressLoaded = loadingProgress?.loaded ?? items.length;
+    const progressTotal = loadingProgress?.total ?? items.length;
+    const progressFraction = progressTotal > 0 ? Math.max(0, Math.min(1, progressLoaded / progressTotal)) : 0;
+
   const panelRef = useRef<HTMLElement | null>(null);
   const trackSubmenuRef = useRef<HTMLDivElement | null>(null);
   const albumMenuRef = useRef<HTMLDivElement | null>(null);
@@ -894,7 +932,9 @@ export function LibraryPane({
           <h2>Current queue</h2>
         </div>
         <div className="library-heading-actions">
-          <span className="pill">{items.length} files</span>
+          <span className="pill">
+            {isLoading && progressTotal > 0 ? `${progressLoaded} / ${progressTotal}` : `${items.length} files`}
+          </span>
           <button
             aria-label={isLoading ? 'Reindexing library…' : 'Reload and reindex loaded tracks'}
             className="library-reload-button"
@@ -904,7 +944,11 @@ export function LibraryPane({
             type="button"
           >
             {isLoading ? (
-              <span aria-hidden="true" className="library-reload-spinner" />
+              <span
+                aria-hidden="true"
+                className="library-reload-progress-circle"
+                style={{ '--progress': String(progressFraction) } as React.CSSProperties}
+              />
             ) : (
               <HugeiconsIcon aria-hidden="true" icon={RedoIcon} size={16} strokeWidth={1.9} />
             )}
@@ -1319,21 +1363,18 @@ export function LibraryPane({
                 role="toolbar"
               >
                 <div className="daw-toolbar-group">
-                  <button
-                    aria-label="Undo album cover edit"
-                    className="daw-tool-button"
+                  <CoverToolbarButton
+                    ariaLabel="Undo album cover edit"
                     disabled={editingAlbum.coverHistory.undo.length === 0}
                     onClick={undoAlbumCoverEdit}
                     title={
                       editingAlbum.coverHistory.undo.length > 0 ? 'Undo last album cover edit' : 'No cover edit to undo'
                     }
-                    type="button"
                   >
                     <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
-                  </button>
-                  <button
-                    aria-label="Redo album cover edit"
-                    className="daw-tool-button"
+                  </CoverToolbarButton>
+                  <CoverToolbarButton
+                    ariaLabel="Redo album cover edit"
                     disabled={editingAlbum.coverHistory.redo.length === 0}
                     onClick={redoAlbumCoverEdit}
                     title={
@@ -1341,72 +1382,69 @@ export function LibraryPane({
                         ? 'Redo last undone album cover edit'
                         : 'No cover edit to redo'
                     }
-                    type="button"
                   >
                     <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
-                  </button>
+                  </CoverToolbarButton>
                 </div>
 
                 <span aria-hidden="true" className="daw-toolbar-divider" />
 
                 <div className="daw-toolbar-group">
-                  <button
-                    aria-label="Upload replacement album artwork"
-                    className="daw-tool-button"
+                  <CoverToolbarButton
+                    ariaLabel="Upload replacement album artwork"
                     onClick={() => albumCoverInputRef.current?.click()}
                     title="Upload replacement album artwork image"
-                    type="button"
                   >
                     <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
-                  </button>
+                  </CoverToolbarButton>
                   <input accept="image/*" hidden onChange={onAlbumCoverChange} ref={albumCoverInputRef} type="file" />
                 </div>
 
                 <span aria-hidden="true" className="daw-toolbar-divider" />
 
                 <div className="daw-toolbar-group">
-                  <button
-                    aria-label="Remove album cover"
-                    className="daw-tool-button"
+                  <CoverToolbarButton
+                    ariaLabel="Remove album cover"
                     onClick={() => setAlbumCover(null)}
                     title="Remove album cover"
-                    type="button"
                   >
                     X
-                  </button>
+                  </CoverToolbarButton>
                 </div>
 
                 <span aria-hidden="true" className="daw-toolbar-divider" />
 
                 <div className="daw-toolbar-group">
-                  <button
-                    aria-label="Use cover from other album or track"
-                    className="daw-tool-button"
+                  <CoverToolbarButton
+                    ariaLabel="Use cover from other album or track"
                     disabled={albumModalCoverSourceOptions.length === 0}
                     onClick={onUseCoverFromOtherAlbumOrTrack}
                     title="Use cover from other album or track"
-                    type="button"
                   >
                     <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
-                  </button>
-                  <button
-                    aria-label="Keep existing covers unchanged"
+                  </CoverToolbarButton>
+                  <CoverToolbarButton
+                    ariaLabel="Keep existing covers unchanged"
                     className={`daw-tool-button${editingAlbum.apply.coverArt ? '' : ' cover-tool-active'}`}
                     onClick={() => setAlbumFieldApplied('coverArt', !editingAlbum.apply.coverArt)}
                     title={
                       editingAlbum.apply.coverArt ? 'Apply edited album cover to tracks' : "Don't change track covers"
                     }
-                    type="button"
                   >
                     <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
-                  </button>
+                  </CoverToolbarButton>
                 </div>
               </div>
 
-              <p className="cover-editor-hint">
-                Cover apply mode:{' '}
-                {editingAlbum.apply.coverArt ? 'Apply this artwork to album tracks.' : "Don't change track covers."}
-              </p>
+              <span className="cover-editor-hint-tooltip-wrap" role="note" tabIndex={0}>
+                <span aria-hidden="true" className="cover-editor-hint-trigger">
+                  i
+                </span>
+                <span className="cover-editor-hint-tooltip">
+                  Cover apply mode:{' '}
+                  {editingAlbum.apply.coverArt ? 'Apply this artwork to album tracks.' : "Don't change track covers."}
+                </span>
+              </span>
 
               {isAlbumModalCoverPickerOpen && albumModalCoverSourceOptions.length > 1 ? (
                 <div className="track-cover-picker" role="listbox">

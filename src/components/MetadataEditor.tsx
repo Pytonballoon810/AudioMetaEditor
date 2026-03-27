@@ -157,6 +157,7 @@ export function MetadataEditor({
   const currentCoverArtRef = useRef<string | null>(null);
   const isWandDraggingRef = useRef(false);
   const hasWandEditsRef = useRef(false);
+  const willConvertToFlacOnSave = item?.extension?.toLowerCase() === 'wav' && Boolean(draft.coverArt);
 
   function applyCoverArt(nextCoverArt: string | null, trackHistory = true) {
     const currentCoverArt = currentCoverArtRef.current;
@@ -652,6 +653,17 @@ export function MetadataEditor({
                 <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
               </button>
             </div>
+
+            {willConvertToFlacOnSave ? (
+              <span className="cover-convert-warning-wrap" role="note" tabIndex={0}>
+                <span aria-hidden="true" className="cover-convert-warning-icon">
+                  ⚠
+                </span>
+                <span className="cover-convert-warning-tooltip">
+                  WAV + cover save will auto-convert this file to FLAC to persist artwork.
+                </span>
+              </span>
+            ) : null}
           </div>
 
           {isAlbumCoverPickerOpen && albumCoverOptions.length > 1 ? (

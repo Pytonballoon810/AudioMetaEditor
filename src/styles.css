@@ -12,6 +12,7 @@
   --accent-strong: #ff9ccd;
   --cool: #75c9ff;
   --shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+  --toolbar-button-size: 2.5rem;
 }
 
 * {
@@ -781,59 +782,75 @@ textarea {
 .album-edit-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(4, 7, 10, 0.6);
+  background: radial-gradient(circle at 18% 12%, rgba(117, 201, 255, 0.12), transparent 38%),
+    radial-gradient(circle at 82% 88%, rgba(255, 94, 168, 0.12), transparent 36%), rgba(4, 7, 10, 0.72);
+  backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
-  padding: 1rem;
+  padding: 1.1rem;
   z-index: 30;
 }
 
 .album-edit-dialog {
-  width: min(640px, 100%);
-  max-height: 80vh;
+  width: min(920px, 100%);
+  max-height: min(86vh, 860px);
   overflow: auto;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(14, 20, 26, 0.98);
-  box-shadow: 0 28px 56px rgba(0, 0, 0, 0.42);
-  padding: 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(180deg, rgba(13, 19, 25, 0.98), rgba(9, 14, 19, 0.98));
+  box-shadow:
+    0 34px 70px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 1.15rem;
   display: grid;
-  gap: 0.9rem;
+  gap: 1rem;
 }
 
 .album-edit-dialog-heading {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.24rem;
+  padding-bottom: 0.78rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .album-edit-dialog-heading h3 {
   margin: 0;
+  font-size: 1.26rem;
 }
 
 .album-edit-track-count {
   margin: 0;
   color: var(--muted);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
 }
 
 .album-edit-cover-card {
+  --cover-toolbar-pad-x: 0.65rem;
   display: grid;
-  gap: 0.75rem;
+  gap: 0;
   grid-template-columns: minmax(0, 1fr);
-  justify-items: start;
+  justify-items: stretch;
+  width: 100%;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.012));
+  margin-bottom: 0.6rem;
 }
 
 .album-edit-cover-image-wrap {
-  width: 132px;
-  height: 132px;
-  border-radius: 16px;
+  aspect-ratio: 1;
+  width: 100%;
+  height: auto;
+  border-radius: 14px 14px 0 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 0;
+  box-shadow: none;
   background:
-    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 14px 14px,
-    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 14px 14px,
-    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 14px 14px,
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 14px 14px,
+    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%) 0 0 / 16px 16px,
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 16px 16px,
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%) 0 0 / 16px 16px,
     rgba(255, 255, 255, 0.03);
 }
 
@@ -845,11 +862,22 @@ textarea {
 }
 
 .album-edit-cover-toolbar {
-  width: 132px;
-  max-width: 132px;
+  width: 100%;
+  max-width: 100%;
+  min-height: 0;
+  align-self: stretch;
+  box-sizing: border-box;
   justify-content: center;
-  flex-wrap: wrap;
-  row-gap: 0.28rem;
+  align-content: center;
+  padding: 0.52rem var(--cover-toolbar-pad-x) 0.56rem;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(180deg, rgba(12, 17, 22, 0.92), rgba(20, 26, 33, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+  row-gap: 0.45rem;
 }
 
 .album-edit-cover-toolbar .daw-toolbar-divider {
@@ -860,10 +888,69 @@ textarea {
   display: contents;
 }
 
+.album-edit-cover-card .cover-editor-hint-tooltip-wrap {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.album-edit-cover-card .cover-editor-hint-trigger {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(117, 201, 255, 0.6);
+  background: rgba(10, 14, 18, 0.72);
+  color: rgba(188, 233, 255, 0.95);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.album-edit-cover-card .cover-editor-hint-tooltip {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.42rem);
+  width: max-content;
+  max-width: min(280px, 70vw);
+  padding: 0.45rem 0.58rem;
+  border-radius: 10px;
+  border: 1px solid rgba(117, 201, 255, 0.36);
+  background: rgba(9, 13, 18, 0.96);
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  transform: translateY(-2px);
+  pointer-events: none;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.album-edit-cover-card .cover-editor-hint-tooltip-wrap:hover .cover-editor-hint-tooltip,
+.album-edit-cover-card .cover-editor-hint-tooltip-wrap:focus-within .cover-editor-hint-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.album-edit-cover-card .track-cover-picker {
+  grid-column: 1 / -1;
+  margin: 0.6rem 0.55rem 0.55rem;
+  max-height: 220px;
+}
+
 .album-edit-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.82rem;
 }
 
 .album-edit-field-head {
@@ -887,9 +974,9 @@ textarea {
 
 .album-edit-grid label {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.32rem;
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 0.85rem;
 }
 
 .album-edit-grid input {
@@ -899,8 +986,30 @@ textarea {
 .album-edit-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
+  gap: 0.65rem;
   flex-wrap: wrap;
+  padding-top: 0.78rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 900px) {
+  .album-edit-cover-image-wrap {
+    width: 100%;
+  }
+
+  .album-edit-cover-toolbar {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .album-edit-cover-card .cover-editor-hint-tooltip {
+    right: -0.2rem;
+    max-width: min(240px, 74vw);
+  }
+
+  .album-edit-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .download-dialog-backdrop {
@@ -1121,8 +1230,8 @@ textarea {
 
 .daw-tool-button {
   box-sizing: border-box;
-  width: 2.15rem;
-  height: 2.15rem;
+  width: var(--toolbar-button-size);
+  height: var(--toolbar-button-size);
   border-radius: 0.48rem;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: linear-gradient(180deg, rgba(66, 76, 88, 0.86), rgba(35, 41, 48, 0.94));
@@ -1380,7 +1489,6 @@ textarea {
 }
 
 .cover-card {
-  --cover-tool-size: 2rem;
   --cover-toolbar-gap: 0.45rem;
   --cover-group-gap: 0.32rem;
   --cover-toolbar-pad-x: 0.65rem;
@@ -1439,6 +1547,8 @@ textarea {
   width: 100%;
   max-width: 100%;
   align-self: stretch;
+  position: relative;
+  z-index: 3;
   box-sizing: border-box;
   padding: 0.52rem var(--cover-toolbar-pad-x) 0.56rem;
   border: 0;
@@ -1453,12 +1563,12 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cover-edit-toolbar .daw-tool-button {
-  width: var(--cover-tool-size);
-  height: var(--cover-tool-size);
+  width: var(--toolbar-button-size);
+  height: var(--toolbar-button-size);
 }
 
 .cover-tool-active {
@@ -1480,6 +1590,57 @@ textarea {
   margin: 0;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.cover-convert-warning-wrap {
+  margin-left: 0.3rem;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cover-convert-warning-icon {
+  width: 1.36rem;
+  height: 1.36rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 196, 127, 0.6);
+  background: rgba(43, 30, 16, 0.78);
+  color: #ffd58a;
+  display: grid;
+  place-items: center;
+  font-size: 0.82rem;
+  line-height: 0;
+  padding-top: 0.02rem;
+}
+
+.cover-convert-warning-tooltip {
+  position: absolute;
+  right: -0.2rem;
+  top: calc(100% + 0.45rem);
+  width: max-content;
+  max-width: min(300px, 74vw);
+  padding: 0.46rem 0.6rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 196, 127, 0.44);
+  background: rgba(20, 14, 8, 0.96);
+  color: #ffe7b9;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.34);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+  z-index: 8;
+}
+
+.cover-convert-warning-wrap:hover .cover-convert-warning-tooltip,
+.cover-convert-warning-wrap:focus-within .cover-convert-warning-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .album-cover-picker {
@@ -1749,7 +1910,7 @@ textarea {
   }
 
   .daw-tool-button {
-    width: 2rem;
-    height: 2rem;
+    width: var(--toolbar-button-size);
+    height: var(--toolbar-button-size);
   }
 }
