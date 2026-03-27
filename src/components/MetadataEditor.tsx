@@ -623,7 +623,7 @@ export function MetadataEditor({
                 <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
               </CoverToolbarButton>
               <CoverToolbarButton
-                aria-label={
+                ariaLabel={
                   isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'
                 }
                 className={`daw-tool-button daw-tool-button-accent${isWandActive ? ' cover-tool-active' : ''}`}
