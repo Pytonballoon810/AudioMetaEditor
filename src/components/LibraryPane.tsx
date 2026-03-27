@@ -337,6 +337,7 @@ export function LibraryPane({
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedAlbums, setCollapsedAlbums] = useState<Record<string, boolean>>({});
   const [editingAlbum, setEditingAlbum] = useState<AlbumEditDialogState | null>(null);
+  const [albumCoverImportError, setAlbumCoverImportError] = useState<string | null>(null);
   const [isApplyingAlbumEdit, setIsApplyingAlbumEdit] = useState(false);
   const [isAlbumModalCoverPickerOpen, setIsAlbumModalCoverPickerOpen] = useState(false);
   const [albumContextMenu, setAlbumContextMenu] = useState<AlbumContextMenuState | null>(null);
@@ -358,6 +359,7 @@ export function LibraryPane({
       }
 
       setIsAlbumModalCoverPickerOpen(false);
+      setAlbumCoverImportError(null);
       setEditingAlbum(null);
     }
 
@@ -703,6 +705,7 @@ export function LibraryPane({
 
   function openAlbumEditor(folderPath: string, folderName: string, albumItems: AudioLibraryItem[]) {
     setIsAlbumModalCoverPickerOpen(false);
+    setAlbumCoverImportError(null);
     setEditingAlbum({
       folderPath,
       folderName,
@@ -751,14 +754,35 @@ export function LibraryPane({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAlbumCover(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Unable to read selected image file.'));
+        reader.onload = () => {
+          if (typeof reader.result !== 'string') {
+            reject(new Error('Selected file is not a valid image payload.'));
+            return;
+          }
+
+          resolve(reader.result);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('Selected file could not be decoded as an image.'));
+        image.src = dataUrl;
+      });
+
+      setAlbumCover(dataUrl);
+      setAlbumCoverImportError(null);
+    } catch {
+      setAlbumCoverImportError('Unable to load image file. Try PNG/JPEG/WebP and verify the file is accessible.');
+    } finally {
+      event.target.value = '';
+    }
   }
 
   function collapseAllAlbums() {
@@ -1435,6 +1459,8 @@ export function LibraryPane({
                   </CoverToolbarButton>
                 </div>
               </div>
+
+              {albumCoverImportError ? <p className="cover-load-error">{albumCoverImportError}</p> : null}
 
               <span className="cover-editor-hint-tooltip-wrap" role="note" tabIndex={0}>
                 <span aria-hidden="true" className="cover-editor-hint-trigger">

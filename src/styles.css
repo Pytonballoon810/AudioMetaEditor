@@ -1592,6 +1592,17 @@ textarea {
   color: var(--muted);
 }
 
+.cover-load-error {
+  margin: 0.5rem 0.55rem 0;
+  padding: 0.46rem 0.58rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 132, 132, 0.45);
+  background: rgba(66, 22, 22, 0.45);
+  color: #ffd1d1;
+  font-size: 0.79rem;
+  line-height: 1.35;
+}
+
 .cover-convert-warning-wrap {
   margin-left: 0.3rem;
   position: relative;

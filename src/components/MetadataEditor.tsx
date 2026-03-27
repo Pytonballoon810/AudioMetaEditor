@@ -146,6 +146,7 @@ export function MetadataEditor({
   onSaveCoverImage,
 }: MetadataEditorProps) {
   const [draft, setDraft] = useState<EditableMetadata>(EMPTY_METADATA);
+  const [coverImportError, setCoverImportError] = useState<string | null>(null);
   const [isAlbumCoverPickerOpen, setIsAlbumCoverPickerOpen] = useState(false);
   const [isTrackCoverPickerOpen, setIsTrackCoverPickerOpen] = useState(false);
   const [coverContextMenu, setCoverContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -215,6 +216,7 @@ export function MetadataEditor({
   useEffect(() => {
     if (!item) {
       setDraft(EMPTY_METADATA);
+      setCoverImportError(null);
       setIsWandActive(false);
       return;
     }
@@ -233,6 +235,7 @@ export function MetadataEditor({
       comment: item.metadata.comment,
       coverArt: item.metadata.coverArt,
     });
+    setCoverImportError(null);
     setIsWandActive(false);
     setCoverUndoStack([]);
     setCoverRedoStack([]);
@@ -305,15 +308,35 @@ export function MetadataEditor({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        return;
-      }
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Unable to read selected image file.'));
+        reader.onload = () => {
+          if (typeof reader.result !== 'string') {
+            reject(new Error('Selected file is not a valid image payload.'));
+            return;
+          }
 
-      applyCoverArt(reader.result);
-    };
-    reader.readAsDataURL(file);
+          resolve(reader.result);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('Selected file could not be decoded as an image.'));
+        image.src = dataUrl;
+      });
+
+      applyCoverArt(dataUrl);
+      setCoverImportError(null);
+    } catch {
+      setCoverImportError('Unable to load image file. Try PNG/JPEG/WebP and verify the file is accessible.');
+    } finally {
+      event.target.value = '';
+    }
   }
 
   function removeConnectedArea(clientX: number, clientY: number) {
@@ -665,6 +688,8 @@ export function MetadataEditor({
               </span>
             ) : null}
           </div>
+
+          {coverImportError ? <p className="cover-load-error">{coverImportError}</p> : null}
 
           {isAlbumCoverPickerOpen && albumCoverOptions.length > 1 ? (
             <div className="album-cover-picker" role="listbox">
