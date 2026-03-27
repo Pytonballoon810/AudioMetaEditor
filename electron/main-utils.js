@@ -7,13 +7,15 @@ const AUDIO_CONTENT_TYPE_EXTENSION_MAP = {
   'audio/mp3': '.mp3',
   'audio/wav': '.wav',
   'audio/x-wav': '.wav',
+  'audio/flac': '.flac',
+  'audio/x-flac': '.flac',
 };
 
 function getSupportedExtensionFromUrl(urlString) {
   try {
     const urlObject = new URL(urlString);
     const extension = path.extname(decodeURIComponent(urlObject.pathname)).toLowerCase();
-    return ['.mp3', '.wav'].includes(extension) ? extension : null;
+    return ['.mp3', '.wav', '.flac'].includes(extension) ? extension : null;
   } catch {
     return null;
   }

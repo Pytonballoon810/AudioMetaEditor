@@ -402,7 +402,7 @@ app.whenReady().then(async () => {
     console.log('[backend-action] dialog:open-audio-files:start');
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Audio', extensions: ['mp3', 'wav'] }],
+      filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac'] }],
     });
 
     console.log('[backend-action] dialog:open-audio-files:done', result.canceled ? 0 : result.filePaths.length);
@@ -564,7 +564,7 @@ app.whenReady().then(async () => {
     const saveResult = await dialog.showSaveDialog({
       title: 'Download audio from URL',
       defaultPath,
-      filters: [{ name: 'Audio', extensions: ['mp3', 'wav'] }],
+      filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac'] }],
     });
 
     if (saveResult.canceled || !saveResult.filePath) {

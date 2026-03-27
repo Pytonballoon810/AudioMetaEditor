@@ -26,13 +26,14 @@ const {
 } = mediaService.__testables;
 
 describe('isSupportedAudioFile', () => {
-  it('accepts mp3 and wav regardless of case', () => {
+  it('accepts mp3, wav, and flac regardless of case', () => {
     expect(mediaService.isSupportedAudioFile('/music/a.mp3')).toBe(true);
     expect(mediaService.isSupportedAudioFile('/music/b.WAV')).toBe(true);
+    expect(mediaService.isSupportedAudioFile('/music/c.FLAC')).toBe(true);
   });
 
   it('rejects unsupported extensions', () => {
-    expect(mediaService.isSupportedAudioFile('/music/a.flac')).toBe(false);
+    expect(mediaService.isSupportedAudioFile('/music/a.aac')).toBe(false);
   });
 });
 

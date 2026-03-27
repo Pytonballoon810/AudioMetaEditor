@@ -459,7 +459,7 @@ export default function App() {
             <div className="download-dialog-heading">
               <p className="eyebrow">Import audio</p>
               <h2>Download from URL</h2>
-              <p>Supports direct MP3/WAV file URLs.</p>
+              <p>Supports direct MP3/WAV/FLAC file URLs.</p>
             </div>
 
             <label>

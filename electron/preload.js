@@ -34,7 +34,7 @@ function emitApiLog(message, level = 'info') {
 
 function describeAction(callName, phase, args, result, error) {
   if (callName === 'openAudioFiles') {
-    if (phase === 'start') return 'Opening file picker so you can choose one or more MP3/WAV files.';
+    if (phase === 'start') return 'Opening file picker so you can choose one or more MP3/WAV/FLAC files.';
     if (phase === 'done') return `File picker closed. Selected ${Array.isArray(result) ? result.length : 0} file(s).`;
   }
 
@@ -103,7 +103,7 @@ function describeAction(callName, phase, args, result, error) {
   }
 
   if (callName === 'downloadFromUrl') {
-    if (phase === 'start') return 'Starting URL download. This supports direct MP3/WAV file links only.';
+    if (phase === 'start') return 'Starting URL download. This supports direct MP3/WAV/FLAC file links only.';
     if (phase === 'done')
       return result ? `Download finished and saved to ${result.outputPath}.` : 'Download was cancelled by user.';
   }
@@ -149,7 +149,7 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
     try {
       const base64 = await invokeLogged('loadAudioBlob', 'audio:load-blob', filePath);
       const extension = filePath.toLowerCase().split('.').pop();
-      const mimeType = extension === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+      const mimeType = extension === 'mp3' ? 'audio/mpeg' : extension === 'flac' ? 'audio/flac' : 'audio/wav';
       const dataUrl = `data:${mimeType};base64,${base64}`;
       return dataUrl;
     } catch (error) {

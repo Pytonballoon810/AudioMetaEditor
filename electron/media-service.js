@@ -148,7 +148,7 @@ if (!resolvedFfmpegPath && ffmpegStaticPath && process.platform === 'win32') {
   );
 }
 
-const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav']);
+const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac']);
 
 function isSupportedAudioFile(filePath) {
   return AUDIO_EXTENSIONS.has(path.extname(filePath).toLowerCase());

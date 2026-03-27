@@ -19,11 +19,13 @@ describe('main-utils download helpers', () => {
   it('maps supported audio content types to file extensions', () => {
     expect(extensionFromContentType('audio/mpeg')).toBe('.mp3');
     expect(extensionFromContentType('audio/wav; charset=binary')).toBe('.wav');
+    expect(extensionFromContentType('audio/flac')).toBe('.flac');
     expect(extensionFromContentType('text/html')).toBeNull();
   });
 
   it('detects supported extension from URL path', () => {
     expect(getSupportedExtensionFromUrl('https://cdn.example.com/track.MP3?sig=abc')).toBe('.mp3');
+    expect(getSupportedExtensionFromUrl('https://cdn.example.com/track.flac?sig=abc')).toBe('.flac');
     expect(getSupportedExtensionFromUrl('https://cdn.example.com/video.mp4')).toBeNull();
   });
 
