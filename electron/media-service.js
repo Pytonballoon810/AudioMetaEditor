@@ -827,6 +827,7 @@ async function saveMetadata(filePath, metadata) {
   const supportsEmbeddedCover = extension === '.mp3';
   const backupPath = await createSafetyBackup(filePath);
   let commitSucceeded = false;
+  let rollbackCompleted = false;
   const args = ['-y', '-i', ffmpegInputPath];
   const outputArgs = [];
 
@@ -852,7 +853,11 @@ async function saveMetadata(filePath, metadata) {
       filePath,
       targetPath: replaceExtension(filePath, '.flac'),
     });
-    return convertWavToFlacWithCover(filePath, metadata, coverArt);
+    try {
+      return await convertWavToFlacWithCover(filePath, metadata, coverArt);
+    } finally {
+      await fs.rm(backupPath, { force: true });
+    }
   }
 
   if (tempInput) {
@@ -962,6 +967,7 @@ async function saveMetadata(filePath, metadata) {
     try {
       await restoreFromSafetyBackup(filePath, backupPath);
       runDataSafetyHook('rollback-complete', { filePath, backupPath });
+      rollbackCompleted = true;
     } catch (restoreError) {
       throw new Error(
         `Metadata save failed and rollback also failed for ${filePath}: ${
@@ -983,7 +989,7 @@ async function saveMetadata(filePath, metadata) {
       await fs.rm(tempCoverPath, { force: true });
     }
 
-    if (backupPath && commitSucceeded) {
+    if (backupPath && (commitSucceeded || rollbackCompleted)) {
       await fs.rm(backupPath, { force: true });
     }
   }
