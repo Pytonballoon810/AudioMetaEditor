@@ -24,6 +24,26 @@ function isAbortLikeError(error: unknown) {
   return name.includes('abort') || lower.includes('abort');
 }
 
+function isTransientWaveLoadError(error: unknown) {
+  if (isAbortLikeError(error)) {
+    return true;
+  }
+
+  if (!error) {
+    return false;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+
+  return (
+    lower.includes('pipeline_error_read') ||
+    lower.includes('net::err_file_not_found') ||
+    lower.includes('err_file_not_found') ||
+    (lower.includes('blob:') && lower.includes('not found'))
+  );
+}
+
 type UseWaveSurferOptions = {
   audioUrl: string | null;
   onReady?: (duration: number) => void;
@@ -100,18 +120,8 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     });
 
     waveSurfer.on('error', (error) => {
-      if (isAbortLikeError(error)) {
-        debugLog('[useWaveSurfer] Ignoring expected waveform abort:', error);
-        return;
-      }
-
-      if (
-        error &&
-        typeof error === 'object' &&
-        'message' in error &&
-        String((error as { message: string }).message).includes('PIPELINE_ERROR_READ')
-      ) {
-        debugLog('[useWaveSurfer] Ignoring transient pipeline read error during source reload:', error);
+      if (isTransientWaveLoadError(error)) {
+        debugLog('[useWaveSurfer] Ignoring transient waveform source error during reload/switch:', error);
         return;
       }
 
@@ -212,14 +222,20 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
         debugLog('[useWaveSurfer] Loading audio:', audioUrl);
         const mediaUrl = getCachedAudioBlob(audioUrl) || (await preloadAudioBlob(audioUrl));
 
-        // Check if component is still mounted and WaveSurfer instance still exists
-        if (!isMounted || !waveSurferRef.current) {
-          debugLog('[useWaveSurfer] Component unmounted or WaveSurfer destroyed, aborting load');
+        // Abort stale loads as soon as possible (rapid track switching can race here).
+        if (!isMounted || currentLoadSequence !== loadSequenceRef.current) {
+          debugLog('[useWaveSurfer] Stale preload result after track switch; skipping load');
+          return;
+        }
+
+        const currentWaveSurfer = waveSurferRef.current;
+        if (!currentWaveSurfer) {
+          debugLog('[useWaveSurfer] WaveSurfer destroyed before load; skipping');
           return;
         }
 
         debugLog('[useWaveSurfer] Media URL ready, loading into WaveSurfer');
-        await waveSurferRef.current.load(mediaUrl);
+        await currentWaveSurfer.load(mediaUrl);
 
         if (!isMounted || currentLoadSequence !== loadSequenceRef.current) {
           return;
@@ -236,21 +252,8 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
           }
         }, hideDelayMs);
       } catch (error) {
-        if (isAbortLikeError(error)) {
-          debugLog('[useWaveSurfer] Load aborted due to track switch; ignoring.');
-          if (currentLoadSequence === loadSequenceRef.current) {
-            setIsWaveformLoading(false);
-          }
-          return;
-        }
-
-        if (
-          error &&
-          typeof error === 'object' &&
-          'message' in error &&
-          String((error as { message: string }).message).includes('PIPELINE_ERROR_READ')
-        ) {
-          debugLog('[useWaveSurfer] Ignoring transient FFmpegDemuxer read error during reload.');
+        if (isTransientWaveLoadError(error)) {
+          debugLog('[useWaveSurfer] Ignoring transient waveform load error during switch:', error);
           if (currentLoadSequence === loadSequenceRef.current) {
             setIsWaveformLoading(false);
           }
