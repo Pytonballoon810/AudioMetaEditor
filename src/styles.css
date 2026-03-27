@@ -782,7 +782,8 @@ textarea {
 .album-edit-backdrop {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 18% 12%, rgba(117, 201, 255, 0.12), transparent 38%),
+  background:
+    radial-gradient(circle at 18% 12%, rgba(117, 201, 255, 0.12), transparent 38%),
     radial-gradient(circle at 82% 88%, rgba(255, 94, 168, 0.12), transparent 36%), rgba(4, 7, 10, 0.72);
   backdrop-filter: blur(4px);
   display: grid;

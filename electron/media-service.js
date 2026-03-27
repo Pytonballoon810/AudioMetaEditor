@@ -192,8 +192,7 @@ function normalizeDirectoryPathForComparison(directoryPath, platform = process.p
 
 function isSameDirectoryPath(leftPath, rightPath, platform = process.platform) {
   return (
-    normalizeDirectoryPathForComparison(leftPath, platform) ===
-    normalizeDirectoryPathForComparison(rightPath, platform)
+    normalizeDirectoryPathForComparison(leftPath, platform) === normalizeDirectoryPathForComparison(rightPath, platform)
   );
 }
 
@@ -887,7 +886,6 @@ async function saveMetadata(filePath, metadata) {
         '-disposition:v:0',
         'attached_pic',
       );
-
     }
   } else {
     outputArgs.push('-map', '0', '-c', 'copy');
@@ -1069,10 +1067,7 @@ async function convertAudioFormat(filePath, targetFormat, outputPath) {
 
   let resolvedOutputPath = outputPath;
   if (!resolvedOutputPath) {
-    resolvedOutputPath = path.join(
-      path.dirname(filePath),
-      `${path.basename(filePath, sourceExtension)}.${target}`,
-    );
+    resolvedOutputPath = path.join(path.dirname(filePath), `${path.basename(filePath, sourceExtension)}.${target}`);
   }
 
   const outputExtension = path.extname(resolvedOutputPath).toLowerCase();
@@ -1086,7 +1081,10 @@ async function convertAudioFormat(filePath, targetFormat, outputPath) {
   const bestPicture = pickBestCoverPicture(common.picture);
 
   const tempCoverSourcePath = bestPicture
-    ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${normalizeImageMimeType(bestPicture.format, bestPicture.data)?.includes('png') ? 'png' : 'jpg'}`)
+    ? path.join(
+        os.tmpdir(),
+        `cover-src-${Date.now()}.${normalizeImageMimeType(bestPicture.format, bestPicture.data)?.includes('png') ? 'png' : 'jpg'}`,
+      )
     : null;
   const tempCoverPath = bestPicture ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
 

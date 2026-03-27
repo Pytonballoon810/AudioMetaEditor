@@ -463,7 +463,11 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             />
           </label>
         </div>
-        <div className="convert-format-dropdown" onBlur={() => window.setTimeout(() => setIsConvertMenuOpen(false), 100)} tabIndex={0}>
+        <div
+          className="convert-format-dropdown"
+          onBlur={() => window.setTimeout(() => setIsConvertMenuOpen(false), 100)}
+          tabIndex={0}
+        >
           <button
             className="accent-button convert-format-trigger"
             disabled={!item || isConverting}

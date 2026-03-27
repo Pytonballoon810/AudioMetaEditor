@@ -2,18 +2,18 @@
 
 ## Features
 
-- [X] Track context menu: Open file location in file manager
-- [X] Track context menu: Create new Album button doesn't currently work, looks like click event is not being registered
-- [X] Cover Image context menu: Download cover image
+- [x] Track context menu: Open file location in file manager
+- [x] Track context menu: Create new Album button doesn't currently work, looks like click event is not being registered
+- [x] Cover Image context menu: Download cover image
 
 ## Style
 
-- [X] the styling of the album metadata should be more concise. the bar currently extends too far beyond the actual buttons and i want the toolbar and the cover to be combined in one section like it is done in the track metadata panel
+- [x] the styling of the album metadata should be more concise. the bar currently extends too far beyond the actual buttons and i want the toolbar and the cover to be combined in one section like it is done in the track metadata panel
 
 ## Bugs
 
-- [X] Setting the track cover sometimes is only displayed in app and not after reloading the directory.
-- [X] Some cover images are displayed correctly in the app but not in Navidrome web ui.
+- [x] Setting the track cover sometimes is only displayed in app and not after reloading the directory.
+- [x] Some cover images are displayed correctly in the app but not in Navidrome web ui.
 
 ## CD/CI
 

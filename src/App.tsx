@@ -414,7 +414,9 @@ export default function App() {
             role="separator"
           />
           <div className="status-bar" title={isLoadingLibrary ? 'Loading library...' : status}>
-            <span className="status-bar-text">{truncateStatusMessage(isLoadingLibrary ? 'Loading library...' : status)}</span>
+            <span className="status-bar-text">
+              {truncateStatusMessage(isLoadingLibrary ? 'Loading library...' : status)}
+            </span>
             {lastErrorStatus ? (
               <button
                 aria-label="Copy latest error message"

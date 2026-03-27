@@ -145,13 +145,7 @@ function isSameDirectoryPath(leftPath: string, rightPath: string) {
   return normalizePathForUiComparison(leftPath) === normalizePathForUiComparison(rightPath);
 }
 
-function clampMenuToPanel(
-  panelRect: DOMRect,
-  anchorX: number,
-  anchorY: number,
-  menuWidth: number,
-  menuHeight: number,
-) {
+function clampMenuToPanel(panelRect: DOMRect, anchorX: number, anchorY: number, menuWidth: number, menuHeight: number) {
   const panelPadding = 8;
   const localX = anchorX - panelRect.left;
   const localY = anchorY - panelRect.top;
@@ -304,9 +298,9 @@ export function LibraryPane({
   onOpenFileLocation,
   onReloadLibrary,
 }: LibraryPaneProps) {
-    const progressLoaded = loadingProgress?.loaded ?? items.length;
-    const progressTotal = loadingProgress?.total ?? items.length;
-    const progressFraction = progressTotal > 0 ? Math.max(0, Math.min(1, progressLoaded / progressTotal)) : 0;
+  const progressLoaded = loadingProgress?.loaded ?? items.length;
+  const progressTotal = loadingProgress?.total ?? items.length;
+  const progressFraction = progressTotal > 0 ? Math.max(0, Math.min(1, progressLoaded / progressTotal)) : 0;
 
   const panelRef = useRef<HTMLElement | null>(null);
   const trackSubmenuRef = useRef<HTMLDivElement | null>(null);
@@ -479,7 +473,7 @@ export function LibraryPane({
     filteredItems.forEach((item) => {
       const isRootPseudoAlbum = Boolean(
         item.openedDirectoryRoot &&
-          (item.isInOpenedDirectoryRoot || isSameDirectoryPath(item.directory, item.openedDirectoryRoot)),
+        (item.isInOpenedDirectoryRoot || isSameDirectoryPath(item.directory, item.openedDirectoryRoot)),
       );
       const groupKey = isRootPseudoAlbum ? `root::${item.openedDirectoryRoot}` : item.directory;
       const group = groups.get(groupKey) ?? {
@@ -1246,10 +1240,7 @@ export function LibraryPane({
                     title={isGroupCollapsed ? 'Expand album tracks' : 'Collapse album tracks'}
                     type="button"
                   >
-                    <span
-                      className={`library-album-chevron${isGroupCollapsed ? '' : ' open'}`}
-                      aria-hidden="true"
-                    >
+                    <span className={`library-album-chevron${isGroupCollapsed ? '' : ' open'}`} aria-hidden="true">
                       ▾
                     </span>
                   </button>
@@ -1374,11 +1365,7 @@ export function LibraryPane({
                     ? (() => {
                         const nextShowMoveTargets = !current.showMoveTargets;
                         const nextShowCreateAlbumInput = nextShowMoveTargets ? current.showCreateAlbumInput : false;
-                        const estimatedHeight = nextShowMoveTargets
-                          ? nextShowCreateAlbumInput
-                            ? 560
-                            : 470
-                          : 170;
+                        const estimatedHeight = nextShowMoveTargets ? (nextShowCreateAlbumInput ? 560 : 470) : 170;
                         const panelRect = panelRef.current?.getBoundingClientRect();
                         const repositioned = panelRect
                           ? clampMenuToPanel(panelRect, current.anchorX, current.anchorY, 240, estimatedHeight)
@@ -1593,7 +1580,9 @@ export function LibraryPane({
                     ariaLabel="Download album cover image"
                     disabled={!editingAlbum.draft.coverArt}
                     onClick={() => void onDownloadAlbumCover()}
-                    title={editingAlbum.draft.coverArt ? 'Download album cover image to file' : 'No cover image to download'}
+                    title={
+                      editingAlbum.draft.coverArt ? 'Download album cover image to file' : 'No cover image to download'
+                    }
                   >
                     <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
                   </CoverToolbarButton>

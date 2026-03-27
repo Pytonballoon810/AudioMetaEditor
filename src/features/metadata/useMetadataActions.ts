@@ -18,7 +18,13 @@ type UseMetadataActionsArgs = {
   setStatus: (message: string) => void;
 };
 
-export function useMetadataActions({ activeItem, library, setLibrary, setActivePath, setStatus }: UseMetadataActionsArgs) {
+export function useMetadataActions({
+  activeItem,
+  library,
+  setLibrary,
+  setActivePath,
+  setStatus,
+}: UseMetadataActionsArgs) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingAlbum, setIsSavingAlbum] = useState(false);
 

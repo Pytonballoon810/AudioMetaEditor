@@ -58,9 +58,7 @@ describe('ipc validators', () => {
   it('validates convert audio payload', () => {
     expect(() => validateConvertAudioPayload({ filePath: '/tmp/a.wav', targetFormat: 'mp3' })).not.toThrow();
     expect(() => validateConvertAudioPayload({ filePath: '/tmp/a.wav', targetFormat: 'flac' })).not.toThrow();
-    expect(() => validateConvertAudioPayload({ filePath: '/tmp/a.wav', targetFormat: 'wav' })).toThrow(
-      /targetFormat/,
-    );
+    expect(() => validateConvertAudioPayload({ filePath: '/tmp/a.wav', targetFormat: 'wav' })).toThrow(/targetFormat/);
     expect(() => validateConvertAudioPayload({ filePath: '', targetFormat: 'mp3' })).toThrow(/filePath/);
   });
 
