@@ -1058,11 +1058,115 @@ async function editAudioSelection(filePath, startTime, endTime, mode, outputPath
   return outputPath;
 }
 
+async function convertAudioFormat(filePath, targetFormat, outputPath) {
+  const target = String(targetFormat || '').toLowerCase();
+  if (target !== 'mp3' && target !== 'flac') {
+    throw new Error("Target format must be 'mp3' or 'flac'.");
+  }
+
+  const targetExtension = `.${target}`;
+  const sourceExtension = path.extname(filePath).toLowerCase();
+
+  let resolvedOutputPath = outputPath;
+  if (!resolvedOutputPath) {
+    resolvedOutputPath = path.join(
+      path.dirname(filePath),
+      `${path.basename(filePath, sourceExtension)}.${target}`,
+    );
+  }
+
+  const outputExtension = path.extname(resolvedOutputPath).toLowerCase();
+  if (outputExtension !== targetExtension) {
+    throw new Error(`Output file extension must be ${targetExtension}.`);
+  }
+
+  const { parseFile } = await getMusicMetadata();
+  const parsed = await parseFile(filePath, { skipCovers: false });
+  const common = parsed.common || {};
+  const bestPicture = pickBestCoverPicture(common.picture);
+
+  const tempCoverSourcePath = bestPicture
+    ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${normalizeImageMimeType(bestPicture.format, bestPicture.data)?.includes('png') ? 'png' : 'jpg'}`)
+    : null;
+  const tempCoverPath = bestPicture ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
+
+  const args = ['-y', '-i', filePath];
+
+  if (tempCoverSourcePath && tempCoverPath) {
+    const pictureBuffer = toBinaryBuffer(bestPicture?.data);
+    if (pictureBuffer) {
+      await fs.writeFile(tempCoverSourcePath, pictureBuffer);
+      await runFfmpeg(['-y', '-i', tempCoverSourcePath, '-frames:v', '1', '-q:v', '2', tempCoverPath]);
+      args.push('-i', tempCoverPath);
+    }
+  }
+
+  if (target === 'mp3') {
+    args.push('-map', '0:a', '-c:a', 'libmp3lame', '-q:a', '2');
+  } else {
+    args.push('-map', '0:a', '-c:a', 'flac');
+  }
+
+  if (tempCoverSourcePath && tempCoverPath) {
+    args.push(
+      '-map',
+      '1:v',
+      '-c:v',
+      'mjpeg',
+      '-metadata:s:v',
+      'title=Album cover',
+      '-metadata:s:v',
+      'comment=Cover (front)',
+      '-disposition:v:0',
+      'attached_pic',
+    );
+  }
+
+  const metadataMap = {
+    title: common.title,
+    artist: common.artist,
+    album: common.album,
+    album_artist: common.albumartist,
+    composer: coerceSingleValue(common.composer),
+    genre: coerceSingleValue(common.genre),
+    date: common.year ? String(common.year) : '',
+    track: common.track?.no ? String(common.track.no) : '',
+    disc: common.disk?.no ? String(common.disk.no) : '',
+    comment: coerceSingleValue(common.comment),
+  };
+
+  for (const [key, value] of Object.entries(metadataMap)) {
+    if (value) {
+      args.push('-metadata', `${key}=${value}`);
+    }
+  }
+
+  if (target === 'mp3') {
+    args.push('-id3v2_version', '3');
+  }
+
+  args.push(resolvedOutputPath);
+
+  try {
+    await runFfmpeg(args);
+  } finally {
+    if (tempCoverSourcePath) {
+      await fs.rm(tempCoverSourcePath, { force: true });
+    }
+    if (tempCoverPath) {
+      await fs.rm(tempCoverPath, { force: true });
+    }
+  }
+
+  return resolvedOutputPath;
+}
+
 module.exports = {
   buildLibrary,
   extractMetadata,
   exportAudioSegment,
   editAudioSelection,
+  convertAudioFormat,
   isSupportedAudioFile,
   saveMetadata,
   parseDataUrl,

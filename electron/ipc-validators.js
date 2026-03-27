@@ -56,6 +56,18 @@ function validateEditSelectionPayload(payload) {
   }
 }
 
+function validateConvertAudioPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('payload must be an object.');
+  }
+
+  assertString(payload.filePath, 'payload.filePath');
+
+  if (payload.targetFormat !== 'mp3' && payload.targetFormat !== 'flac') {
+    throw new Error("payload.targetFormat must be either 'mp3' or 'flac'.");
+  }
+}
+
 function validateLoadBlobPayload(filePath) {
   assertString(filePath, 'filePath');
 }
@@ -102,6 +114,7 @@ module.exports = {
   validateMetadataSavePayload,
   validateExportClipPayload,
   validateEditSelectionPayload,
+  validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateMoveTrackPayload,

@@ -4,7 +4,14 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu, screen, shell } = require('electron');
 
-const { buildLibrary, editAudioSelection, exportAudioSegment, saveMetadata, __testables } = require('./media-service');
+const {
+  buildLibrary,
+  editAudioSelection,
+  exportAudioSegment,
+  saveMetadata,
+  convertAudioFormat,
+  __testables,
+} = require('./media-service');
 const { readFileAsBase64WithLimit } = require('./file-io');
 const {
   getSupportedExtensionFromUrl,
@@ -19,6 +26,7 @@ const {
   validateMetadataSavePayload,
   validateExportClipPayload,
   validateEditSelectionPayload,
+  validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateMoveTrackPayload,
@@ -510,6 +518,34 @@ app.whenReady().then(async () => {
     );
 
     console.log('[backend-action] audio:edit-selection:done', outputPath);
+    return { outputPath };
+  });
+
+  registerIpcHandler('audio:convert-format', async (_event, payload) => {
+    validateConvertAudioPayload(payload);
+    console.log('[backend-action] audio:convert-format:start', payload?.filePath, payload?.targetFormat);
+
+    const sourcePath = path.resolve(payload.filePath);
+    const sourceExtension = path.extname(sourcePath);
+    const targetFormat = payload.targetFormat;
+    const defaultPath = path.join(
+      path.dirname(sourcePath),
+      `${path.basename(sourcePath, sourceExtension)}.${targetFormat}`,
+    );
+
+    const result = await dialog.showSaveDialog({
+      title: `Convert audio to ${targetFormat.toUpperCase()}`,
+      defaultPath,
+      filters: [{ name: 'Audio', extensions: [targetFormat] }],
+    });
+
+    if (result.canceled || !result.filePath) {
+      console.log('[backend-action] audio:convert-format:cancelled');
+      return null;
+    }
+
+    const outputPath = await convertAudioFormat(sourcePath, targetFormat, result.filePath);
+    console.log('[backend-action] audio:convert-format:done', outputPath);
     return { outputPath };
   });
 

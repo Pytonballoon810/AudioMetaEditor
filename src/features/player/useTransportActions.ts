@@ -40,6 +40,7 @@ export function useTransportActions({
   setIsDownloadDialogOpen,
 }: UseTransportActionsArgs) {
   const [isExporting, setIsExporting] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
   const [isEditingSelection, setIsEditingSelection] = useState(false);
   const [isDownloadingFromUrl, setIsDownloadingFromUrl] = useState(false);
 
@@ -90,6 +91,31 @@ export function useTransportActions({
       setStatus(toUserErrorMessage(error, 'Unable to edit selected audio section.'));
     } finally {
       setIsEditingSelection(false);
+    }
+  }
+
+  async function handleConvertAudio(targetFormat: 'mp3' | 'flac') {
+    if (!activeItem) {
+      return;
+    }
+
+    setIsConverting(true);
+    setStatus(`Converting ${activeItem.name} to ${targetFormat.toUpperCase()}...`);
+
+    try {
+      const api = requireAudioMetaApi();
+      const result = await api.convertAudio({ filePath: activeItem.path, targetFormat });
+      if (!result) {
+        setStatus('Audio conversion cancelled.');
+        return;
+      }
+
+      await loadPaths([result.outputPath], result.outputPath);
+      setStatus(`Converted audio saved to ${result.outputPath}.`);
+    } catch (error) {
+      setStatus(toUserErrorMessage(error, 'Unable to convert audio format.'));
+    } finally {
+      setIsConverting(false);
     }
   }
 
@@ -211,9 +237,11 @@ export function useTransportActions({
 
   return {
     isExporting,
+    isConverting,
     isEditingSelection,
     isDownloadingFromUrl,
     handleExportClip,
+    handleConvertAudio,
     handleEditSelection,
     handleMoveTrackToAlbum,
     handleDownloadFromUrl,

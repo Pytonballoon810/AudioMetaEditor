@@ -35,6 +35,9 @@ export type ExportClipResult = { outputPath: string } | null;
 export type EditSelectionPayload = ExportClipPayload & { mode: 'trim' | 'cut' };
 export type EditSelectionResult = { outputPath: string } | null;
 
+export type ConvertAudioPayload = { filePath: string; targetFormat: 'mp3' | 'flac' };
+export type ConvertAudioResult = { outputPath: string } | null;
+
 export interface AudioMetaApi {
   openAudioFiles: () => Promise<string[]>;
   openDirectory: () => Promise<string[]>;
@@ -46,6 +49,7 @@ export interface AudioMetaApi {
   saveCoverImage: (payload: SaveCoverImagePayload) => Promise<SaveCoverImageResult>;
   exportClip: (payload: ExportClipPayload) => Promise<ExportClipResult>;
   editSelection: (payload: EditSelectionPayload) => Promise<EditSelectionResult>;
+  convertAudio: (payload: ConvertAudioPayload) => Promise<ConvertAudioResult>;
   loadAudioBlob: (filePath: string) => Promise<string>;
   onOpenPaths: (callback: (paths: string[]) => void) => () => void;
   onApiLog: (callback: (payload: ApiLogPayload) => void) => () => void;

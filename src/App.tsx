@@ -252,9 +252,11 @@ export default function App() {
 
   const {
     isExporting,
+    isConverting,
     isEditingSelection,
     isDownloadingFromUrl,
     handleExportClip,
+    handleConvertAudio,
     handleEditSelection,
     handleMoveTrackToAlbum,
     handleDownloadFromUrl,
@@ -398,6 +400,8 @@ export default function App() {
             item={activeItem}
             onEditSelection={handleEditSelection}
             onExportClip={handleExportClip}
+            onConvertAudio={handleConvertAudio}
+            isConverting={isConverting}
             isEditingSelection={isEditingSelection}
             isExporting={isExporting}
           />

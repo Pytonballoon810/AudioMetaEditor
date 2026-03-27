@@ -102,6 +102,15 @@ function describeAction(callName, phase, args, result, error) {
         : `${mode === 'cut' ? 'Cut' : 'Trim'} operation was cancelled by user.`;
   }
 
+  if (callName === 'convertAudio') {
+    const filePath = args?.[0]?.filePath;
+    const targetFormat = args?.[0]?.targetFormat;
+    const name = fileNameFromPath(filePath);
+    if (phase === 'start') return `Converting ${name} to ${String(targetFormat || '').toUpperCase()}.`;
+    if (phase === 'done')
+      return result ? `Converted file saved to ${result.outputPath}.` : 'Audio conversion was cancelled by user.';
+  }
+
   if (callName === 'downloadFromUrl') {
     if (phase === 'start') return 'Starting URL download. This supports direct MP3/WAV/FLAC file links only.';
     if (phase === 'done')
@@ -145,6 +154,7 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   saveCoverImage: (payload) => invokeLogged('saveCoverImage', 'cover:save-image', payload),
   exportClip: (payload) => invokeLogged('exportClip', 'audio:export-clip', payload),
   editSelection: (payload) => invokeLogged('editSelection', 'audio:edit-selection', payload),
+  convertAudio: (payload) => invokeLogged('convertAudio', 'audio:convert-format', payload),
   loadAudioBlob: async (filePath) => {
     try {
       const base64 = await invokeLogged('loadAudioBlob', 'audio:load-blob', filePath);

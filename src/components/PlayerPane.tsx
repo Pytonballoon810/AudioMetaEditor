@@ -21,8 +21,10 @@ export type PlayerPaneHandle = {
 type PlayerPaneProps = {
   item: AudioLibraryItem | null;
   onExportClip: (startTime: number, endTime: number) => Promise<void>;
+  onConvertAudio: (targetFormat: 'mp3' | 'flac') => Promise<void>;
   onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
   isExporting: boolean;
+  isConverting: boolean;
   isEditingSelection: boolean;
 };
 
@@ -82,12 +84,13 @@ function buildRemovedRanges(edit: PendingWaveEdit, trackDuration: number): Remov
 }
 
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
-  { item, onExportClip, onEditSelection, isExporting, isEditingSelection },
+  { item, onExportClip, onConvertAudio, onEditSelection, isExporting, isConverting, isEditingSelection },
   ref,
 ) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
   const audioUrl = item ? item.path : null;
@@ -460,9 +463,51 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             />
           </label>
         </div>
+        <div className="convert-format-dropdown" onBlur={() => window.setTimeout(() => setIsConvertMenuOpen(false), 100)} tabIndex={0}>
+          <button
+            className="accent-button convert-format-trigger"
+            disabled={!item || isConverting}
+            onClick={() => setIsConvertMenuOpen((open) => !open)}
+            type="button"
+          >
+            <span>{isConverting ? 'Converting...' : 'Convert to...'}</span>
+            <span aria-hidden="true" className={`convert-format-chevron${isConvertMenuOpen ? ' open' : ''}`}>
+              ▾
+            </span>
+          </button>
+
+          {isConvertMenuOpen && item && !isConverting ? (
+            <div className="convert-format-menu" role="listbox">
+              <button
+                className={`convert-format-option${item.extension.toLowerCase() === 'mp3' ? ' active' : ''}`}
+                disabled={item.extension.toLowerCase() === 'mp3'}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  void onConvertAudio('mp3');
+                  setIsConvertMenuOpen(false);
+                }}
+                type="button"
+              >
+                Convert to MP3
+              </button>
+              <button
+                className={`convert-format-option${item.extension.toLowerCase() === 'flac' ? ' active' : ''}`}
+                disabled={item.extension.toLowerCase() === 'flac'}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  void onConvertAudio('flac');
+                  setIsConvertMenuOpen(false);
+                }}
+                type="button"
+              >
+                Convert to FLAC
+              </button>
+            </div>
+          ) : null}
+        </div>
         <button
           className="accent-button"
-          disabled={!item || selection.end <= selection.start || isExporting}
+          disabled={!item || selection.end <= selection.start || isExporting || isConverting}
           onClick={() => void onExportClip(selection.start, selection.end)}
           type="button"
         >

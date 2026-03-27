@@ -7,6 +7,7 @@ const {
   validateMetadataSavePayload,
   validateExportClipPayload,
   validateEditSelectionPayload,
+  validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateMoveTrackPayload,
@@ -52,6 +53,15 @@ describe('ipc validators', () => {
     expect(() =>
       validateEditSelectionPayload({ filePath: '/tmp/a.mp3', startTime: 1, endTime: 3, mode: 'slice' }),
     ).toThrow(/mode/);
+  });
+
+  it('validates convert audio payload', () => {
+    expect(() => validateConvertAudioPayload({ filePath: '/tmp/a.wav', targetFormat: 'mp3' })).not.toThrow();
+    expect(() => validateConvertAudioPayload({ filePath: '/tmp/a.wav', targetFormat: 'flac' })).not.toThrow();
+    expect(() => validateConvertAudioPayload({ filePath: '/tmp/a.wav', targetFormat: 'wav' })).toThrow(
+      /targetFormat/,
+    );
+    expect(() => validateConvertAudioPayload({ filePath: '', targetFormat: 'mp3' })).toThrow(/filePath/);
   });
 
   it('validates load blob payload', () => {
