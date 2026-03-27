@@ -19,6 +19,7 @@ import {
 } from 'react';
 import type { AudioLibraryItem, EditableMetadata, MetadataSuggestions } from '../types';
 import defaultCover from '../assets/defaultCover.png';
+import { CoverEditToolbar, CoverToolbarButton, CoverToolbarDivider, CoverToolbarGroup } from './CoverEditToolbar';
 
 const MAGIC_WAND_TOLERANCE = 42;
 
@@ -575,61 +576,53 @@ export function MetadataEditor({
               ref={coverCanvasRef}
             />
           </div>
-          <div aria-label="Cover editing toolbar" className="cover-edit-toolbar" role="toolbar">
-            <div className="daw-toolbar-group">
-              <button
-                aria-label="Undo cover edit"
-                className="daw-tool-button"
+          <CoverEditToolbar ariaLabel="Cover editing toolbar">
+            <CoverToolbarGroup>
+              <CoverToolbarButton
+                ariaLabel="Undo cover edit"
                 disabled={coverUndoStack.length === 0}
                 onClick={undoCoverArtEdit}
                 title={coverUndoStack.length > 0 ? 'Undo last cover edit' : 'No cover edit to undo'}
-                type="button"
               >
                 <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
-              </button>
-              <button
-                aria-label="Redo cover edit"
-                className="daw-tool-button"
+              </CoverToolbarButton>
+              <CoverToolbarButton
+                ariaLabel="Redo cover edit"
                 disabled={coverRedoStack.length === 0}
                 onClick={redoCoverArtEdit}
                 title={coverRedoStack.length > 0 ? 'Redo last undone cover edit' : 'No cover edit to redo'}
-                type="button"
               >
                 <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
-              </button>
-            </div>
+              </CoverToolbarButton>
+            </CoverToolbarGroup>
 
-            <span aria-hidden="true" className="daw-toolbar-divider" />
+            <CoverToolbarDivider />
 
-            <div className="daw-toolbar-group">
-              <button
-                aria-label="Upload replacement artwork"
-                className="daw-tool-button"
+            <CoverToolbarGroup>
+              <CoverToolbarButton
+                ariaLabel="Upload replacement artwork"
                 onClick={() => coverInputRef.current?.click()}
                 title="Upload replacement artwork image"
-                type="button"
               >
                 <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
-              </button>
+              </CoverToolbarButton>
               <input accept="image/*" hidden onChange={onCoverChange} ref={coverInputRef} type="file" />
-            </div>
+            </CoverToolbarGroup>
 
-            <span aria-hidden="true" className="daw-toolbar-divider" />
+            <CoverToolbarDivider />
 
-            <div className="daw-toolbar-group">
-              <button
-                aria-label="Download cover image"
-                className="daw-tool-button"
+            <CoverToolbarGroup>
+              <CoverToolbarButton
+                ariaLabel="Download cover image"
                 disabled={!draft.coverArt}
                 onClick={() =>
                   void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover')
                 }
                 title={draft.coverArt ? 'Download cover image to file' : 'No cover image to download'}
-                type="button"
               >
                 <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
-              </button>
-              <button
+              </CoverToolbarButton>
+              <CoverToolbarButton
                 aria-label={
                   isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'
                 }
@@ -646,36 +639,31 @@ export function MetadataEditor({
                     ? 'Magic wand: click and drag on similar colors to make them transparent'
                     : 'Load artwork first to use the magic wand'
                 }
-                type="button"
               >
                 <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
-              </button>
-            </div>
+              </CoverToolbarButton>
+            </CoverToolbarGroup>
 
-            <span aria-hidden="true" className="daw-toolbar-divider" />
+            <CoverToolbarDivider />
 
-            <div className="daw-toolbar-group">
-              <button
-                aria-label="Carry over cover from derived album cover"
-                className="daw-tool-button"
+            <CoverToolbarGroup>
+              <CoverToolbarButton
+                ariaLabel="Carry over cover from derived album cover"
                 disabled={albumCoverOptions.length === 0}
                 onClick={onCarryOverAlbumCover}
                 title="Carry over cover from derived album cover"
-                type="button"
               >
                 <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
-              </button>
-              <button
-                aria-label="Copy cover from other track"
-                className="daw-tool-button"
+              </CoverToolbarButton>
+              <CoverToolbarButton
+                ariaLabel="Copy cover from other track"
                 disabled={otherTrackCoverOptions.length === 0}
                 onClick={onCopyCoverFromOtherTrack}
                 title="Copy cover from other track"
-                type="button"
               >
                 <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
-              </button>
-            </div>
+              </CoverToolbarButton>
+            </CoverToolbarGroup>
 
             {willConvertToFlacOnSave ? (
               <span className="cover-convert-warning-wrap" role="note" tabIndex={0}>
@@ -687,7 +675,7 @@ export function MetadataEditor({
                 </span>
               </span>
             ) : null}
-          </div>
+          </CoverEditToolbar>
 
           {coverImportError ? <p className="cover-load-error">{coverImportError}</p> : null}
 

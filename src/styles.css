@@ -854,6 +854,10 @@ textarea {
     rgba(255, 255, 255, 0.03);
 }
 
+.album-edit-cover-image-wrap.wand-active {
+  box-shadow: 0 0 0 2px rgba(255, 94, 168, 0.5);
+}
+
 .album-edit-cover-image {
   display: block;
   width: 100%;
@@ -881,11 +885,11 @@ textarea {
 }
 
 .album-edit-cover-toolbar .daw-toolbar-divider {
-  display: none;
+  display: block;
 }
 
 .album-edit-cover-toolbar .daw-toolbar-group {
-  display: contents;
+  display: inline-flex;
 }
 
 .album-edit-cover-card .cover-editor-hint-tooltip-wrap {

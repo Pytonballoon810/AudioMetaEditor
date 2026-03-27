@@ -1,5 +1,14 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Album01Icon, Copy01Icon, Folder01Icon, RedoIcon, UndoIcon, Upload01Icon } from '@hugeicons/core-free-icons';
+import {
+  Album01Icon,
+  Copy01Icon,
+  Download01Icon,
+  Folder01Icon,
+  MagicWand01Icon,
+  RedoIcon,
+  UndoIcon,
+  Upload01Icon,
+} from '@hugeicons/core-free-icons';
 import {
   useEffect,
   useLayoutEffect,
@@ -8,12 +17,13 @@ import {
   useState,
   type ChangeEvent,
   type MouseEvent as ReactMouseEvent,
-  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { AudioLibraryItem, EditableMetadata } from '../types';
 import { formatDuration } from '../lib/format';
 import { preloadAudioBlob, requireAudioMetaApi } from '../services/audioMetaApi';
 import defaultCover from '../assets/defaultCover.png';
+import { CoverEditToolbar, CoverToolbarButton, CoverToolbarDivider, CoverToolbarGroup } from './CoverEditToolbar';
 
 type LibraryPaneProps = {
   items: AudioLibraryItem[];
@@ -118,6 +128,8 @@ const SORT_OPTIONS: Array<{ value: LibrarySortMethod; label: string }> = [
   { value: 'duration-desc', label: 'Duration longest first' },
   { value: 'format-asc', label: 'Format A-Z' },
 ];
+
+const MAGIC_WAND_TOLERANCE = 42;
 
 function folderNameFromPath(directoryPath: string) {
   const normalized = directoryPath.replace(/\\/g, '/').replace(/\/+$/, '');
@@ -281,37 +293,6 @@ function AlbumEditSuggestionInput({
   );
 }
 
-type CoverToolbarButtonProps = {
-  ariaLabel: string;
-  title: string;
-  onClick: () => void;
-  disabled?: boolean;
-  className?: string;
-  children: ReactNode;
-};
-
-function CoverToolbarButton({
-  ariaLabel,
-  title,
-  onClick,
-  disabled = false,
-  className = 'daw-tool-button',
-  children,
-}: CoverToolbarButtonProps) {
-  return (
-    <button
-      aria-label={ariaLabel}
-      className={className}
-      disabled={disabled}
-      onClick={onClick}
-      title={title}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
 export function LibraryPane({
   items,
   currentPath,
@@ -340,9 +321,13 @@ export function LibraryPane({
   const [albumCoverImportError, setAlbumCoverImportError] = useState<string | null>(null);
   const [isApplyingAlbumEdit, setIsApplyingAlbumEdit] = useState(false);
   const [isAlbumModalCoverPickerOpen, setIsAlbumModalCoverPickerOpen] = useState(false);
+  const [isAlbumWandActive, setIsAlbumWandActive] = useState(false);
   const [albumContextMenu, setAlbumContextMenu] = useState<AlbumContextMenuState | null>(null);
   const [trackContextMenu, setTrackContextMenu] = useState<TrackContextMenuState | null>(null);
   const [isMovingTrack, setIsMovingTrack] = useState(false);
+  const albumCoverCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isAlbumWandDraggingRef = useRef(false);
+  const hasAlbumWandEditsRef = useRef(false);
 
   useEffect(() => {
     if (!editingAlbum) {
@@ -360,6 +345,7 @@ export function LibraryPane({
 
       setIsAlbumModalCoverPickerOpen(false);
       setAlbumCoverImportError(null);
+      setIsAlbumWandActive(false);
       setEditingAlbum(null);
     }
 
@@ -393,6 +379,49 @@ export function LibraryPane({
       window.removeEventListener('pointerdown', handleGlobalPointerDown);
     };
   }, [albumContextMenu, trackContextMenu]);
+
+  useEffect(() => {
+    const cover = editingAlbum?.draft.coverArt || defaultCover;
+    const canvas = albumCoverCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      return;
+    }
+
+    let isCancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (isCancelled || !albumCoverCanvasRef.current) {
+        return;
+      }
+
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0);
+      hasAlbumWandEditsRef.current = false;
+    };
+
+    image.onerror = () => {
+      if (isCancelled || !albumCoverCanvasRef.current) {
+        return;
+      }
+
+      if (cover !== defaultCover) {
+        image.src = defaultCover;
+      }
+    };
+
+    image.src = cover;
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [editingAlbum?.draft.coverArt]);
 
   useLayoutEffect(() => {
     if (!trackContextMenu?.showCreateAlbumInput) {
@@ -629,6 +658,130 @@ export function LibraryPane({
     });
   }
 
+  function removeAlbumCoverConnectedArea(clientX: number, clientY: number) {
+    if (!isAlbumWandActive || !editingAlbum?.draft.coverArt) {
+      return;
+    }
+
+    const canvas = albumCoverCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(((clientX - rect.left) / rect.width) * canvas.width)));
+    const y = Math.max(
+      0,
+      Math.min(canvas.height - 1, Math.floor(((clientY - rect.top) / rect.height) * canvas.height)),
+    );
+
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = imageData.width;
+    const height = imageData.height;
+
+    const pixelOffset = (y * width + x) * 4;
+    const sourceR = data[pixelOffset] ?? 0;
+    const sourceG = data[pixelOffset + 1] ?? 0;
+    const sourceB = data[pixelOffset + 2] ?? 0;
+    const sourceA = data[pixelOffset + 3] ?? 0;
+
+    if (sourceA === 0) {
+      return;
+    }
+
+    const toleranceSquared = MAGIC_WAND_TOLERANCE * MAGIC_WAND_TOLERANCE;
+    const alphaTolerance = 48;
+    const visited = new Uint8Array(width * height);
+    const stack = [y * width + x];
+
+    while (stack.length > 0) {
+      const index = stack.pop();
+      if (typeof index !== 'number' || visited[index] === 1) {
+        continue;
+      }
+
+      visited[index] = 1;
+      const offset = index * 4;
+      const red = data[offset] ?? 0;
+      const green = data[offset + 1] ?? 0;
+      const blue = data[offset + 2] ?? 0;
+      const alpha = data[offset + 3] ?? 0;
+      const deltaR = red - sourceR;
+      const deltaG = green - sourceG;
+      const deltaB = blue - sourceB;
+      const deltaA = Math.abs(alpha - sourceA);
+      const distanceSquared = deltaR * deltaR + deltaG * deltaG + deltaB * deltaB;
+
+      if (distanceSquared > toleranceSquared || deltaA > alphaTolerance) {
+        continue;
+      }
+
+      data[offset + 3] = 0;
+
+      const px = index % width;
+      const py = Math.floor(index / width);
+      if (px > 0) stack.push(index - 1);
+      if (px < width - 1) stack.push(index + 1);
+      if (py > 0) stack.push(index - width);
+      if (py < height - 1) stack.push(index + width);
+    }
+
+    context.putImageData(imageData, 0, 0);
+    hasAlbumWandEditsRef.current = true;
+  }
+
+  function commitAlbumWandEditsToCover() {
+    if (!hasAlbumWandEditsRef.current) {
+      return;
+    }
+
+    const canvas = albumCoverCanvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    setAlbumCover(canvas.toDataURL('image/png'));
+    hasAlbumWandEditsRef.current = false;
+  }
+
+  function handleAlbumCoverPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!isAlbumWandActive || !editingAlbum?.draft.coverArt) {
+      return;
+    }
+
+    isAlbumWandDraggingRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    removeAlbumCoverConnectedArea(event.clientX, event.clientY);
+  }
+
+  function handleAlbumCoverPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!isAlbumWandActive || !isAlbumWandDraggingRef.current || !editingAlbum?.draft.coverArt) {
+      return;
+    }
+
+    removeAlbumCoverConnectedArea(event.clientX, event.clientY);
+  }
+
+  function handleAlbumCoverPointerUp(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!isAlbumWandDraggingRef.current) {
+      return;
+    }
+
+    isAlbumWandDraggingRef.current = false;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    commitAlbumWandEditsToCover();
+  }
+
   function undoAlbumCoverEdit() {
     setEditingAlbum((current) => {
       if (!current || current.coverHistory.undo.length === 0) {
@@ -706,6 +859,7 @@ export function LibraryPane({
   function openAlbumEditor(folderPath: string, folderName: string, albumItems: AudioLibraryItem[]) {
     setIsAlbumModalCoverPickerOpen(false);
     setAlbumCoverImportError(null);
+    setIsAlbumWandActive(false);
     setEditingAlbum({
       folderPath,
       folderName,
@@ -946,6 +1100,17 @@ export function LibraryPane({
     } finally {
       setIsApplyingAlbumEdit(false);
     }
+  }
+
+  async function onDownloadAlbumCover() {
+    if (!editingAlbum?.draft.coverArt) {
+      return;
+    }
+
+    await requireAudioMetaApi().saveCoverImage({
+      dataUrl: editingAlbum.draft.coverArt,
+      suggestedName: editingAlbum.draft.album || editingAlbum.folderName || 'cover',
+    });
   }
 
   return (
@@ -1370,23 +1535,20 @@ export function LibraryPane({
             </div>
 
             <div className="album-edit-cover-card">
-              <div className="album-edit-cover-image-wrap">
-                <img
-                  alt="Album cover"
-                  className="album-edit-cover-image"
-                  onError={(event) => {
-                    event.currentTarget.src = defaultCover;
-                  }}
-                  src={editingAlbum.draft.coverArt || defaultCover}
+              <div className={`album-edit-cover-image-wrap${isAlbumWandActive ? ' wand-active' : ''}`}>
+                <canvas
+                  aria-label="Album cover editor"
+                  className="cover-image-canvas"
+                  onPointerDown={handleAlbumCoverPointerDown}
+                  onPointerMove={handleAlbumCoverPointerMove}
+                  onPointerUp={handleAlbumCoverPointerUp}
+                  onPointerCancel={handleAlbumCoverPointerUp}
+                  ref={albumCoverCanvasRef}
                 />
               </div>
 
-              <div
-                aria-label="Album artwork toolbar"
-                className="cover-edit-toolbar album-edit-cover-toolbar"
-                role="toolbar"
-              >
-                <div className="daw-toolbar-group">
+              <CoverEditToolbar ariaLabel="Album artwork toolbar" className="album-edit-cover-toolbar">
+                <CoverToolbarGroup>
                   <CoverToolbarButton
                     ariaLabel="Undo album cover edit"
                     disabled={editingAlbum.coverHistory.undo.length === 0}
@@ -1409,11 +1571,11 @@ export function LibraryPane({
                   >
                     <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
                   </CoverToolbarButton>
-                </div>
+                </CoverToolbarGroup>
 
-                <span aria-hidden="true" className="daw-toolbar-divider" />
+                <CoverToolbarDivider />
 
-                <div className="daw-toolbar-group">
+                <CoverToolbarGroup>
                   <CoverToolbarButton
                     ariaLabel="Upload replacement album artwork"
                     onClick={() => albumCoverInputRef.current?.click()}
@@ -1422,11 +1584,46 @@ export function LibraryPane({
                     <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
                   </CoverToolbarButton>
                   <input accept="image/*" hidden onChange={onAlbumCoverChange} ref={albumCoverInputRef} type="file" />
-                </div>
+                </CoverToolbarGroup>
 
-                <span aria-hidden="true" className="daw-toolbar-divider" />
+                <CoverToolbarDivider />
 
-                <div className="daw-toolbar-group">
+                <CoverToolbarGroup>
+                  <CoverToolbarButton
+                    ariaLabel="Download album cover image"
+                    disabled={!editingAlbum.draft.coverArt}
+                    onClick={() => void onDownloadAlbumCover()}
+                    title={editingAlbum.draft.coverArt ? 'Download album cover image to file' : 'No cover image to download'}
+                  >
+                    <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
+                  </CoverToolbarButton>
+                  <CoverToolbarButton
+                    ariaLabel={
+                      isAlbumWandActive
+                        ? 'Disable magic wand background remover'
+                        : 'Enable magic wand background remover'
+                    }
+                    className={`daw-tool-button daw-tool-button-accent${isAlbumWandActive ? ' cover-tool-active' : ''}`}
+                    disabled={!editingAlbum.draft.coverArt}
+                    onClick={() => {
+                      if (isAlbumWandActive) {
+                        commitAlbumWandEditsToCover();
+                      }
+                      setIsAlbumWandActive((current) => !current);
+                    }}
+                    title={
+                      editingAlbum.draft.coverArt
+                        ? 'Magic wand: click and drag on similar colors to make them transparent'
+                        : 'Load artwork first to use the magic wand'
+                    }
+                  >
+                    <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
+                  </CoverToolbarButton>
+                </CoverToolbarGroup>
+
+                <CoverToolbarDivider />
+
+                <CoverToolbarGroup>
                   <CoverToolbarButton
                     ariaLabel="Remove album cover"
                     onClick={() => setAlbumCover(null)}
@@ -1434,11 +1631,11 @@ export function LibraryPane({
                   >
                     X
                   </CoverToolbarButton>
-                </div>
+                </CoverToolbarGroup>
 
-                <span aria-hidden="true" className="daw-toolbar-divider" />
+                <CoverToolbarDivider />
 
-                <div className="daw-toolbar-group">
+                <CoverToolbarGroup>
                   <CoverToolbarButton
                     ariaLabel="Use cover from other album or track"
                     disabled={albumModalCoverSourceOptions.length === 0}
@@ -1457,8 +1654,8 @@ export function LibraryPane({
                   >
                     <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
                   </CoverToolbarButton>
-                </div>
-              </div>
+                </CoverToolbarGroup>
+              </CoverEditToolbar>
 
               {albumCoverImportError ? <p className="cover-load-error">{albumCoverImportError}</p> : null}
 
