@@ -436,11 +436,12 @@ app.whenReady().then(async () => {
   registerIpcHandler('metadata:save', async (_event, payload) => {
     validateMetadataSavePayload(payload);
     console.log('[backend-action] metadata:save:start', payload?.filePath);
-    const metadata = await saveMetadata(payload.filePath, payload.metadata);
-    console.log('[backend-action] metadata:save:done', payload?.filePath);
+    const result = await saveMetadata(payload.filePath, payload.metadata);
+    console.log('[backend-action] metadata:save:done', result?.filePath || payload?.filePath);
     return {
-      filePath: payload.filePath,
-      metadata,
+      sourcePath: payload.filePath,
+      filePath: result.filePath,
+      metadata: result.metadata,
     };
   });
 

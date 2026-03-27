@@ -712,6 +712,92 @@ function runDataSafetyHook(phase, details) {
   console.log('[data-safety-hook]', phase, details);
 }
 
+function replaceExtension(filePath, nextExtension) {
+  const directory = path.dirname(filePath);
+  const baseName = path.basename(filePath, path.extname(filePath));
+  return path.join(directory, `${baseName}${nextExtension}`);
+}
+
+async function convertWavToFlacWithCover(filePath, metadata, coverArt) {
+  const extension = path.extname(filePath).toLowerCase();
+  const targetPath = replaceExtension(filePath, '.flac');
+  const shouldStageInput = requiresLocalFfmpegInput(filePath);
+  const tempInput = shouldStageInput
+    ? path.join(os.tmpdir(), `${path.basename(filePath, extension)}-input-${Date.now()}${extension}`)
+    : null;
+  const ffmpegInputPath = tempInput || filePath;
+  const tempOutput = path.join(os.tmpdir(), `${path.basename(filePath, extension)}-${Date.now()}.flac`);
+  const tempCoverSourcePath = path.join(os.tmpdir(), `cover-src-${Date.now()}.${coverArt.extension}`);
+  const tempCoverPath = path.join(os.tmpdir(), `cover-${Date.now()}.jpg`);
+
+  try {
+    if (tempInput) {
+      await copyFileWithFallback(filePath, tempInput);
+    }
+
+    await fs.writeFile(tempCoverSourcePath, coverArt.buffer);
+    await runFfmpeg(['-y', '-i', tempCoverSourcePath, '-frames:v', '1', '-q:v', '2', tempCoverPath]);
+
+    const args = ['-y', '-i', ffmpegInputPath, '-i', tempCoverPath, '-map', '0:a', '-map', '1:v'];
+    args.push(
+      '-c:a',
+      'flac',
+      '-c:v',
+      'mjpeg',
+      '-metadata:s:v',
+      'title=Album cover',
+      '-metadata:s:v',
+      'comment=Cover (front)',
+      '-disposition:v:0',
+      'attached_pic',
+    );
+
+    const metadataMap = {
+      title: metadata.title,
+      artist: metadata.artist,
+      album: metadata.album,
+      album_artist: metadata.albumArtist,
+      composer: metadata.composer,
+      producer: metadata.producer,
+      genre: metadata.genre,
+      date: metadata.year,
+      track: metadata.track,
+      disc: metadata.disc,
+      comment: metadata.comment,
+    };
+
+    for (const [key, value] of Object.entries(metadataMap)) {
+      if (value) {
+        args.push('-metadata', `${key}=${value}`);
+      }
+    }
+
+    args.push(tempOutput);
+    await runFfmpeg(args);
+    await copyFileWithFallback(tempOutput, targetPath);
+
+    const extracted = await extractMetadata(targetPath);
+
+    try {
+      await fs.rm(filePath, { force: false });
+    } catch (removeError) {
+      console.warn('[convertWavToFlacWithCover] Converted but could not remove source WAV:', filePath, removeError);
+    }
+
+    return {
+      filePath: targetPath,
+      metadata: extracted,
+    };
+  } finally {
+    if (tempInput) {
+      await fs.rm(tempInput, { force: true });
+    }
+    await fs.rm(tempOutput, { force: true });
+    await fs.rm(tempCoverSourcePath, { force: true });
+    await fs.rm(tempCoverPath, { force: true });
+  }
+}
+
 async function saveMetadata(filePath, metadata) {
   console.log('[backend-action] saveMetadata:start', filePath);
   if (metadata?.coverArt) {
@@ -761,6 +847,14 @@ async function saveMetadata(filePath, metadata) {
     });
   }
 
+  if (extension === '.wav' && coverArt) {
+    console.log('[metadata-debug] saveMetadata:auto-convert-wav-to-flac', {
+      filePath,
+      targetPath: replaceExtension(filePath, '.flac'),
+    });
+    return convertWavToFlacWithCover(filePath, metadata, coverArt);
+  }
+
   if (tempInput) {
     await copyFileWithFallback(filePath, tempInput);
   }
@@ -794,10 +888,9 @@ async function saveMetadata(filePath, metadata) {
     outputArgs.push('-map', '0', '-c', 'copy');
 
     if (metadata.coverArt) {
-      console.warn('[saveMetadata] Embedded cover art is not supported for this container; skipping cover write.', {
-        filePath,
-        extension,
-      });
+      throw new Error(
+        `Embedded cover art is not supported for ${extension.toUpperCase()} files in this build. Use MP3 for artwork embedding.`,
+      );
     }
   }
 
@@ -860,7 +953,10 @@ async function saveMetadata(filePath, metadata) {
 
     commitSucceeded = true;
     console.log('[backend-action] saveMetadata:done', filePath);
-    return extracted;
+    return {
+      filePath,
+      metadata: extracted,
+    };
   } catch (error) {
     runDataSafetyHook('rollback-start', { filePath, backupPath });
     try {

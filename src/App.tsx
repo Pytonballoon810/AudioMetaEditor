@@ -55,6 +55,7 @@ export default function App() {
   const [isMetadataResizing, setIsMetadataResizing] = useState(false);
   const [isStatusResizing, setIsStatusResizing] = useState(false);
   const [lastErrorStatus, setLastErrorStatus] = useState<string | null>(null);
+  const [libraryLoadingProgress, setLibraryLoadingProgress] = useState<{ loaded: number; total: number } | null>(null);
   const playerPaneRef = useRef<PlayerPaneHandle>(null);
   const mainColumnRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -208,7 +209,16 @@ export default function App() {
         setLastErrorStatus(payload.message);
       }
     },
+    onLibraryProgressPayload: (payload) => {
+      setLibraryLoadingProgress({ loaded: payload.loaded, total: payload.total });
+    },
   });
+
+  useEffect(() => {
+    if (!isLoadingLibrary) {
+      setLibraryLoadingProgress(null);
+    }
+  }, [isLoadingLibrary]);
 
   useSessionRestore({
     activePath,
@@ -236,6 +246,7 @@ export default function App() {
       activeItem,
       library,
       setLibrary,
+      setActivePath,
       setStatus,
     });
 
@@ -361,6 +372,7 @@ export default function App() {
           items={library}
           currentPath={activeItem?.path ?? null}
           isLoading={isLoadingLibrary}
+          loadingProgress={libraryLoadingProgress}
           onApplyAlbumFields={handleApplyAlbumFields}
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
           onOpenFileLocation={handleOpenFileLocation}

@@ -17,6 +17,7 @@ export type DownloadFromUrlResult = { outputPath: string } | null;
 
 export type SaveMetadataPayload = { filePath: string; metadata: EditableMetadata };
 export type SaveMetadataResult = {
+  sourcePath: string;
   filePath: string;
   metadata: AudioLibraryItem['metadata'];
 };

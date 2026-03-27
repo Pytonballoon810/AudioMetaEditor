@@ -14,10 +14,11 @@ type UseMetadataActionsArgs = {
   activeItem: AudioLibraryItem | null;
   library: AudioLibraryItem[];
   setLibrary: Dispatch<SetStateAction<AudioLibraryItem[]>>;
+  setActivePath: Dispatch<SetStateAction<string | null>>;
   setStatus: (message: string) => void;
 };
 
-export function useMetadataActions({ activeItem, library, setLibrary, setStatus }: UseMetadataActionsArgs) {
+export function useMetadataActions({ activeItem, library, setLibrary, setActivePath, setStatus }: UseMetadataActionsArgs) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingAlbum, setIsSavingAlbum] = useState(false);
 
@@ -39,6 +40,7 @@ export function useMetadataActions({ activeItem, library, setLibrary, setStatus 
         });
       }
       const result = await api.saveMetadata({ filePath: activeItem.path, metadata });
+      setActivePath(result.filePath);
 
       if (metadata.coverArt && !result.metadata.coverArt) {
         console.warn('[metadata-debug] save-track:cover-missing-after-save', {
@@ -47,8 +49,28 @@ export function useMetadataActions({ activeItem, library, setLibrary, setStatus 
       }
 
       setLibrary((current) =>
-        current.map((item) => (item.path === result.filePath ? { ...item, metadata: result.metadata } : item)),
+        current.map((item) => {
+          if (item.path !== result.sourcePath) {
+            return item;
+          }
+
+          return {
+            ...item,
+            path: result.filePath,
+            name: result.filePath.split(/[/\\]/).pop() || item.name,
+            extension: result.filePath.split('.').pop()?.toLowerCase() || item.extension,
+            metadata: result.metadata,
+          };
+        }),
       );
+
+      if (result.filePath !== activeItem.path) {
+        setStatus(
+          `Converted ${activeItem.name} to ${result.filePath.split(/[/\\]/).pop() || 'FLAC'} to persist cover art.`,
+        );
+        return;
+      }
+
       setStatus(`Updated metadata for ${activeItem.name}.`);
     } catch (error) {
       setStatus(toUserErrorMessage(error, 'Unable to save metadata.'));
