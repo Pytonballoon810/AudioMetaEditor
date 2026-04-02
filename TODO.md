@@ -2,9 +2,13 @@
 
 ## Features
 
-- [x] Track context menu: Open file location in file manager
-- [x] Track context menu: Create new Album button doesn't currently work, looks like click event is not being registered
-- [x] Cover Image context menu: Download cover image
+- [ ] Add file change listener to automatically update the app when files are added/removed/changed in the directory. Currently, the app only updates when the directory is reloaded.
+- [ ] Add app as option in the "Open with" context menu for audio files and directories in the file manager.
+- [ ] Add filling outline as border for track items in the track list when they are loaded. This indicates which tracks have been loaded/cached and which are still loading. This is especially useful when loading large directories, as it can take some time for all tracks to be loaded and cached.
+- [ ] Also add that unloaded tracks are displayed greyed out but are still index instantly but make them only clickable when they are loaded.
+- [ ] When updating metadata of a track, update the track item in the track list immediately to reflect the changes. Move the process to another thread to avoid blocking the UI and make it more responsive.
+- [ ] Split selected Segment from wav into a new track and save it as a new file in the same Album directory. This is useful for splitting long recordings into multiple tracks. This should prompt teh user to enter the title manually but copy the other metadata from the original track. This should also update the track list and the album metadata accordingly.
+- [ ] Add simple EQ tool for waveform editor. This will apply the EQ settings to the track when it is played. This EQ should be temporarily applied until it is applied like the other edits.
 
 ## Style
 
