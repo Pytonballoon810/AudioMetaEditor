@@ -628,8 +628,15 @@ textarea {
 }
 
 .library-item {
+  --track-load-border: 0%;
   align-items: center;
-  background: rgba(255, 255, 255, 0.03);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)) padding-box,
+    linear-gradient(90deg, rgba(117, 201, 255, 0.9), rgba(255, 94, 168, 0.85)) border-box;
+  background-repeat: no-repeat;
+  background-size:
+    100% 100%,
+    var(--track-load-border) 100%;
   border: 1px solid transparent;
   border-radius: 20px;
   color: inherit;
@@ -638,9 +645,18 @@ textarea {
   gap: 0.85rem;
   padding: 1rem;
   text-align: left;
+  transition:
+    background-size 220ms ease,
+    opacity 220ms ease,
+    filter 220ms ease;
+}
+
+.library-item.loaded {
+  --track-load-border: 100%;
 }
 
 .library-item.loading {
+  --track-load-border: 18%;
   opacity: 0.58;
   filter: saturate(0.45);
   cursor: wait;
@@ -674,8 +690,10 @@ textarea {
 }
 
 .library-item.active {
-  background: linear-gradient(135deg, rgba(117, 201, 255, 0.12), rgba(255, 94, 168, 0.2));
-  border-color: rgba(255, 255, 255, 0.12);
+  --track-load-border: 100%;
+  background:
+    linear-gradient(135deg, rgba(117, 201, 255, 0.12), rgba(255, 94, 168, 0.2)) padding-box,
+    linear-gradient(90deg, rgba(117, 201, 255, 0.92), rgba(255, 94, 168, 0.88)) border-box;
 }
 
 .library-meta {
