@@ -951,6 +951,46 @@ app.whenReady().then(async () => {
     };
   });
 
+  registerIpcHandler('track:duplicate', async (_event, payload) => {
+    validateOpenFileLocationPayload(payload);
+    console.log('[backend-action] track:duplicate:start', payload?.filePath);
+
+    const sourcePath = path.resolve(payload.filePath);
+    const sourceStats = await fs.stat(sourcePath);
+    if (!sourceStats.isFile()) {
+      throw new Error('Only files can be duplicated.');
+    }
+
+    const extension = path.extname(sourcePath);
+    const baseName = path.basename(sourcePath, extension);
+    const destinationCandidate = path.join(path.dirname(sourcePath), `${baseName} (Copy)${extension}`);
+    const destinationPath = await ensureUniquePath(destinationCandidate);
+
+    await fs.copyFile(sourcePath, destinationPath);
+
+    console.log('[backend-action] track:duplicate:done', sourcePath, '->', destinationPath);
+    return {
+      sourcePath,
+      destinationPath,
+    };
+  });
+
+  registerIpcHandler('track:delete', async (_event, payload) => {
+    validateOpenFileLocationPayload(payload);
+    console.log('[backend-action] track:delete:start', payload?.filePath);
+
+    const sourcePath = path.resolve(payload.filePath);
+    const sourceStats = await fs.stat(sourcePath);
+    if (!sourceStats.isFile()) {
+      throw new Error('Only files can be deleted.');
+    }
+
+    await fs.rm(sourcePath);
+
+    console.log('[backend-action] track:delete:done', sourcePath);
+    return { sourcePath };
+  });
+
   registerIpcHandler('track:open-file-location', async (_event, payload) => {
     validateOpenFileLocationPayload(payload);
     console.log('[backend-action] track:open-file-location:start', payload?.filePath);

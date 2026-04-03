@@ -71,6 +71,20 @@ function describeAction(callName, phase, args, result, error) {
     if (phase === 'done') return `Track move completed for ${name}.`;
   }
 
+  if (callName === 'duplicateTrack') {
+    const filePath = args?.[0]?.filePath;
+    const name = fileNameFromPath(filePath);
+    if (phase === 'start') return `Duplicating ${name}.`;
+    if (phase === 'done') return `Created duplicate track for ${name}.`;
+  }
+
+  if (callName === 'deleteTrack') {
+    const filePath = args?.[0]?.filePath;
+    const name = fileNameFromPath(filePath);
+    if (phase === 'start') return `Deleting ${name} from disk.`;
+    if (phase === 'done') return `Deleted ${name}.`;
+  }
+
   if (callName === 'openFileLocation') {
     const filePath = args?.[0]?.filePath;
     const name = fileNameFromPath(filePath);
@@ -171,6 +185,8 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   downloadFromUrl: (payload) => invokeLogged('downloadFromUrl', 'audio:download-from-url', payload),
   saveMetadata: (payload) => invokeLogged('saveMetadata', 'metadata:save', payload),
   moveTrackToAlbum: (payload) => invokeLogged('moveTrackToAlbum', 'track:move-to-album', payload),
+  duplicateTrack: (payload) => invokeLogged('duplicateTrack', 'track:duplicate', payload),
+  deleteTrack: (payload) => invokeLogged('deleteTrack', 'track:delete', payload),
   openFileLocation: (payload) => invokeLogged('openFileLocation', 'track:open-file-location', payload),
   saveCoverImage: (payload) => invokeLogged('saveCoverImage', 'cover:save-image', payload),
   exportClip: (payload) => invokeLogged('exportClip', 'audio:export-clip', payload),

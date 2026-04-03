@@ -268,6 +268,8 @@ export default function App() {
     handleEditSelection,
     handleSplitSelectionToTrack,
     handleMoveTrackToAlbum,
+    handleDuplicateTrack,
+    handleDeleteTrack,
     handleDownloadFromUrl,
     handleOpenFileLocation,
     handleSaveCoverImage,
@@ -397,6 +399,8 @@ export default function App() {
           loadingProgress={libraryLoadingProgress}
           onApplyAlbumFields={handleApplyAlbumFields}
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
+          onDuplicateTrack={handleDuplicateTrack}
+          onDeleteTrack={handleDeleteTrack}
           onOpenFileLocation={handleOpenFileLocation}
           onReloadLibrary={handleReloadLibrary}
           onSelect={(item) => setActivePath(item.path)}

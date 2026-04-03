@@ -35,6 +35,10 @@ export type SaveMetadataResult = {
 export type MoveTrackToAlbumPayload = { filePath: string; targetDirectory: string };
 export type MoveTrackToAlbumResult = { sourcePath: string; destinationPath: string };
 
+export type TrackFilePayload = { filePath: string };
+export type DuplicateTrackResult = { sourcePath: string; destinationPath: string };
+export type DeleteTrackResult = { sourcePath: string };
+
 export type OpenFileLocationPayload = { filePath: string };
 export type SaveCoverImagePayload = { dataUrl: string; suggestedName?: string };
 export type SaveCoverImageResult = { outputPath: string } | null;
@@ -67,6 +71,8 @@ export interface AudioMetaApi {
   downloadFromUrl: (payload: DownloadFromUrlPayload) => Promise<DownloadFromUrlResult>;
   saveMetadata: (payload: SaveMetadataPayload) => Promise<SaveMetadataResult>;
   moveTrackToAlbum: (payload: MoveTrackToAlbumPayload) => Promise<MoveTrackToAlbumResult>;
+  duplicateTrack: (payload: TrackFilePayload) => Promise<DuplicateTrackResult>;
+  deleteTrack: (payload: TrackFilePayload) => Promise<DeleteTrackResult>;
   openFileLocation: (payload: OpenFileLocationPayload) => Promise<{ revealedPath: string }>;
   saveCoverImage: (payload: SaveCoverImagePayload) => Promise<SaveCoverImageResult>;
   exportClip: (payload: ExportClipPayload) => Promise<ExportClipResult>;

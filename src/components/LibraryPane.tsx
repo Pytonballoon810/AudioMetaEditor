@@ -33,6 +33,8 @@ type LibraryPaneProps = {
   onSelect: (item: AudioLibraryItem) => void;
   onApplyAlbumFields: (folderPath: string, metadata: AlbumBulkEditFields) => Promise<void>;
   onMoveTrackToAlbum: (item: AudioLibraryItem, targetDirectory: string) => Promise<void>;
+  onDuplicateTrack: (item: AudioLibraryItem) => Promise<void>;
+  onDeleteTrack: (item: AudioLibraryItem) => Promise<void>;
   onOpenFileLocation: (item: AudioLibraryItem) => Promise<void>;
   onReloadLibrary: () => Promise<void>;
 };
@@ -300,6 +302,8 @@ export function LibraryPane({
   onSelect,
   onApplyAlbumFields,
   onMoveTrackToAlbum,
+  onDuplicateTrack,
+  onDeleteTrack,
   onOpenFileLocation,
   onReloadLibrary,
 }: LibraryPaneProps) {
@@ -324,6 +328,7 @@ export function LibraryPane({
   const [albumContextMenu, setAlbumContextMenu] = useState<AlbumContextMenuState | null>(null);
   const [trackContextMenu, setTrackContextMenu] = useState<TrackContextMenuState | null>(null);
   const [isMovingTrack, setIsMovingTrack] = useState(false);
+  const [isTrackActionPending, setIsTrackActionPending] = useState(false);
   const albumCoverCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isAlbumWandDraggingRef = useRef(false);
   const hasAlbumWandEditsRef = useRef(false);
@@ -992,7 +997,7 @@ export function LibraryPane({
       return;
     }
 
-    const collapsedMenuHeight = 170;
+    const collapsedMenuHeight = 250;
     const { x, y } = clampMenuToPanel(panelRect, event.clientX, event.clientY, 240, collapsedMenuHeight);
 
     setAlbumContextMenu(null);
@@ -1020,6 +1025,36 @@ export function LibraryPane({
       setTrackContextMenu(null);
     } finally {
       setIsMovingTrack(false);
+    }
+  }
+
+  async function duplicateTrackFromContextMenu() {
+    if (!trackContextMenu || isMovingTrack || isTrackActionPending) {
+      return;
+    }
+
+    setIsTrackActionPending(true);
+
+    try {
+      await onDuplicateTrack(trackContextMenu.item);
+      setTrackContextMenu(null);
+    } finally {
+      setIsTrackActionPending(false);
+    }
+  }
+
+  async function deleteTrackFromContextMenu() {
+    if (!trackContextMenu || isMovingTrack || isTrackActionPending) {
+      return;
+    }
+
+    setIsTrackActionPending(true);
+
+    try {
+      await onDeleteTrack(trackContextMenu.item);
+      setTrackContextMenu(null);
+    } finally {
+      setIsTrackActionPending(false);
     }
   }
 
@@ -1393,7 +1428,7 @@ export function LibraryPane({
                     ? (() => {
                         const nextShowMoveTargets = !current.showMoveTargets;
                         const nextShowCreateAlbumInput = nextShowMoveTargets ? current.showCreateAlbumInput : false;
-                        const estimatedHeight = nextShowMoveTargets ? (nextShowCreateAlbumInput ? 560 : 470) : 170;
+                        const estimatedHeight = nextShowMoveTargets ? (nextShowCreateAlbumInput ? 560 : 470) : 250;
                         const panelRect = panelRef.current?.getBoundingClientRect();
                         const repositioned = panelRect
                           ? clampMenuToPanel(panelRect, current.anchorX, current.anchorY, 240, estimatedHeight)
@@ -1416,18 +1451,46 @@ export function LibraryPane({
             </button>
 
             {!trackContextMenu.showMoveTargets ? (
-              <button
-                className="library-context-menu-option"
-                disabled={isMovingTrack}
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }}
-                onClick={() => void onOpenFileLocation(trackContextMenu.item).finally(() => setTrackContextMenu(null))}
-                type="button"
-              >
-                Open file location
-              </button>
+              <>
+                <button
+                  className="library-context-menu-option"
+                  disabled={isMovingTrack || isTrackActionPending}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={() => void duplicateTrackFromContextMenu()}
+                  type="button"
+                >
+                  Duplicate track
+                </button>
+
+                <button
+                  className="library-context-menu-option"
+                  disabled={isMovingTrack || isTrackActionPending}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={() => void deleteTrackFromContextMenu()}
+                  type="button"
+                >
+                  Delete track
+                </button>
+
+                <button
+                  className="library-context-menu-option"
+                  disabled={isMovingTrack || isTrackActionPending}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={() => void onOpenFileLocation(trackContextMenu.item).finally(() => setTrackContextMenu(null))}
+                  type="button"
+                >
+                  Open file location
+                </button>
+              </>
             ) : null}
 
             {trackContextMenu.showMoveTargets ? (

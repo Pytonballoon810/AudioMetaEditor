@@ -55,6 +55,45 @@ export function useTransportActions({
     return inserted;
   };
 
+  const removeLibraryItem = (items: AudioLibraryItem[], removedPath: string) => {
+    const normalizedPath = normalizePathForComparison(removedPath);
+    return items.filter((item) => normalizePathForComparison(item.path) !== normalizedPath);
+  };
+
+  const pickNextActivePathAfterRemoval = (
+    currentItems: AudioLibraryItem[],
+    nextItems: AudioLibraryItem[],
+    currentActive: string | null,
+    removedPath: string,
+  ) => {
+    if (!currentActive) {
+      return nextItems.find((item) => item.isMetadataLoaded)?.path ?? null;
+    }
+
+    const normalizedRemoved = normalizePathForComparison(removedPath);
+    const normalizedActive = normalizePathForComparison(currentActive);
+    if (normalizedActive !== normalizedRemoved) {
+      return currentActive;
+    }
+
+    const removedIndex = currentItems.findIndex((item) => normalizePathForComparison(item.path) === normalizedRemoved);
+    if (removedIndex > 0) {
+      const abovePath = currentItems[removedIndex - 1]?.path;
+      if (abovePath && nextItems.some((item) => normalizePathForComparison(item.path) === normalizePathForComparison(abovePath))) {
+        return abovePath;
+      }
+    }
+
+    if (removedIndex >= 0) {
+      const belowPath = currentItems[removedIndex + 1]?.path;
+      if (belowPath && nextItems.some((item) => normalizePathForComparison(item.path) === normalizePathForComparison(belowPath))) {
+        return belowPath;
+      }
+    }
+
+    return nextItems.find((item) => item.isMetadataLoaded)?.path ?? null;
+  };
+
   const [isExporting, setIsExporting] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isEditingSelection, setIsEditingSelection] = useState(false);
@@ -276,6 +315,83 @@ export function useTransportActions({
     }
   }
 
+  async function handleDuplicateTrack(item: AudioLibraryItem) {
+    if (!audioMetaApi || typeof audioMetaApi.duplicateTrack !== 'function') {
+      setStatus(`Duplicate API is unavailable. ${DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE}`);
+      return;
+    }
+
+    setStatus(`Duplicating ${item.name}...`);
+
+    try {
+      const api = requireAudioMetaApi();
+      const result = await api.duplicateTrack({ filePath: item.path });
+
+      const nextSourcePaths = loadedSourcePaths.length > 0 ? [...loadedSourcePaths] : [item.path];
+      if (
+        !nextSourcePaths.includes(result.destinationPath) &&
+        nextSourcePaths.every((sourcePath) => normalizePathForComparison(sourcePath) === normalizePathForComparison(item.path))
+      ) {
+        nextSourcePaths.push(result.destinationPath);
+      }
+
+      let nextLibrary = library;
+
+      if (api.loadLibraryIncremental) {
+        const refreshedItems = await api.loadLibraryIncremental([result.destinationPath]);
+        for (const refreshedItem of refreshedItems) {
+          nextLibrary = upsertLibraryItem(nextLibrary, refreshedItem);
+        }
+      } else {
+        const extension = result.destinationPath.split('.').pop()?.toLowerCase() || item.extension;
+        const fileName = result.destinationPath.split(/[/\\]/).pop() || item.name;
+        const nextItem: AudioLibraryItem = {
+          ...item,
+          path: result.destinationPath,
+          name: fileName,
+          directory: result.destinationPath.replace(/[/\\][^/\\]+$/, ''),
+          extension,
+        };
+        nextLibrary = upsertLibraryItem(nextLibrary, nextItem);
+      }
+
+      setLibrary(nextLibrary);
+      setLibraryWidth(estimateLibraryWidthForItems(nextLibrary));
+      setLoadedSourcePaths(nextSourcePaths);
+      setActivePath(result.destinationPath);
+      setStatus(`Duplicated track to ${result.destinationPath}.`);
+    } catch (error) {
+      setStatus(toUserErrorMessage(error, 'Unable to duplicate track.'));
+    }
+  }
+
+  async function handleDeleteTrack(item: AudioLibraryItem) {
+    if (!audioMetaApi || typeof audioMetaApi.deleteTrack !== 'function') {
+      setStatus(`Delete API is unavailable. ${DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE}`);
+      return;
+    }
+
+    setStatus(`Deleting ${item.name}...`);
+
+    try {
+      const api = requireAudioMetaApi();
+      const result = await api.deleteTrack({ filePath: item.path });
+      const nextLibrary = removeLibraryItem(library, result.sourcePath);
+      const nextLoadedSourcePaths = loadedSourcePaths.filter(
+        (sourcePath) => normalizePathForComparison(sourcePath) !== normalizePathForComparison(result.sourcePath),
+      );
+      const nextActivePath = pickNextActivePathAfterRemoval(library, nextLibrary, activePath, result.sourcePath);
+
+      setLibrary(nextLibrary);
+      setLibraryWidth(estimateLibraryWidthForItems(nextLibrary));
+      setLoadedSourcePaths(nextLoadedSourcePaths);
+      setActivePath(nextActivePath);
+      setStatus(`Deleted ${item.name}.`);
+    } catch (error) {
+      setStatus(toUserErrorMessage(error, 'Unable to delete track.'));
+    }
+  }
+
   async function handleDownloadFromUrl() {
     const url = downloadUrl.trim();
     if (!url) {
@@ -358,6 +474,8 @@ export function useTransportActions({
     handleEditSelection,
     handleSplitSelectionToTrack,
     handleMoveTrackToAlbum,
+    handleDuplicateTrack,
+    handleDeleteTrack,
     handleDownloadFromUrl,
     handleOpenFileLocation,
     handleSaveCoverImage,
