@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import RegionsPlugin, { type Region } from 'wavesurfer.js/dist/plugins/regions.js';
 import { getCachedAudioBlob, preloadAudioBlob } from '../services/audioMetaApi';
@@ -48,10 +48,9 @@ type UseWaveSurferOptions = {
   audioUrl: string | null;
   onReady?: (duration: number) => void;
   onTimeUpdate?: (currentTime: number) => void;
-  reloadSignal?: number;
 };
 
-export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 0 }: UseWaveSurferOptions) {
+export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurferOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null);
@@ -178,7 +177,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 
     };
   }, [onReady, onTimeUpdate]);
 
-  useEffect(() => {
+  const reloadWaveformSource = useCallback((sourceUrl: string | null) => {
     const waveSurfer = waveSurferRef.current;
     if (!waveSurfer) {
       return;
@@ -197,7 +196,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 
     setSelection(clearedSelection);
     setIsPlaying(false);
 
-    if (!audioUrl) {
+    if (!sourceUrl) {
       if (hideSpinnerTimerRef.current !== null) {
         window.clearTimeout(hideSpinnerTimerRef.current);
         hideSpinnerTimerRef.current = null;
@@ -206,7 +205,6 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 
       return;
     }
 
-    let isMounted = true;
     const currentLoadSequence = loadSequenceRef.current;
     if (hideSpinnerTimerRef.current !== null) {
       window.clearTimeout(hideSpinnerTimerRef.current);
@@ -220,11 +218,11 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 
       logMemorySnapshot('waveform:load:start');
 
       try {
-        debugLog('[useWaveSurfer] Loading audio:', audioUrl);
-        const mediaUrl = getCachedAudioBlob(audioUrl) || (await preloadAudioBlob(audioUrl));
+        debugLog('[useWaveSurfer] Loading audio:', sourceUrl);
+        const mediaUrl = getCachedAudioBlob(sourceUrl) || (await preloadAudioBlob(sourceUrl));
 
         // Abort stale loads as soon as possible (rapid track switching can race here).
-        if (!isMounted || currentLoadSequence !== loadSequenceRef.current) {
+        if (currentLoadSequence !== loadSequenceRef.current) {
           debugLog('[useWaveSurfer] Stale preload result after track switch; skipping load');
           return;
         }
@@ -238,7 +236,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 
         debugLog('[useWaveSurfer] Media URL ready, loading into WaveSurfer');
         await currentWaveSurfer.load(mediaUrl);
 
-        if (!isMounted || currentLoadSequence !== loadSequenceRef.current) {
+        if (currentLoadSequence !== loadSequenceRef.current) {
           return;
         }
 
@@ -270,12 +268,12 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 
       }
     };
 
-    loadAudio();
+    void loadAudio();
+  }, []);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [audioUrl, reloadSignal]);
+  useEffect(() => {
+    reloadWaveformSource(audioUrl);
+  }, [audioUrl, reloadWaveformSource]);
 
   return {
     containerRef,
@@ -338,6 +336,9 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 
     getVolume: () => waveSurferRef.current?.getVolume() ?? 0.5,
     setVolume: (volume: number) => {
       waveSurferRef.current?.setVolume(Math.max(0, Math.min(1, volume)));
+    },
+    reloadWaveform: () => {
+      reloadWaveformSource(audioUrl);
     },
   };
 }

@@ -102,7 +102,6 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [waveformReloadSignal, setWaveformReloadSignal] = useState(0);
   const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [splitMode, setSplitMode] = useState<'keep' | 'slice'>('keep');
@@ -123,12 +122,12 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     selection,
     setSelection,
     seekTo,
+    reloadWaveform,
     setVolume: setWaveSurferVolume,
   } = useWaveSurfer({
     audioUrl,
     onReady: handleReady,
     onTimeUpdate: setCurrentTime,
-    reloadSignal: waveformReloadSignal,
   });
 
   useImperativeHandle(
@@ -434,7 +433,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             aria-label={isWaveformLoading ? 'Reloading waveform' : 'Reload waveform'}
             className="daw-tool-button"
             disabled={!item || isWaveformLoading}
-            onClick={() => setWaveformReloadSignal((current) => current + 1)}
+            onClick={reloadWaveform}
             title={isWaveformLoading ? 'Reloading waveform' : 'Reload waveform'}
             type="button"
           >
