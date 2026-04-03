@@ -419,7 +419,7 @@ export default function App() {
             title="Settings"
             type="button"
           >
-            <HugeiconsIcon icon={Settings01Icon} size={22} strokeWidth={2.05} />
+            <HugeiconsIcon icon={Settings01Icon} size={28} strokeWidth={2.2} />
           </button>
         </div>
       </header>
