@@ -1493,15 +1493,6 @@ textarea {
   cursor: not-allowed;
 }
 
-.daw-tool-button-text {
-  width: auto;
-  min-width: 2.4rem;
-  padding: 0 0.55rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
 .daw-tool-button-active {
   border-color: rgba(120, 238, 180, 0.78);
   background: linear-gradient(180deg, rgba(46, 96, 74, 0.9), rgba(28, 58, 44, 0.96));

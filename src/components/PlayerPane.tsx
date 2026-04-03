@@ -5,6 +5,7 @@ import {
   FirstBracketIcon,
   RedoIcon,
   SaveIcon,
+  ScrollHorizontalIcon,
   ScissorIcon,
   SecondBracketIcon,
   Select02Icon,
@@ -491,13 +492,13 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         <div className="daw-toolbar-group daw-toolbar-group-right">
           <button
             aria-label={isAutoScrollEnabled ? 'Disable auto-scroll with playhead' : 'Enable auto-scroll with playhead'}
-            className={`daw-tool-button daw-tool-button-text${isAutoScrollEnabled ? ' daw-tool-button-active' : ''}`}
+            className={`daw-tool-button${isAutoScrollEnabled ? ' daw-tool-button-active' : ''}`}
             disabled={!item}
             onClick={toggleAutoScroll}
             title={isAutoScrollEnabled ? 'Auto-scroll: on' : 'Auto-scroll: off'}
             type="button"
           >
-            AS
+            <HugeiconsIcon icon={ScrollHorizontalIcon} size={18} strokeWidth={1.8} />
           </button>
           <button
             aria-label={isWaveformLoading ? 'Reloading waveform' : 'Reload waveform'}

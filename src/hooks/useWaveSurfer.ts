@@ -162,7 +162,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       normalize: true,
       dragToSeek: true,
       autoScroll: autoScrollEnabledRef.current,
-      autoCenter: false,
+      autoCenter: autoScrollEnabledRef.current,
       plugins: [regionsPlugin],
     });
 
@@ -491,7 +491,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       | null;
     configurableWaveSurfer?.setOptions?.({
       autoScroll: nextAutoScroll,
-      autoCenter: false,
+      autoCenter: nextAutoScroll,
     });
   }, []);
 
