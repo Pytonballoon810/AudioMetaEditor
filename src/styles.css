@@ -1196,23 +1196,71 @@ textarea {
 
 .split-options-group {
   display: grid;
-  gap: 0.55rem;
+  gap: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .split-option-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  padding: 0.68rem 0.72rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.72rem;
+  padding: 0.76rem 0.8rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
   cursor: pointer;
+  transition: background-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.split-option-card:last-child {
+  border-bottom: none;
+}
+
+.split-option-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.split-option-card:focus-within {
+  box-shadow: inset 0 0 0 1px rgba(117, 201, 255, 0.55);
+}
+
+.split-option-card-selected {
+  background: rgba(117, 201, 255, 0.13);
 }
 
 .split-option-card input[type='radio'] {
-  margin-top: 0.18rem;
-  accent-color: var(--cool);
+  margin: 0;
+  width: 1rem;
+  height: 1rem;
+  appearance: none;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.07);
+  display: grid;
+  place-items: center;
+  transition: border-color 0.14s ease, background-color 0.14s ease;
+}
+
+.split-option-card input[type='radio']::before {
+  content: '';
+  width: 0.46rem;
+  height: 0.46rem;
+  border-radius: 50%;
+  background: var(--cool);
+  transform: scale(0);
+  transition: transform 0.14s ease;
+}
+
+.split-option-card input[type='radio']:checked {
+  border-color: var(--cool);
+  background: rgba(117, 201, 255, 0.2);
+}
+
+.split-option-card input[type='radio']:checked::before {
+  transform: scale(1);
 }
 
 .split-option-copy {

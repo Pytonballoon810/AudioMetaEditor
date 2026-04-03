@@ -751,7 +751,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             </div>
 
             <div className="split-options-group" role="radiogroup" aria-label="Original file behavior">
-              <label className="split-option-card">
+              <label className={splitMode === 'keep' ? 'split-option-card split-option-card-selected' : 'split-option-card'}>
                 <input
                   checked={splitMode === 'keep'}
                   onChange={() => setSplitMode('keep')}
@@ -765,7 +765,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
                 </span>
               </label>
 
-              <label className="split-option-card">
+              <label className={splitMode === 'slice' ? 'split-option-card split-option-card-selected' : 'split-option-card'}>
                 <input
                   checked={splitMode === 'slice'}
                   onChange={() => setSplitMode('slice')}
