@@ -23,6 +23,7 @@ type UseTransportActionsArgs = {
   downloadTargetMode: 'existing' | 'new';
   downloadTargetExistingDirectory: string;
   downloadTargetNewAlbumName: string;
+  downloadFormat: 'flac' | 'mp3' | 'wav' | 'm4a';
   splitDownloadIntoChapters: boolean;
   isWebDownloadEnabled: boolean;
 };
@@ -46,12 +47,14 @@ export function useTransportActions({
   downloadTargetMode,
   downloadTargetExistingDirectory,
   downloadTargetNewAlbumName,
+  downloadFormat,
   splitDownloadIntoChapters,
   isWebDownloadEnabled,
 }: UseTransportActionsArgs) {
   const normalizePathForComparison = (pathValue: string) => pathValue.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
   const isSamePath = (leftPath: string, rightPath: string) =>
     normalizePathForComparison(leftPath) === normalizePathForComparison(rightPath);
+  const isAbsolutePath = (pathValue: string) => /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(pathValue);
 
   const fileNameFromPath = (pathValue: string) => {
     const normalized = pathValue.replace(/\\/g, '/');
@@ -484,15 +487,22 @@ export function useTransportActions({
       targetAlbumDirectory?: string;
       newAlbumName?: string;
       newAlbumParentDirectory?: string;
+      downloadFormat?: 'flac' | 'mp3' | 'wav' | 'm4a';
       splitIntoChapters?: boolean;
     } = {
       url,
+      downloadFormat,
       splitIntoChapters: splitDownloadIntoChapters,
     };
 
     if (downloadTargetMode === 'existing') {
       if (!existingDirectory) {
         setStatus('Choose an album to download into.');
+        return;
+      }
+
+      if (!isAbsolutePath(existingDirectory)) {
+        setStatus('Selected album directory is invalid. Choose an absolute folder path.');
         return;
       }
 
@@ -506,11 +516,17 @@ export function useTransportActions({
 
       const parentDirectoryCandidate =
         activeItem?.openedDirectoryRoot?.trim() ||
-        (existingDirectory ? getDirectoryParent(existingDirectory) : '') ||
         library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot?.trim() ||
-        (library[0]?.directory ? getDirectoryParent(library[0].directory) : '');
+        loadedSourcePaths
+          .map((sourcePath) => sourcePath.trim())
+          .find((sourcePath) => isAbsolutePath(sourcePath) && !/\.(mp3|wav|flac|m4a|opus|aac|ogg)$/i.test(sourcePath)) ||
+        loadedSourcePaths
+          .map((sourcePath) => sourcePath.trim())
+          .find((sourcePath) => isAbsolutePath(sourcePath) && /\.(mp3|wav|flac|m4a|opus|aac|ogg)$/i.test(sourcePath))
+          ?.replace(/[/\\][^/\\]+$/, '') ||
+        (existingDirectory && isAbsolutePath(existingDirectory) ? getDirectoryParent(existingDirectory) : '');
 
-      if (!parentDirectoryCandidate) {
+      if (!parentDirectoryCandidate || !isAbsolutePath(parentDirectoryCandidate)) {
         setStatus('Open a directory first so the new album location can be resolved.');
         return;
       }

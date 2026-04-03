@@ -64,6 +64,10 @@ function getDirectoryTail(directory: string) {
   return segments[segments.length - 1] ?? directory;
 }
 
+function isAbsolutePath(pathValue: string) {
+  return /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(pathValue);
+}
+
 export default function App() {
   const MIN_METADATA_WIDTH = 320;
   const MAX_METADATA_WIDTH = 760;
@@ -79,6 +83,7 @@ export default function App() {
   const [downloadTargetMode, setDownloadTargetMode] = useState<'existing' | 'new'>('existing');
   const [downloadTargetExistingDirectory, setDownloadTargetExistingDirectory] = useState('');
   const [downloadTargetNewAlbumName, setDownloadTargetNewAlbumName] = useState('');
+  const [downloadFormat, setDownloadFormat] = useState<'flac' | 'mp3' | 'wav' | 'm4a'>('flac');
   const [splitDownloadIntoChapters, setSplitDownloadIntoChapters] = useState(false);
   const [isWebDownloadEnabled, setIsWebDownloadEnabled] = useState(() => getDefaultWebDownloadEnabledSetting());
   const [isWebDownloadEnabledDraft, setIsWebDownloadEnabledDraft] = useState(() =>
@@ -128,7 +133,7 @@ export default function App() {
 
     for (const item of library) {
       const directory = item.directory.trim();
-      if (!directory || byDirectory.has(directory)) {
+      if (!directory || !item.isMetadataLoaded || !isAbsolutePath(directory) || byDirectory.has(directory)) {
         continue;
       }
 
@@ -364,6 +369,7 @@ export default function App() {
     downloadTargetMode,
     downloadTargetExistingDirectory,
     downloadTargetNewAlbumName,
+    downloadFormat,
     splitDownloadIntoChapters,
     isWebDownloadEnabled,
   });
@@ -671,6 +677,21 @@ export default function App() {
                 placeholder="https://example.com/audio-file.mp3"
                 value={downloadUrl}
               />
+            </label>
+
+            <label className="settings-field">
+              File type
+              <select
+                onChange={(event) =>
+                  setDownloadFormat(event.target.value as 'flac' | 'mp3' | 'wav' | 'm4a')
+                }
+                value={downloadFormat}
+              >
+                <option value="flac">FLAC</option>
+                <option value="mp3">MP3</option>
+                <option value="wav">WAV</option>
+                <option value="m4a">M4A</option>
+              </select>
             </label>
 
             <label className="settings-field">

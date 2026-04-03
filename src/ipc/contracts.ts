@@ -27,6 +27,7 @@ export type DownloadFromUrlPayload = {
   targetAlbumDirectory?: string;
   newAlbumName?: string;
   newAlbumParentDirectory?: string;
+  downloadFormat?: 'flac' | 'mp3' | 'wav' | 'm4a';
   splitIntoChapters?: boolean;
 };
 export type DownloadFromUrlResult = { outputPath: string; outputPaths?: string[] } | null;

@@ -113,6 +113,16 @@ function validateDownloadFromUrlPayload(payload) {
     throw new Error('payload.splitIntoChapters must be a boolean when provided.');
   }
 
+  if (
+    payload.downloadFormat !== undefined &&
+    payload.downloadFormat !== 'flac' &&
+    payload.downloadFormat !== 'mp3' &&
+    payload.downloadFormat !== 'wav' &&
+    payload.downloadFormat !== 'm4a'
+  ) {
+    throw new Error("payload.downloadFormat must be one of 'flac', 'mp3', 'wav', or 'm4a' when provided.");
+  }
+
   const hasExistingTarget = typeof payload.targetAlbumDirectory === 'string';
   const hasNewAlbumTarget = typeof payload.newAlbumName === 'string';
 

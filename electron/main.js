@@ -1052,6 +1052,8 @@ app.whenReady().then(async () => {
       throw new Error('Enable web downloads in Settings and save changes to install yt-dlp first.');
     }
 
+    const downloadFormat = payload.downloadFormat || 'flac';
+
     let parsedUrl;
     try {
       parsedUrl = new URL(payload.url.trim());
@@ -1075,13 +1077,22 @@ app.whenReady().then(async () => {
 
     let targetAlbumDirectory = '';
     if (typeof payload.targetAlbumDirectory === 'string' && payload.targetAlbumDirectory.trim()) {
-      targetAlbumDirectory = path.resolve(payload.targetAlbumDirectory.trim());
+      const rawTargetDirectory = payload.targetAlbumDirectory.trim();
+      if (!path.isAbsolute(rawTargetDirectory)) {
+        throw new Error('Download target directory must be an absolute path.');
+      }
+
+      targetAlbumDirectory = path.resolve(rawTargetDirectory);
     } else {
       const newAlbumNameRaw = typeof payload.newAlbumName === 'string' ? payload.newAlbumName.trim() : '';
       const newAlbumParentDirectory =
         typeof payload.newAlbumParentDirectory === 'string' ? payload.newAlbumParentDirectory.trim() : '';
       if (!newAlbumNameRaw || !newAlbumParentDirectory) {
         throw new Error('A valid album destination is required.');
+      }
+
+      if (!path.isAbsolute(newAlbumParentDirectory)) {
+        throw new Error('New album parent directory must be an absolute path.');
       }
 
       const sanitizedAlbumFolderName = sanitizeFileSystemSegment(newAlbumNameRaw);
@@ -1101,6 +1112,9 @@ app.whenReady().then(async () => {
     try {
       const commandArgs = [
         '--no-playlist',
+        '--extract-audio',
+        '--audio-format',
+        downloadFormat,
         '--no-progress',
         '--no-warnings',
         '--print',

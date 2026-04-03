@@ -73,6 +73,7 @@ describe('ipc validators', () => {
       validateDownloadFromUrlPayload({
         url: 'https://example.com/a.mp3',
         targetAlbumDirectory: '/tmp/Album',
+        downloadFormat: 'flac',
       }),
     ).not.toThrow();
     expect(() =>
@@ -80,6 +81,7 @@ describe('ipc validators', () => {
         url: 'https://example.com/a.mp3',
         targetAlbumDirectory: '/tmp/Album',
         splitIntoChapters: true,
+        downloadFormat: 'mp3',
       }),
     ).not.toThrow();
     expect(() =>
@@ -97,6 +99,13 @@ describe('ipc validators', () => {
         splitIntoChapters: 'yes',
       }),
     ).toThrow(/splitIntoChapters/);
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        targetAlbumDirectory: '/tmp/Album',
+        downloadFormat: 'ogg',
+      }),
+    ).toThrow(/downloadFormat/);
     expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3' })).toThrow(/destination target/);
     expect(() =>
       validateDownloadFromUrlPayload({
