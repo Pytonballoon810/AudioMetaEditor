@@ -27,6 +27,7 @@ export type AudioLibraryItem = {
   extension: string;
   openedDirectoryRoot: string | null;
   isInOpenedDirectoryRoot: boolean;
+  isMetadataLoaded: boolean;
   metadata: AudioMetadata;
 };
 

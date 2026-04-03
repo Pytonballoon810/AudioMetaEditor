@@ -523,7 +523,15 @@ export function LibraryPane({
 
     return Array.from(groups.values())
       .map((group) => {
-        const albumNameEntries = Array.from(group.albumValueCounts.entries()).sort((left, right) => {
+        const loadedItems = group.items.filter((item) => item.isMetadataLoaded);
+        const loadedAlbumCounts = new Map<string, number>();
+
+        loadedItems.forEach((item) => {
+          const albumName = normalizeAlbumValue(item.metadata.album);
+          loadedAlbumCounts.set(albumName, (loadedAlbumCounts.get(albumName) ?? 0) + 1);
+        });
+
+        const albumNameEntries = Array.from(loadedAlbumCounts.entries()).sort((left, right) => {
           if (right[1] !== left[1]) {
             return right[1] - left[1];
           }
@@ -532,17 +540,17 @@ export function LibraryPane({
         });
         const canonicalAlbumName = albumNameEntries[0]?.[0] ?? '(empty)';
         const mismatchedTrackPaths = new Set(
-          group.items
+          loadedItems
             .filter((item) => normalizeAlbumValue(item.metadata.album) !== canonicalAlbumName)
             .map((item) => item.path),
         );
 
         return {
           ...group,
-          hasAlbumNameDiscrepancy: group.isRootPseudoAlbum ? false : group.albumNames.size > 1,
+          hasAlbumNameDiscrepancy: group.isRootPseudoAlbum ? false : loadedAlbumCounts.size > 1,
           mismatchCount: group.isRootPseudoAlbum ? 0 : mismatchedTrackPaths.size,
           mismatchedTrackPaths: group.isRootPseudoAlbum ? new Set<string>() : mismatchedTrackPaths,
-          uniqueCovers: Array.from(new Set(group.items.map((item) => item.metadata.coverArt).filter(Boolean))).slice(
+          uniqueCovers: Array.from(new Set(loadedItems.map((item) => item.metadata.coverArt).filter(Boolean))).slice(
             0,
             4,
           ),
@@ -1257,21 +1265,36 @@ export function LibraryPane({
                 ? group.items.map((item) => {
                     const isActive = item.path === currentPath;
                     const hasMismatch = group.mismatchedTrackPaths.has(item.path);
+                    const isLoaded = item.isMetadataLoaded;
                     return (
                       <button
                         key={item.path}
-                        className={`library-item${isActive ? ' active' : ''}`}
-                        onContextMenu={(event) => openTrackContextMenu(event, item)}
-                        onClick={() => onSelect(item)}
+                        className={`library-item${isActive ? ' active' : ''}${isLoaded ? ' loaded' : ' loading'}`}
+                        disabled={!isLoaded}
+                        onContextMenu={(event) => {
+                          if (!isLoaded) {
+                            return;
+                          }
+
+                          openTrackContextMenu(event, item);
+                        }}
+                        onClick={() => {
+                          if (!isLoaded) {
+                            return;
+                          }
+
+                          onSelect(item);
+                        }}
+                        title={isLoaded ? undefined : 'Metadata is still loading for this track.'}
                         type="button"
                       >
                         <div>
                           <strong>{item.metadata.title || item.name}</strong>
-                          <p>{item.metadata.artist || 'Unknown artist'}</p>
+                          <p>{isLoaded ? item.metadata.artist || 'Unknown artist' : 'Loading metadata...'}</p>
                         </div>
                         <div className="library-meta">
                           <span>{item.extension.toUpperCase()}</span>
-                          <span>{formatDuration(item.metadata.duration)}</span>
+                          <span>{isLoaded ? formatDuration(item.metadata.duration) : 'Loading...'}</span>
                           {hasMismatch ? (
                             <span
                               className="library-warning-icon"

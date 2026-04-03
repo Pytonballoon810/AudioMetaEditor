@@ -640,6 +640,22 @@ textarea {
   text-align: left;
 }
 
+.library-item.loading {
+  opacity: 0.58;
+  filter: saturate(0.45);
+  cursor: wait;
+}
+
+.library-item.loading strong,
+.library-item.loading p,
+.library-item.loading .library-meta {
+  color: rgba(196, 206, 220, 0.72);
+}
+
+.library-item:disabled {
+  pointer-events: none;
+}
+
 .library-item > div:first-child {
   flex: 1;
   min-width: 0;

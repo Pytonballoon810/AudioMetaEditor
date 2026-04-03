@@ -226,7 +226,10 @@ export default function App() {
   });
 
   const activeItem = useMemo(
-    () => library.find((item) => item.path === activePath) ?? library[0] ?? null,
+    () =>
+      library.find((item) => item.path === activePath && item.isMetadataLoaded) ??
+      library.find((item) => item.isMetadataLoaded) ??
+      null,
     [activePath, library],
   );
 

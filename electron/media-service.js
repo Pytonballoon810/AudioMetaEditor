@@ -154,6 +154,27 @@ function isSupportedAudioFile(filePath) {
   return AUDIO_EXTENSIONS.has(path.extname(filePath).toLowerCase());
 }
 
+function buildPendingMetadata(filePath) {
+  return {
+    title: path.basename(filePath, path.extname(filePath)),
+    album: '',
+    artist: '',
+    albumArtist: '',
+    composer: '',
+    producer: '',
+    genre: '',
+    year: '',
+    track: '',
+    disc: '',
+    comment: '',
+    coverArt: null,
+    duration: 0,
+    sampleRate: 0,
+    bitrate: 0,
+    codec: '',
+  };
+}
+
 async function getMusicMetadata() {
   return import('music-metadata');
 }
@@ -564,22 +585,40 @@ async function buildLibrary(pathsToScan, onProgress) {
   }
 
   const sortedFiles = files.sort((left, right) => left.path.localeCompare(right.path));
-  const items = [];
+  const items = sortedFiles.map((file) => ({
+    path: file.path,
+    name: path.basename(file.path),
+    directory: path.dirname(file.path),
+    extension: path.extname(file.path).slice(1).toLowerCase(),
+    openedDirectoryRoot: file.openedDirectoryRoot,
+    isInOpenedDirectoryRoot: file.isInOpenedDirectoryRoot,
+    isMetadataLoaded: false,
+    metadata: buildPendingMetadata(file.path),
+  }));
+
+  if (typeof onProgress === 'function') {
+    onProgress({
+      phase: 'metadata',
+      loaded: 0,
+      total: sortedFiles.length,
+      indexed: sortedFiles.length,
+      items: [...items],
+    });
+  }
 
   for (let index = 0; index < sortedFiles.length; index += 1) {
     const file = sortedFiles[index];
     const metadata = await extractMetadata(file.path);
-    const nextItem = {
-      path: file.path,
-      name: path.basename(file.path),
-      directory: path.dirname(file.path),
-      extension: path.extname(file.path).slice(1).toLowerCase(),
-      openedDirectoryRoot: file.openedDirectoryRoot,
-      isInOpenedDirectoryRoot: file.isInOpenedDirectoryRoot,
+    const currentItem = items[index];
+    if (!currentItem) {
+      continue;
+    }
+
+    items[index] = {
+      ...currentItem,
+      isMetadataLoaded: true,
       metadata,
     };
-
-    items.push(nextItem);
 
     if (typeof onProgress === 'function') {
       onProgress({

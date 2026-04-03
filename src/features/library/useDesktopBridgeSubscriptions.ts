@@ -70,11 +70,11 @@ export function useDesktopBridgeSubscriptions({
       setLibrary(payload.items);
       setLibraryWidth(estimateLibraryWidthForItems(payload.items));
       setActivePath((current) => {
-        if (current) {
+        if (current && payload.items.some((item) => item.path === current && item.isMetadataLoaded)) {
           return current;
         }
 
-        return payload.items[0]?.path ?? null;
+        return payload.items.find((item) => item.isMetadataLoaded)?.path ?? null;
       });
       setStatus(`Loading track metadata... ${payload.loaded}/${payload.total}`);
     });
