@@ -80,6 +80,12 @@ function inferOpenedDirectoryRoot(filePath: string, loadedSourcePaths: string[])
   return matchingRoots.sort((left, right) => right.length - left.length)[0] ?? null;
 }
 
+function albumCoverGroupKey(item: AudioLibraryItem) {
+  const normalizedDirectory = normalizePathForComparison(item.directory);
+  const normalizedAlbum = (item.metadata.album || '').trim().toLowerCase();
+  return `${normalizedDirectory}::${normalizedAlbum}`;
+}
+
 function removeLibraryPaths(items: AudioLibraryItem[], removedPaths: string[]) {
   if (removedPaths.length === 0) {
     return items;
@@ -131,16 +137,43 @@ function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLi
   }
 
   const merged = [...items];
+  const canonicalCoverByAlbum = new Map<string, string>();
+
+  for (const item of merged) {
+    const coverArt = item.metadata.coverArt;
+    if (!coverArt) {
+      continue;
+    }
+
+    const key = albumCoverGroupKey(item);
+    if (!canonicalCoverByAlbum.has(key)) {
+      canonicalCoverByAlbum.set(key, coverArt);
+    }
+  }
 
   for (const incomingItem of incomingItems) {
     const inferredRoot = incomingItem.openedDirectoryRoot || inferOpenedDirectoryRoot(incomingItem.path, loadedSourcePaths);
-    const nextItem = inferredRoot
+    let nextItem = inferredRoot
       ? {
           ...incomingItem,
           openedDirectoryRoot: inferredRoot,
           isInOpenedDirectoryRoot: isSamePath(incomingItem.directory, inferredRoot),
         }
       : incomingItem;
+
+    const albumKey = albumCoverGroupKey(nextItem);
+    const canonicalCover = canonicalCoverByAlbum.get(albumKey);
+    if (canonicalCover && nextItem.metadata.coverArt && nextItem.metadata.coverArt !== canonicalCover) {
+      nextItem = {
+        ...nextItem,
+        metadata: {
+          ...nextItem.metadata,
+          coverArt: canonicalCover,
+        },
+      };
+    } else if (!canonicalCover && nextItem.metadata.coverArt) {
+      canonicalCoverByAlbum.set(albumKey, nextItem.metadata.coverArt);
+    }
 
     const normalizedPath = normalizePathForComparison(nextItem.path);
     const { found, index } = findItemIndexByPath(merged, normalizedPath);
