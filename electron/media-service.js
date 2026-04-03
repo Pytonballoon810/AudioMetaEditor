@@ -507,7 +507,18 @@ async function buildLibrary(pathsToScan, onProgress) {
   const files = [];
 
   for (const selectedPath of pathsToScan) {
-    const stats = await fs.stat(selectedPath);
+    let stats;
+    try {
+      stats = await fs.stat(selectedPath);
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        // Ignore stale entries (deleted/moved files) so a single missing path does not abort library loading.
+        continue;
+      }
+
+      throw error;
+    }
+
     if (stats.isDirectory()) {
       const rootDirectory = path.resolve(selectedPath);
       const nested = await scanDirectory(selectedPath);

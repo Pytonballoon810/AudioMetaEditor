@@ -69,6 +69,15 @@ describe('scanDirectory', () => {
 
     await fs.rm(root, { recursive: true, force: true });
   });
+
+  it('ignores missing paths instead of failing the entire build', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ame-build-'));
+    const missingPath = path.join(root, 'watch.webm');
+
+    await expect(mediaService.buildLibrary([missingPath])).resolves.toEqual([]);
+
+    await fs.rm(root, { recursive: true, force: true });
+  });
 });
 
 describe('root pseudo-folder path comparison', () => {
