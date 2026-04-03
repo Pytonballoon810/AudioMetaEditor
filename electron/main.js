@@ -27,6 +27,7 @@ const {
   validateMetadataSavePayload,
   validateExportClipPayload,
   validateEditSelectionPayload,
+  validateSplitSelectionPayload,
   validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
@@ -716,6 +717,41 @@ app.whenReady().then(async () => {
 
     console.log('[backend-action] audio:edit-selection:done', outputPath);
     return { outputPath };
+  });
+
+  registerIpcHandler('audio:split-selection', async (_event, payload) => {
+    validateSplitSelectionPayload(payload);
+    console.log(
+      '[backend-action] audio:split-selection:start',
+      payload?.filePath,
+      payload?.startTime,
+      payload?.endTime,
+      payload?.title,
+    );
+
+    const sourcePath = path.resolve(payload.filePath);
+    const extension = path.extname(sourcePath).toLowerCase();
+    if (extension !== '.wav') {
+      throw new Error('Split to new track currently supports WAV source files only.');
+    }
+
+    const safeTitle = payload.title.trim().replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, ' ');
+    if (!safeTitle) {
+      throw new Error('A non-empty split track title is required.');
+    }
+
+    const targetDirectory = path.dirname(sourcePath);
+    const outputCandidate = path.join(targetDirectory, `${safeTitle}${extension}`);
+    const outputPath = await ensureUniquePath(outputCandidate);
+    await exportAudioSegment(sourcePath, payload.startTime, payload.endTime, outputPath);
+
+    const metadataResult = await saveMetadataInWorker(outputPath, {
+      ...payload.metadata,
+      title: safeTitle,
+    });
+
+    console.log('[backend-action] audio:split-selection:done', metadataResult.filePath);
+    return { outputPath: metadataResult.filePath };
   });
 
   registerIpcHandler('audio:convert-format', async (_event, payload) => {

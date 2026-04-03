@@ -23,9 +23,11 @@ type PlayerPaneProps = {
   onExportClip: (startTime: number, endTime: number) => Promise<void>;
   onConvertAudio: (targetFormat: 'mp3' | 'flac') => Promise<void>;
   onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
+  onSplitSelection: (startTime: number, endTime: number) => Promise<void>;
   isExporting: boolean;
   isConverting: boolean;
   isEditingSelection: boolean;
+  isSplittingSelection: boolean;
 };
 
 type PendingWaveEdit = {
@@ -84,7 +86,17 @@ function buildRemovedRanges(edit: PendingWaveEdit, trackDuration: number): Remov
 }
 
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
-  { item, onExportClip, onConvertAudio, onEditSelection, isExporting, isConverting, isEditingSelection },
+  {
+    item,
+    onExportClip,
+    onConvertAudio,
+    onEditSelection,
+    onSplitSelection,
+    isExporting,
+    isConverting,
+    isEditingSelection,
+    isSplittingSelection,
+  },
   ref,
 ) {
   const [currentTime, setCurrentTime] = useState(0);
@@ -509,6 +521,20 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             </div>
           ) : null}
         </div>
+        <button
+          className="accent-button"
+          disabled={
+            !item ||
+            selection.end <= selection.start ||
+            item.extension.toLowerCase() !== 'wav' ||
+            isSplittingSelection ||
+            isConverting
+          }
+          onClick={() => void onSplitSelection(selection.start, selection.end)}
+          type="button"
+        >
+          {isSplittingSelection ? 'Splitting track...' : 'Split to new track'}
+        </button>
         <button
           className="accent-button"
           disabled={!item || selection.end <= selection.start || isExporting || isConverting}

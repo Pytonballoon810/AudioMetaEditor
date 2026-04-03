@@ -260,10 +260,12 @@ export default function App() {
     isExporting,
     isConverting,
     isEditingSelection,
+    isSplittingSelection,
     isDownloadingFromUrl,
     handleExportClip,
     handleConvertAudio,
     handleEditSelection,
+    handleSplitSelectionToTrack,
     handleMoveTrackToAlbum,
     handleDownloadFromUrl,
     handleOpenFileLocation,
@@ -416,10 +418,12 @@ export default function App() {
             ref={playerPaneRef}
             item={activeItem}
             onEditSelection={handleEditSelection}
+            onSplitSelection={handleSplitSelectionToTrack}
             onExportClip={handleExportClip}
             onConvertAudio={handleConvertAudio}
             isConverting={isConverting}
             isEditingSelection={isEditingSelection}
+            isSplittingSelection={isSplittingSelection}
             isExporting={isExporting}
           />
           <div

@@ -102,6 +102,20 @@ function describeAction(callName, phase, args, result, error) {
         : `${mode === 'cut' ? 'Cut' : 'Trim'} operation was cancelled by user.`;
   }
 
+  if (callName === 'splitSelectionToTrack') {
+    const filePath = args?.[0]?.filePath;
+    const startTime = args?.[0]?.startTime;
+    const endTime = args?.[0]?.endTime;
+    const title = args?.[0]?.title;
+    const name = fileNameFromPath(filePath);
+    if (phase === 'start') {
+      return `Splitting ${name} (${startTime}s to ${endTime}s) into a new track named ${title || 'untitled'}.`;
+    }
+    if (phase === 'done') {
+      return result ? `Split track saved to ${result.outputPath}.` : 'Split operation was cancelled by user.';
+    }
+  }
+
   if (callName === 'convertAudio') {
     const filePath = args?.[0]?.filePath;
     const targetFormat = args?.[0]?.targetFormat;
@@ -154,6 +168,7 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   saveCoverImage: (payload) => invokeLogged('saveCoverImage', 'cover:save-image', payload),
   exportClip: (payload) => invokeLogged('exportClip', 'audio:export-clip', payload),
   editSelection: (payload) => invokeLogged('editSelection', 'audio:edit-selection', payload),
+  splitSelectionToTrack: (payload) => invokeLogged('splitSelectionToTrack', 'audio:split-selection', payload),
   convertAudio: (payload) => invokeLogged('convertAudio', 'audio:convert-format', payload),
   loadAudioBlob: async (filePath) => {
     try {

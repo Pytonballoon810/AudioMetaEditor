@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import type { AudioLibraryItem } from '../../types';
+import type { AudioLibraryItem, EditableMetadata } from '../../types';
 import type { AudioMetaApi } from '../../ipc/contracts';
 import { DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE, requireAudioMetaApi } from '../../services/audioMetaApi';
 import { toUserErrorMessage } from '../../lib/errors';
@@ -42,6 +42,7 @@ export function useTransportActions({
   const [isExporting, setIsExporting] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isEditingSelection, setIsEditingSelection] = useState(false);
+  const [isSplittingSelection, setIsSplittingSelection] = useState(false);
   const [isDownloadingFromUrl, setIsDownloadingFromUrl] = useState(false);
 
   async function handleExportClip(startTime: number, endTime: number) {
@@ -116,6 +117,79 @@ export function useTransportActions({
       setStatus(toUserErrorMessage(error, 'Unable to convert audio format.'));
     } finally {
       setIsConverting(false);
+    }
+  }
+
+  async function handleSplitSelectionToTrack(startTime: number, endTime: number) {
+    if (!activeItem) {
+      return;
+    }
+
+    if (activeItem.extension.toLowerCase() !== 'wav') {
+      setStatus('Split to new track currently supports WAV files only.');
+      return;
+    }
+
+    const defaultTitle = `${activeItem.metadata.title || activeItem.name} (Split)`;
+    const promptValue = window.prompt('Title for the new split track', defaultTitle);
+    if (promptValue === null) {
+      setStatus('Split operation cancelled.');
+      return;
+    }
+
+    const nextTitle = promptValue.trim();
+    if (!nextTitle) {
+      setStatus('Split track title cannot be empty.');
+      return;
+    }
+
+    const metadataPayload: EditableMetadata = {
+      title: nextTitle,
+      album: activeItem.metadata.album,
+      artist: activeItem.metadata.artist,
+      albumArtist: activeItem.metadata.albumArtist,
+      composer: activeItem.metadata.composer,
+      producer: activeItem.metadata.producer,
+      genre: activeItem.metadata.genre,
+      year: activeItem.metadata.year,
+      track: activeItem.metadata.track,
+      disc: activeItem.metadata.disc,
+      comment: activeItem.metadata.comment,
+      coverArt: activeItem.metadata.coverArt,
+    };
+
+    setIsSplittingSelection(true);
+    setStatus(`Splitting selection into new track "${nextTitle}"...`);
+
+    try {
+      const api = requireAudioMetaApi();
+      const result = await api.splitSelectionToTrack({
+        filePath: activeItem.path,
+        startTime,
+        endTime,
+        title: nextTitle,
+        metadata: metadataPayload,
+      });
+
+      if (!result) {
+        setStatus('Split operation cancelled.');
+        return;
+      }
+
+      const nextSourcePaths = loadedSourcePaths.length > 0 ? [...loadedSourcePaths] : [activeItem.path];
+      if (
+        !nextSourcePaths.includes(result.outputPath) &&
+        nextSourcePaths.every((sourcePath) => sourcePath === activeItem.path)
+      ) {
+        nextSourcePaths.push(result.outputPath);
+      }
+
+      await loadPaths(nextSourcePaths, result.outputPath);
+      setStatus(`Created split track at ${result.outputPath}.`);
+    } catch (error) {
+      setStatus(toUserErrorMessage(error, 'Unable to split selected segment into a new track.'));
+    } finally {
+      setIsSplittingSelection(false);
     }
   }
 
@@ -239,10 +313,12 @@ export function useTransportActions({
     isExporting,
     isConverting,
     isEditingSelection,
+    isSplittingSelection,
     isDownloadingFromUrl,
     handleExportClip,
     handleConvertAudio,
     handleEditSelection,
+    handleSplitSelectionToTrack,
     handleMoveTrackToAlbum,
     handleDownloadFromUrl,
     handleOpenFileLocation,

@@ -56,6 +56,16 @@ function validateEditSelectionPayload(payload) {
   }
 }
 
+function validateSplitSelectionPayload(payload) {
+  validateExportClipPayload(payload);
+
+  assertString(payload.title, 'payload.title');
+
+  if (!payload.metadata || typeof payload.metadata !== 'object') {
+    throw new Error('payload.metadata must be an object.');
+  }
+}
+
 function validateConvertAudioPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('payload must be an object.');
@@ -114,6 +124,7 @@ module.exports = {
   validateMetadataSavePayload,
   validateExportClipPayload,
   validateEditSelectionPayload,
+  validateSplitSelectionPayload,
   validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
