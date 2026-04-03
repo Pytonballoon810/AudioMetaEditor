@@ -1194,6 +1194,28 @@ textarea {
   width: min(620px, 100%);
 }
 
+.split-title-field {
+  display: grid;
+  gap: 0.34rem;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.split-title-field input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(5, 11, 17, 0.7);
+  color: var(--text);
+  padding: 0.52rem 0.62rem;
+}
+
+.split-title-field input:focus {
+  outline: none;
+  border-color: rgba(117, 201, 255, 0.66);
+  box-shadow: 0 0 0 1px rgba(117, 201, 255, 0.34);
+}
+
 .split-options-group {
   display: grid;
   gap: 0;

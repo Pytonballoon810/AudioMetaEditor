@@ -24,7 +24,7 @@ type PlayerPaneProps = {
   onExportClip: (startTime: number, endTime: number) => Promise<void>;
   onConvertAudio: (targetFormat: 'mp3' | 'flac') => Promise<void>;
   onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
-  onSplitSelection: (startTime: number, endTime: number, splitMode: 'keep' | 'slice') => Promise<void>;
+  onSplitSelection: (startTime: number, endTime: number, splitMode: 'keep' | 'slice', splitTitle: string) => Promise<void>;
   isExporting: boolean;
   isConverting: boolean;
   isEditingSelection: boolean;
@@ -162,6 +162,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [splitMode, setSplitMode] = useState<'keep' | 'slice'>('keep');
+  const [splitTrackTitle, setSplitTrackTitle] = useState('');
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
   const audioUrl = item ? item.path : null;
@@ -223,6 +224,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const effectiveDuration = duration || item?.metadata.duration || 0;
   const splitStartTime = normalizedSelectionStart;
   const splitEndTime = normalizedSelectionEnd;
+  const defaultSplitTrackTitle = item ? `${item.metadata.title || item.name} (Split)` : 'Split track';
+  const splitTrackTitleTrimmed = splitTrackTitle.trim();
   const canSplitTrackType = Boolean(item);
   const isFullTrackSelection =
     effectiveDuration > 0.01 &&
@@ -688,6 +691,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           disabled={!item || !canSplitSelection || !canSplitTrackType || isSplittingSelection || isConverting}
           onClick={() => {
             setSplitMode('keep');
+            setSplitTrackTitle(defaultSplitTrackTitle);
             setIsSplitModalOpen(true);
           }}
           title={splitDisabledReason ?? 'Split selected segment into a new track'}
@@ -750,6 +754,24 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               <p>Choose how the original file should be handled after creating the split track.</p>
             </div>
 
+            <label className="split-title-field">
+              New track title
+              <input
+                autoFocus
+                disabled={isSplittingSelection}
+                onChange={(event) => setSplitTrackTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && item && canSplitTrackType && canSplitSelection && splitTrackTitleTrimmed) {
+                    event.preventDefault();
+                    void onSplitSelection(splitStartTime, splitEndTime, splitMode, splitTrackTitleTrimmed);
+                  }
+                }}
+                placeholder="Split track title"
+                type="text"
+                value={splitTrackTitle}
+              />
+            </label>
+
             <div className="split-options-group" role="radiogroup" aria-label="Original file behavior">
               <label className={splitMode === 'keep' ? 'split-option-card split-option-card-selected' : 'split-option-card'}>
                 <input
@@ -795,8 +817,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               </button>
               <button
                 className="primary-button"
-                disabled={!item || !canSplitTrackType || !canSplitSelection || isSplittingSelection}
-                onClick={() => void onSplitSelection(splitStartTime, splitEndTime, splitMode)}
+                disabled={!item || !canSplitTrackType || !canSplitSelection || isSplittingSelection || !splitTrackTitleTrimmed}
+                onClick={() => void onSplitSelection(splitStartTime, splitEndTime, splitMode, splitTrackTitleTrimmed)}
                 type="button"
               >
                 {isSplittingSelection ? 'Splitting...' : 'Continue'}

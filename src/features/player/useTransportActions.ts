@@ -120,19 +120,17 @@ export function useTransportActions({
     }
   }
 
-  async function handleSplitSelectionToTrack(startTime: number, endTime: number, splitMode: 'keep' | 'slice') {
+  async function handleSplitSelectionToTrack(
+    startTime: number,
+    endTime: number,
+    splitMode: 'keep' | 'slice',
+    splitTitle: string,
+  ) {
     if (!activeItem) {
       return;
     }
 
-    const defaultTitle = `${activeItem.metadata.title || activeItem.name} (Split)`;
-    const promptValue = window.prompt('Title for the new split track', defaultTitle);
-    if (promptValue === null) {
-      setStatus('Split operation cancelled.');
-      return;
-    }
-
-    const nextTitle = promptValue.trim();
+    const nextTitle = splitTitle.trim();
     if (!nextTitle) {
       setStatus('Split track title cannot be empty.');
       return;
