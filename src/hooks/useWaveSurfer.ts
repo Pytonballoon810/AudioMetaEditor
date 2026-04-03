@@ -52,6 +52,49 @@ type UseWaveSurferOptions = {
 
 const ZOOM_STEP_PX_PER_SEC = 20;
 const MAX_ZOOM_PX_PER_SEC = 400;
+const HORIZONTAL_SCROLL_SENSITIVITY = 1;
+
+function applyPersistentScrollbarStyle(waveSurfer: WaveSurfer) {
+  const wrapper = (waveSurfer as WaveSurfer & { getWrapper?: () => HTMLElement }).getWrapper?.();
+  if (!wrapper) {
+    return;
+  }
+
+  const root = wrapper.getRootNode();
+  if (!(root instanceof ShadowRoot)) {
+    return;
+  }
+
+  if (!root.getElementById('audio-meta-wave-scrollbar-style')) {
+    const style = document.createElement('style');
+    style.id = 'audio-meta-wave-scrollbar-style';
+    style.textContent = `
+      :host .scroll {
+        overflow-x: scroll;
+        scrollbar-gutter: stable both-edges;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 94, 168, 0.9) rgba(255, 255, 255, 0.08);
+      }
+      :host .scroll::-webkit-scrollbar {
+        height: 11px;
+      }
+      :host .scroll::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      :host .scroll::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, rgba(255, 94, 168, 0.92), rgba(117, 201, 255, 0.9));
+        border-radius: 999px;
+        border: 2px solid rgba(16, 20, 22, 0.85);
+      }
+    `;
+    root.appendChild(style);
+  }
+
+  const scrollElement = root.querySelector<HTMLElement>('[part="scroll"]');
+  if (scrollElement) {
+    scrollElement.style.overflowX = 'scroll';
+  }
+}
 
 export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurferOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +140,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     });
 
     waveSurferRef.current = waveSurfer;
+    applyPersistentScrollbarStyle(waveSurfer);
 
     waveSurfer.on('ready', () => {
       if (waveSurferRef.current !== waveSurfer || regionsPluginRef.current !== regionsPlugin) {
@@ -173,16 +217,33 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     regionsPlugin.on('region-update', handleRegionChange);
     regionsPlugin.on('region-updated', handleRegionChange);
 
-    const handleWheelZoom = (event: WheelEvent) => {
+    const handleWheelInteraction = (event: WheelEvent) => {
       if (waveSurferRef.current !== waveSurfer || durationRef.current <= 0) {
         return;
       }
 
-      event.preventDefault();
+      const hasHorizontalDelta = Math.abs(event.deltaX) > 0.01;
+      const useShiftAsHorizontal = !hasHorizontalDelta && event.shiftKey && Math.abs(event.deltaY) > 0.01;
+      if (hasHorizontalDelta || useShiftAsHorizontal) {
+        const delta = (hasHorizontalDelta ? event.deltaX : event.deltaY) * HORIZONTAL_SCROLL_SENSITIVITY;
+        const scrollableWaveSurfer = waveSurfer as WaveSurfer & {
+          getScroll?: () => number;
+          setScroll?: (value: number) => void;
+        };
+        if (scrollableWaveSurfer.getScroll && scrollableWaveSurfer.setScroll) {
+          event.preventDefault();
+          const currentScroll = scrollableWaveSurfer.getScroll();
+          const nextScroll = Math.max(0, currentScroll + delta);
+          scrollableWaveSurfer.setScroll(nextScroll);
+          return;
+        }
+      }
 
       if (event.deltaY === 0) {
         return;
       }
+
+      event.preventDefault();
 
       const direction = event.deltaY < 0 ? 1 : -1;
       const step = event.shiftKey ? ZOOM_STEP_PX_PER_SEC * 2 : ZOOM_STEP_PX_PER_SEC;
@@ -198,14 +259,14 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       waveSurfer.zoom(nextZoom);
     };
 
-    containerElement.addEventListener('wheel', handleWheelZoom, { passive: false });
+    containerElement.addEventListener('wheel', handleWheelInteraction, { passive: false });
 
     return () => {
       if (hideSpinnerTimerRef.current !== null) {
         window.clearTimeout(hideSpinnerTimerRef.current);
         hideSpinnerTimerRef.current = null;
       }
-      containerElement.removeEventListener('wheel', handleWheelZoom);
+      containerElement.removeEventListener('wheel', handleWheelInteraction);
       waveSurfer.destroy();
       waveSurferRef.current = null;
       regionsPluginRef.current = null;
