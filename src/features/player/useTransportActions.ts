@@ -246,13 +246,30 @@ export function useTransportActions({
       }
 
       const refreshedItems = await api.loadLibraryIncremental([result.outputPath, activeItem.path]);
-      const refreshedOutputItem = refreshedItems.find(
+      const harmonizedRefreshedItems = refreshedItems.map((refreshedItem) => {
+        if (
+          activeItem.metadata.coverArt &&
+          normalizePathForComparison(refreshedItem.path) === normalizePathForComparison(result.outputPath)
+        ) {
+          return {
+            ...refreshedItem,
+            metadata: {
+              ...refreshedItem.metadata,
+              coverArt: activeItem.metadata.coverArt,
+            },
+          };
+        }
+
+        return refreshedItem;
+      });
+
+      const refreshedOutputItem = harmonizedRefreshedItems.find(
         (item) => normalizePathForComparison(item.path) === normalizePathForComparison(result.outputPath),
       );
 
-      if (refreshedItems.length > 0) {
+      if (harmonizedRefreshedItems.length > 0) {
         let mergedLibrary = library;
-        for (const refreshedItem of refreshedItems) {
+        for (const refreshedItem of harmonizedRefreshedItems) {
           mergedLibrary = upsertLibraryItem(mergedLibrary, refreshedItem);
         }
 

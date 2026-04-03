@@ -194,6 +194,16 @@ function pickAlbumCover(items: AudioLibraryItem[]) {
   return items.map((item) => item.metadata.coverArt).find((cover): cover is string => Boolean(cover)) || null;
 }
 
+function coverIdentityKey(coverArt: string) {
+  const trimmed = coverArt.trim();
+  const dataUrlMatch = trimmed.match(/^data:[^;]+;base64,(.+)$/i);
+  if (dataUrlMatch?.[1]) {
+    return dataUrlMatch[1].replace(/\s+/g, '');
+  }
+
+  return trimmed;
+}
+
 function AlbumEditSuggestionInput({
   id,
   label,
@@ -560,10 +570,22 @@ export function LibraryPane({
           hasAlbumNameDiscrepancy: group.isRootPseudoAlbum ? false : loadedAlbumCounts.size > 1,
           mismatchCount: group.isRootPseudoAlbum ? 0 : mismatchedTrackPaths.size,
           mismatchedTrackPaths: group.isRootPseudoAlbum ? new Set<string>() : mismatchedTrackPaths,
-          uniqueCovers: Array.from(new Set(loadedItems.map((item) => item.metadata.coverArt).filter(Boolean))).slice(
-            0,
-            4,
-          ),
+          uniqueCovers: (() => {
+            const uniqueByCover = new Map<string, string>();
+            loadedItems.forEach((item) => {
+              const coverArt = item.metadata.coverArt;
+              if (!coverArt) {
+                return;
+              }
+
+              const key = coverIdentityKey(coverArt);
+              if (!uniqueByCover.has(key)) {
+                uniqueByCover.set(key, coverArt);
+              }
+            });
+
+            return Array.from(uniqueByCover.values()).slice(0, 4);
+          })(),
           items: group.items.sort(trackComparator),
         };
       })
@@ -598,8 +620,9 @@ export function LibraryPane({
 
     const uniqueByCover = new Map<string, AlbumCoverSourceOption>();
     sortedCandidates.forEach((candidate) => {
-      if (!uniqueByCover.has(candidate.coverArt)) {
-        uniqueByCover.set(candidate.coverArt, candidate);
+      const key = coverIdentityKey(candidate.coverArt);
+      if (!uniqueByCover.has(key)) {
+        uniqueByCover.set(key, candidate);
       }
     });
 
