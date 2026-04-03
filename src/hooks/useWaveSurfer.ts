@@ -171,6 +171,9 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
   const containerRef = useRef<HTMLDivElement | null>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null);
+  const onReadyRef = useRef(onReady);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  const onFinishRef = useRef(onFinish);
   const selectionRef = useRef({ start: 0, end: 0 });
   const durationRef = useRef(0);
   const lastLoopAtRef = useRef(0);
@@ -188,6 +191,18 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
     end: 0,
     tickStepSeconds: DEFAULT_TIME_RULER_STEP_SECONDS,
   });
+
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
+
+  useEffect(() => {
+    onTimeUpdateRef.current = onTimeUpdate;
+  }, [onTimeUpdate]);
+
+  useEffect(() => {
+    onFinishRef.current = onFinish;
+  }, [onFinish]);
 
   function clearWaveform(waveSurfer: WaveSurfer) {
     (waveSurfer as WaveSurfer & { empty?: () => void }).empty?.();
@@ -297,7 +312,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
       selectionRef.current = fullSelection;
       setSelection(fullSelection);
       updateVisibleTimeframe();
-      onReady?.(duration);
+      onReadyRef.current?.(duration);
     });
 
     waveSurfer.on('error', (error) => {
@@ -324,19 +339,19 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
           if (!waveSurfer.isPlaying()) {
             void waveSurfer.play();
           }
-          onTimeUpdate?.(start);
+          onTimeUpdateRef.current?.(start);
           return;
         }
       }
 
-      onTimeUpdate?.(currentTime);
+      onTimeUpdateRef.current?.(currentTime);
     });
 
     waveSurfer.on('play', () => setIsPlaying(true));
     waveSurfer.on('pause', () => setIsPlaying(false));
     waveSurfer.on('finish', () => {
       setIsPlaying(false);
-      onFinish?.();
+      onFinishRef.current?.();
     });
 
     const handleRegionChange = (region: Region) => {
@@ -519,7 +534,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
       waveSurferRef.current = null;
       regionsPluginRef.current = null;
     };
-  }, [onFinish, onReady, onTimeUpdate]);
+  }, []);
 
   const reloadWaveformSource = useCallback((sourceUrl: string | null) => {
     const waveSurfer = waveSurferRef.current;
