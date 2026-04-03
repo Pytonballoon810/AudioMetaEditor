@@ -160,14 +160,15 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
 
   const hasValidSelection = selection.end > selection.start + 0.01;
   const effectiveDuration = duration || item?.metadata.duration || 0;
-  const splitStartTime = hasValidSelection ? selection.start : 0;
-  const splitEndTime = hasValidSelection ? selection.end : effectiveDuration;
-  const hasValidSplitRange = splitEndTime > splitStartTime + 0.01;
-  const isFullTrackSplitRange =
-    hasValidSplitRange && splitStartTime <= 0.01 && splitEndTime >= Math.max(0, effectiveDuration - 0.01);
+  const splitStartTime = selection.start;
+  const splitEndTime = selection.end;
   const canSplitTrackType = item?.extension.toLowerCase() === 'wav';
   const canCutSelection =
     hasValidSelection && duration > 0.01 && !(selection.start <= 0.01 && selection.end >= duration - 0.01);
+  const canSplitSelection =
+    hasValidSelection &&
+    effectiveDuration > 0.01 &&
+    !(selection.start <= 0.01 && selection.end >= effectiveDuration - 0.01);
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
   const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
   const canCutAfterPlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
@@ -554,9 +555,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         </div>
         <button
           className="accent-button"
-          disabled={
-            !item || !hasValidSplitRange || isFullTrackSplitRange || !canSplitTrackType || isSplittingSelection || isConverting
-          }
+          disabled={!item || !canSplitSelection || !canSplitTrackType || isSplittingSelection || isConverting}
           onClick={() => {
             setSplitMode('keep');
             setIsSplitModalOpen(true);
@@ -669,7 +668,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               </button>
               <button
                 className="primary-button"
-                disabled={!item || !canSplitTrackType || !hasValidSplitRange || isFullTrackSplitRange || isSplittingSelection}
+                disabled={!item || !canSplitTrackType || !canSplitSelection || isSplittingSelection}
                 onClick={() => void onSplitSelection(splitStartTime, splitEndTime, splitMode)}
                 type="button"
               >
