@@ -47,6 +47,14 @@ function formatEditTime(seconds: number) {
   return `${formatDuration(seconds)} (${seconds.toFixed(2)}s)`;
 }
 
+function formatStepLabel(stepSeconds: number) {
+  if (stepSeconds >= 60 && stepSeconds % 60 === 0) {
+    return `${Math.round(stepSeconds / 60)}m`;
+  }
+
+  return `${Math.round(stepSeconds)}s`;
+}
+
 const MIN_VOLUME_DB = -48;
 
 function perceivedSliderToGain(sliderValue: number) {
@@ -137,6 +145,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     seekTo,
     reloadWaveform,
     setVolume: setWaveSurferVolume,
+    visibleTimeframe,
   } = useWaveSurfer({
     audioUrl,
     onReady: handleReady,
@@ -198,6 +207,28 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
   const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
   const canCutAfterPlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
+  const rulerStart = item ? Math.max(0, visibleTimeframe.start) : 0;
+  const fallbackRulerEnd = effectiveDuration > 0.01 ? effectiveDuration : 0;
+  const rulerEnd = item
+    ? Math.max(rulerStart, visibleTimeframe.end > rulerStart ? visibleTimeframe.end : fallbackRulerEnd)
+    : 0;
+  const rulerSpan = Math.max(0.01, rulerEnd - rulerStart);
+  const baseTickStepSeconds = Math.max(5, visibleTimeframe.tickStepSeconds || 5);
+  const estimatedTickCount = Math.floor(rulerSpan / baseTickStepSeconds) + 1;
+  const tickRenderStride = estimatedTickCount > 36 ? Math.ceil(estimatedTickCount / 36) : 1;
+  const renderedTickStepSeconds = baseTickStepSeconds * tickRenderStride;
+  const firstTick = Math.ceil(rulerStart / baseTickStepSeconds) * baseTickStepSeconds;
+  const timelineTicks: number[] = [];
+
+  if (item && rulerEnd > rulerStart + 0.01) {
+    for (let tick = firstTick, index = 0; tick <= rulerEnd + 0.0001; tick += baseTickStepSeconds, index += 1) {
+      if (index % tickRenderStride !== 0) {
+        continue;
+      }
+
+      timelineTicks.push(Number(tick.toFixed(4)));
+    }
+  }
 
   const setSelectionStartToPlayhead = () => {
     const nextStart = Math.max(0, Math.min(currentTime, selection.end));
@@ -472,8 +503,24 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
       <div className="wave-shell">
         <div className="wave-topline">
           <span>{formatDuration(currentTime)}</span>
+          <span className="wave-topline-meta">
+            View {formatDuration(rulerStart)} - {formatDuration(rulerEnd)} • step {formatStepLabel(renderedTickStepSeconds)}
+          </span>
           <span>{item ? formatDuration(duration || item.metadata.duration) : '00:00'}</span>
         </div>
+        {item && timelineTicks.length > 0 ? (
+          <div className="wave-time-ruler" aria-hidden="true">
+            {timelineTicks.map((tick) => {
+              const leftPercent = ((tick - rulerStart) / rulerSpan) * 100;
+
+              return (
+                <div className="wave-time-tick" key={tick} style={{ left: `${Math.max(0, Math.min(100, leftPercent))}%` }}>
+                  <span>{formatDuration(tick)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="wave-area">
           <div className="waveform" ref={containerRef} />
           {removedRangeGuides.length > 0 ? (

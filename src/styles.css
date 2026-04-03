@@ -1374,6 +1374,44 @@ textarea {
   color: var(--muted);
 }
 
+.wave-topline-meta {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--muted) 82%, var(--text));
+  text-align: center;
+  flex: 1;
+  min-width: 220px;
+}
+
+.wave-time-ruler {
+  position: relative;
+  height: 1.55rem;
+  margin-bottom: 0.65rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  overflow: hidden;
+}
+
+.wave-time-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.12));
+  transform: translateX(-0.5px);
+}
+
+.wave-time-tick span {
+  position: absolute;
+  top: 0.1rem;
+  left: 0.34rem;
+  font-size: 0.7rem;
+  color: color-mix(in srgb, var(--muted) 90%, var(--text));
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
 .waveform {
   min-height: 240px;
 }

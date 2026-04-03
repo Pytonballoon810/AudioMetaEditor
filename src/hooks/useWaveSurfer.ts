@@ -53,6 +53,23 @@ type UseWaveSurferOptions = {
 const ZOOM_STEP_PX_PER_SEC = 20;
 const MAX_ZOOM_PX_PER_SEC = 400;
 const HORIZONTAL_SCROLL_SENSITIVITY = 1;
+const DEFAULT_TIME_RULER_STEP_SECONDS = 5;
+
+function pickTimeRulerStepSeconds(visibleDuration: number) {
+  if (visibleDuration <= 45) {
+    return 5;
+  }
+
+  if (visibleDuration <= 120) {
+    return 10;
+  }
+
+  if (visibleDuration <= 360) {
+    return 30;
+  }
+
+  return 60;
+}
 
 function applyPersistentScrollbarStyle(waveSurfer: WaveSurfer) {
   const wrapper = (waveSurfer as WaveSurfer & { getWrapper?: () => HTMLElement }).getWrapper?.();
@@ -110,6 +127,11 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isWaveformLoading, setIsWaveformLoading] = useState(false);
+  const [visibleTimeframe, setVisibleTimeframe] = useState({
+    start: 0,
+    end: 0,
+    tickStepSeconds: DEFAULT_TIME_RULER_STEP_SECONDS,
+  });
 
   function clearWaveform(waveSurfer: WaveSurfer) {
     (waveSurfer as WaveSurfer & { empty?: () => void }).empty?.();
@@ -142,6 +164,54 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     waveSurferRef.current = waveSurfer;
     applyPersistentScrollbarStyle(waveSurfer);
 
+    const updateVisibleTimeframe = () => {
+      if (waveSurferRef.current !== waveSurfer) {
+        return;
+      }
+
+      const duration = durationRef.current;
+      if (duration <= 0) {
+        setVisibleTimeframe({
+          start: 0,
+          end: 0,
+          tickStepSeconds: DEFAULT_TIME_RULER_STEP_SECONDS,
+        });
+        return;
+      }
+
+      const scrollAwareWaveSurfer = waveSurfer as WaveSurfer & {
+        getScroll?: () => number;
+        getWidth?: () => number;
+      };
+
+      const zoomPxPerSec = zoomPxPerSecRef.current;
+      if (zoomPxPerSec <= 0) {
+        setVisibleTimeframe({
+          start: 0,
+          end: duration,
+          tickStepSeconds: pickTimeRulerStepSeconds(duration),
+        });
+        return;
+      }
+
+      const scrollLeft = scrollAwareWaveSurfer.getScroll ? scrollAwareWaveSurfer.getScroll() : 0;
+      const viewportWidth = scrollAwareWaveSurfer.getWidth ? scrollAwareWaveSurfer.getWidth() : containerElement.clientWidth;
+      const visibleSpan = Math.max(0.01, viewportWidth / zoomPxPerSec);
+
+      let start = Math.max(0, scrollLeft / zoomPxPerSec);
+      const end = Math.min(duration, start + visibleSpan);
+
+      if (end - start < visibleSpan) {
+        start = Math.max(0, end - visibleSpan);
+      }
+
+      setVisibleTimeframe({
+        start,
+        end,
+        tickStepSeconds: pickTimeRulerStepSeconds(Math.max(0.01, end - start)),
+      });
+    };
+
     waveSurfer.on('ready', () => {
       if (waveSurferRef.current !== waveSurfer || regionsPluginRef.current !== regionsPlugin) {
         return;
@@ -167,6 +237,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       const fullSelection = { start: 0, end: duration };
       selectionRef.current = fullSelection;
       setSelection(fullSelection);
+      updateVisibleTimeframe();
       onReady?.(duration);
     });
 
@@ -216,6 +287,8 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
 
     regionsPlugin.on('region-update', handleRegionChange);
     regionsPlugin.on('region-updated', handleRegionChange);
+    waveSurfer.on('zoom', updateVisibleTimeframe);
+    waveSurfer.on('scroll', updateVisibleTimeframe);
 
     const handleWheelInteraction = (event: WheelEvent) => {
       if (waveSurferRef.current !== waveSurfer || durationRef.current <= 0) {
@@ -257,6 +330,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       nextZoom = Math.max(0, Math.min(MAX_ZOOM_PX_PER_SEC, nextZoom));
       zoomPxPerSecRef.current = nextZoom;
       waveSurfer.zoom(nextZoom);
+      updateVisibleTimeframe();
     };
 
     containerElement.addEventListener('wheel', handleWheelInteraction, { passive: false });
@@ -291,6 +365,11 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     durationRef.current = 0;
     setSelection(clearedSelection);
     setIsPlaying(false);
+    setVisibleTimeframe({
+      start: 0,
+      end: 0,
+      tickStepSeconds: DEFAULT_TIME_RULER_STEP_SECONDS,
+    });
 
     if (!sourceUrl) {
       if (hideSpinnerTimerRef.current !== null) {
@@ -375,6 +454,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     containerRef,
     isPlaying,
     isWaveformLoading,
+    visibleTimeframe,
     selection,
     playPause: () => {
       const waveSurfer = waveSurferRef.current;
