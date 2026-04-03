@@ -63,6 +63,8 @@ let pendingPaths = [];
 let libraryWatcher = null;
 let libraryWatcherDebounceTimer = null;
 let pendingLibraryChangedPath = null;
+let libraryWatcherReady = false;
+let libraryWatcherSuppressUntil = 0;
 let metadataWorker = null;
 let metadataWorkerRequestSequence = 0;
 const pendingMetadataWorkerRequests = new Map();
@@ -72,6 +74,12 @@ const DEFAULT_WINDOW_HEIGHT = 940;
 const MIN_WINDOW_WIDTH = 1120;
 const MIN_WINDOW_HEIGHT = 720;
 const WINDOW_STATE_FILE_PATH = path.join(app.getPath('userData'), 'window-state.json');
+const LIBRARY_WATCHER_SUPPRESS_MS = 2200;
+
+function isAudioFilePath(candidatePath) {
+  const extension = path.extname(String(candidatePath || '')).toLowerCase();
+  return extension === '.mp3' || extension === '.wav' || extension === '.flac';
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -381,6 +389,8 @@ async function disposeLibraryWatcher() {
   }
 
   pendingLibraryChangedPath = null;
+  libraryWatcherReady = false;
+  libraryWatcherSuppressUntil = 0;
 
   if (!libraryWatcher) {
     return;
@@ -398,6 +408,10 @@ async function disposeLibraryWatcher() {
 
 function scheduleLibraryChangedRefresh(changedPath) {
   if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (!libraryWatcherReady || Date.now() < libraryWatcherSuppressUntil) {
     return;
   }
 
@@ -448,6 +462,9 @@ async function configureLibraryWatcher(pathsToScan) {
     return;
   }
 
+  libraryWatcherReady = false;
+  libraryWatcherSuppressUntil = Date.now() + LIBRARY_WATCHER_SUPPRESS_MS;
+
   const watcher = chokidar.watch(watchTargets, {
     ignoreInitial: true,
     awaitWriteFinish: {
@@ -456,16 +473,25 @@ async function configureLibraryWatcher(pathsToScan) {
     },
   });
 
-  const onFsChanged = (changedPath) => {
+  const onFsChanged = (eventName, changedPath) => {
     const normalizedPath = typeof changedPath === 'string' ? path.resolve(changedPath) : '(unknown path)';
+    const isDirectoryEvent = eventName === 'addDir' || eventName === 'unlinkDir';
+    if (!isDirectoryEvent && !isAudioFilePath(normalizedPath)) {
+      return;
+    }
+
     scheduleLibraryChangedRefresh(normalizedPath);
   };
 
-  watcher.on('add', onFsChanged);
-  watcher.on('change', onFsChanged);
-  watcher.on('unlink', onFsChanged);
-  watcher.on('addDir', onFsChanged);
-  watcher.on('unlinkDir', onFsChanged);
+  watcher.on('ready', () => {
+    libraryWatcherReady = true;
+    libraryWatcherSuppressUntil = Date.now() + LIBRARY_WATCHER_SUPPRESS_MS;
+  });
+  watcher.on('add', (changedPath) => onFsChanged('add', changedPath));
+  watcher.on('change', (changedPath) => onFsChanged('change', changedPath));
+  watcher.on('unlink', (changedPath) => onFsChanged('unlink', changedPath));
+  watcher.on('addDir', (changedPath) => onFsChanged('addDir', changedPath));
+  watcher.on('unlinkDir', (changedPath) => onFsChanged('unlinkDir', changedPath));
   watcher.on('error', (error) => {
     console.warn('[library-watcher] Watcher error:', error);
   });
