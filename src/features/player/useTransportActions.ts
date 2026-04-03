@@ -20,7 +20,7 @@ type UseTransportActionsArgs = {
   downloadUrl: string;
   setDownloadUrl: (url: string) => void;
   setIsDownloadDialogOpen: (open: boolean) => void;
-  downloadTargetMode: 'existing' | 'new';
+  downloadTargetMode: 'existing' | 'new' | 'video-name-album';
   downloadTargetExistingDirectory: string;
   downloadTargetNewAlbumName: string;
   downloadFormat: 'flac' | 'mp3' | 'wav' | 'm4a';
@@ -82,6 +82,17 @@ export function useTransportActions({
   };
 
   const getDirectoryParent = (directoryPath: string) => directoryPath.replace(/[/\\][^/\\]+$/, '');
+  const resolveDownloadParentDirectory = (existingDirectory: string) =>
+    activeItem?.openedDirectoryRoot?.trim() ||
+    library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot?.trim() ||
+    loadedSourcePaths
+      .map((sourcePath) => sourcePath.trim())
+      .find((sourcePath) => isAbsolutePath(sourcePath) && !/\.(mp3|wav|flac|m4a|opus|aac|ogg)$/i.test(sourcePath)) ||
+    loadedSourcePaths
+      .map((sourcePath) => sourcePath.trim())
+      .find((sourcePath) => isAbsolutePath(sourcePath) && /\.(mp3|wav|flac|m4a|opus|aac|ogg)$/i.test(sourcePath))
+      ?.replace(/[/\\][^/\\]+$/, '') ||
+    (existingDirectory && isAbsolutePath(existingDirectory) ? getDirectoryParent(existingDirectory) : '');
 
   const buildPlaceholderItem = (
     placeholderPath: string,
@@ -487,6 +498,7 @@ export function useTransportActions({
       targetAlbumDirectory?: string;
       newAlbumName?: string;
       newAlbumParentDirectory?: string;
+      useVideoNameAsAlbum?: boolean;
       downloadFormat?: 'flac' | 'mp3' | 'wav' | 'm4a';
       splitIntoChapters?: boolean;
     } = {
@@ -508,23 +520,13 @@ export function useTransportActions({
 
       payload.targetAlbumDirectory = existingDirectory;
       destinationDirectory = existingDirectory;
-    } else {
+    } else if (downloadTargetMode === 'new') {
       if (!newAlbumName) {
         setStatus('Enter a new album name.');
         return;
       }
 
-      const parentDirectoryCandidate =
-        activeItem?.openedDirectoryRoot?.trim() ||
-        library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot?.trim() ||
-        loadedSourcePaths
-          .map((sourcePath) => sourcePath.trim())
-          .find((sourcePath) => isAbsolutePath(sourcePath) && !/\.(mp3|wav|flac|m4a|opus|aac|ogg)$/i.test(sourcePath)) ||
-        loadedSourcePaths
-          .map((sourcePath) => sourcePath.trim())
-          .find((sourcePath) => isAbsolutePath(sourcePath) && /\.(mp3|wav|flac|m4a|opus|aac|ogg)$/i.test(sourcePath))
-          ?.replace(/[/\\][^/\\]+$/, '') ||
-        (existingDirectory && isAbsolutePath(existingDirectory) ? getDirectoryParent(existingDirectory) : '');
+      const parentDirectoryCandidate = resolveDownloadParentDirectory(existingDirectory);
 
       if (!parentDirectoryCandidate || !isAbsolutePath(parentDirectoryCandidate)) {
         setStatus('Open a directory first so the new album location can be resolved.');
@@ -534,6 +536,21 @@ export function useTransportActions({
       payload.newAlbumName = newAlbumName;
       payload.newAlbumParentDirectory = parentDirectoryCandidate;
       destinationDirectory = `${parentDirectoryCandidate.replace(/[/\\]+$/, '')}/${newAlbumName}`;
+    } else {
+      if (!splitDownloadIntoChapters) {
+        setStatus('Enable chapter splitting to use video name as album.');
+        return;
+      }
+
+      const parentDirectoryCandidate = resolveDownloadParentDirectory(existingDirectory);
+      if (!parentDirectoryCandidate || !isAbsolutePath(parentDirectoryCandidate)) {
+        setStatus('Open a directory first so the video-named album location can be resolved.');
+        return;
+      }
+
+      payload.useVideoNameAsAlbum = true;
+      payload.newAlbumParentDirectory = parentDirectoryCandidate;
+      destinationDirectory = `${parentDirectoryCandidate.replace(/[/\\]+$/, '')}/(video title)`;
     }
 
     const startedAt = Date.now();

@@ -91,6 +91,14 @@ describe('ipc validators', () => {
         newAlbumParentDirectory: '/tmp',
       }),
     ).not.toThrow();
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        splitIntoChapters: true,
+        useVideoNameAsAlbum: true,
+        newAlbumParentDirectory: '/tmp',
+      }),
+    ).not.toThrow();
     expect(() => validateDownloadFromUrlPayload({ url: '' })).toThrow(/payload.url/);
     expect(() =>
       validateDownloadFromUrlPayload({
@@ -103,9 +111,23 @@ describe('ipc validators', () => {
       validateDownloadFromUrlPayload({
         url: 'https://example.com/a.mp3',
         targetAlbumDirectory: '/tmp/Album',
+        useVideoNameAsAlbum: 'yes',
+      }),
+    ).toThrow(/useVideoNameAsAlbum/);
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        targetAlbumDirectory: '/tmp/Album',
         downloadFormat: 'ogg',
       }),
     ).toThrow(/downloadFormat/);
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        useVideoNameAsAlbum: true,
+        newAlbumParentDirectory: '/tmp',
+      }),
+    ).toThrow(/splitIntoChapters/);
     expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3' })).toThrow(/destination target/);
     expect(() =>
       validateDownloadFromUrlPayload({
@@ -119,6 +141,13 @@ describe('ipc validators', () => {
       validateDownloadFromUrlPayload({
         url: 'https://example.com/a.mp3',
         newAlbumName: 'My Album',
+      }),
+    ).toThrow(/newAlbumParentDirectory/);
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        splitIntoChapters: true,
+        useVideoNameAsAlbum: true,
       }),
     ).toThrow(/newAlbumParentDirectory/);
     expect(() => validateDownloadFromUrlPayload(null)).toThrow(/payload/);

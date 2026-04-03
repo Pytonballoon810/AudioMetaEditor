@@ -113,6 +113,10 @@ function validateDownloadFromUrlPayload(payload) {
     throw new Error('payload.splitIntoChapters must be a boolean when provided.');
   }
 
+  if (payload.useVideoNameAsAlbum !== undefined && typeof payload.useVideoNameAsAlbum !== 'boolean') {
+    throw new Error('payload.useVideoNameAsAlbum must be a boolean when provided.');
+  }
+
   if (
     payload.downloadFormat !== undefined &&
     payload.downloadFormat !== 'flac' &&
@@ -125,13 +129,25 @@ function validateDownloadFromUrlPayload(payload) {
 
   const hasExistingTarget = typeof payload.targetAlbumDirectory === 'string';
   const hasNewAlbumTarget = typeof payload.newAlbumName === 'string';
+  const hasVideoNameAlbumTarget = payload.useVideoNameAsAlbum === true;
 
-  if (hasExistingTarget === hasNewAlbumTarget) {
+  if (hasVideoNameAlbumTarget && payload.splitIntoChapters !== true) {
+    throw new Error('payload.useVideoNameAsAlbum can only be used when payload.splitIntoChapters is true.');
+  }
+
+  const destinationTargetCount =
+    Number(hasExistingTarget) + Number(hasNewAlbumTarget) + Number(hasVideoNameAlbumTarget);
+
+  if (destinationTargetCount !== 1) {
     throw new Error('payload must include exactly one destination target.');
   }
 
   if (hasNewAlbumTarget && typeof payload.newAlbumParentDirectory !== 'string') {
     throw new Error('payload.newAlbumParentDirectory is required when payload.newAlbumName is provided.');
+  }
+
+  if (hasVideoNameAlbumTarget && typeof payload.newAlbumParentDirectory !== 'string') {
+    throw new Error('payload.newAlbumParentDirectory is required when payload.useVideoNameAsAlbum is true.');
   }
 }
 

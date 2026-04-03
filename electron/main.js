@@ -1068,12 +1068,8 @@ app.whenReady().then(async () => {
       );
     }
 
-    const rawPathName = path.basename(parsedUrl.pathname || '').trim();
-    const safeBaseName = (rawPathName || 'audio-download')
-      .replace(/[<>:"/\\|?*]+/g, '-')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const safeStem = (path.parse(safeBaseName || 'audio-download').name || 'audio-download').trim() || 'audio-download';
+    const splitIntoChapters = payload.splitIntoChapters === true;
+    const useVideoNameAsAlbum = payload.useVideoNameAsAlbum === true;
 
     let targetAlbumDirectory = '';
     if (typeof payload.targetAlbumDirectory === 'string' && payload.targetAlbumDirectory.trim()) {
@@ -1087,7 +1083,7 @@ app.whenReady().then(async () => {
       const newAlbumNameRaw = typeof payload.newAlbumName === 'string' ? payload.newAlbumName.trim() : '';
       const newAlbumParentDirectory =
         typeof payload.newAlbumParentDirectory === 'string' ? payload.newAlbumParentDirectory.trim() : '';
-      if (!newAlbumNameRaw || !newAlbumParentDirectory) {
+      if (!newAlbumParentDirectory || (!newAlbumNameRaw && !useVideoNameAsAlbum)) {
         throw new Error('A valid album destination is required.');
       }
 
@@ -1095,26 +1091,38 @@ app.whenReady().then(async () => {
         throw new Error('New album parent directory must be an absolute path.');
       }
 
-      const sanitizedAlbumFolderName = sanitizeFileSystemSegment(newAlbumNameRaw);
+      if (useVideoNameAsAlbum) {
+        targetAlbumDirectory = path.resolve(newAlbumParentDirectory);
+      } else {
+        const sanitizedAlbumFolderName = sanitizeFileSystemSegment(newAlbumNameRaw);
 
-      if (!sanitizedAlbumFolderName) {
-        throw new Error('New album name is invalid after sanitization.');
+        if (!sanitizedAlbumFolderName) {
+          throw new Error('New album name is invalid after sanitization.');
+        }
+
+        targetAlbumDirectory = path.resolve(newAlbumParentDirectory, sanitizedAlbumFolderName);
       }
-
-      targetAlbumDirectory = path.resolve(newAlbumParentDirectory, sanitizedAlbumFolderName);
     }
 
     await fs.mkdir(targetAlbumDirectory, { recursive: true });
 
-    const outputTemplatePath = path.join(targetAlbumDirectory, `${safeStem}.%(ext)s`);
-    const splitIntoChapters = payload.splitIntoChapters === true;
+    const outputTemplatePath = splitIntoChapters
+      ? useVideoNameAsAlbum
+        ? path.join(targetAlbumDirectory, '%(title)s', '%(section_title)s.%(ext)s')
+        : path.join(targetAlbumDirectory, '%(section_title)s.%(ext)s')
+      : path.join(targetAlbumDirectory, '%(title)s.%(ext)s');
+    const expectedExtension = `.${downloadFormat.toLowerCase()}`;
+    const commandStartedAt = Date.now();
 
     try {
       const commandArgs = [
         '--no-playlist',
+        '--format',
+        'bestaudio/best',
         '--extract-audio',
         '--audio-format',
         downloadFormat,
+        '--no-keep-video',
         '--no-progress',
         '--no-warnings',
         '--print',
@@ -1149,39 +1157,73 @@ app.whenReady().then(async () => {
         }
       }
 
-      if (discoveredPaths.length === 0) {
-        const directoryEntries = await fs.readdir(targetAlbumDirectory);
-        const candidatePaths = directoryEntries
-          .filter((entry) => path.parse(entry).name.toLowerCase().startsWith(safeStem.toLowerCase()))
-          .map((entry) => path.join(targetAlbumDirectory, entry));
+      const expectedDiscoveredPaths = discoveredPaths.filter(
+        (candidatePath) => path.extname(candidatePath).toLowerCase() === expectedExtension,
+      );
 
+      if (expectedDiscoveredPaths.length === 0) {
+        const collectRecentFiles = async (rootDirectory) => {
+          const stack = [rootDirectory];
+          const files = [];
+
+          while (stack.length > 0) {
+            const nextDirectory = stack.pop();
+            const entries = await fs.readdir(nextDirectory, { withFileTypes: true });
+
+            for (const entry of entries) {
+              const fullPath = path.join(nextDirectory, entry.name);
+              if (entry.isDirectory()) {
+                stack.push(fullPath);
+              } else if (entry.isFile()) {
+                files.push(fullPath);
+              }
+            }
+          }
+
+          return files;
+        };
+
+        const candidatePaths = await collectRecentFiles(targetAlbumDirectory);
         const candidateStats = await Promise.all(
-          candidatePaths.map(async (candidatePath) => ({
-            candidatePath,
-            stats: await fs.stat(candidatePath),
-          })),
+          candidatePaths
+            .filter((candidatePath) => path.extname(candidatePath).toLowerCase() === expectedExtension)
+            .map(async (candidatePath) => ({
+              candidatePath,
+              stats: await fs.stat(candidatePath),
+            })),
         );
 
-        const fileCandidates = candidateStats.filter((candidate) => candidate.stats.isFile());
+        const recentFileCandidates = candidateStats
+          .filter((candidate) => candidate.stats.isFile() && candidate.stats.mtimeMs >= commandStartedAt - 5000)
+          .sort((left, right) => right.stats.mtimeMs - left.stats.mtimeMs)
+          .map((candidate) => candidate.candidatePath);
 
-        fileCandidates.sort((left, right) => right.stats.mtimeMs - left.stats.mtimeMs);
-        for (const candidate of fileCandidates) {
-          if (!discoveredPaths.includes(candidate.candidatePath)) {
-            discoveredPaths.push(candidate.candidatePath);
+        for (const candidatePath of recentFileCandidates) {
+          if (!expectedDiscoveredPaths.includes(candidatePath)) {
+            expectedDiscoveredPaths.push(candidatePath);
           }
         }
       }
 
-      const outputPath = discoveredPaths[0] || '';
+      if (expectedDiscoveredPaths.length === 0 && discoveredPaths.length > 0) {
+        const discoveredExtensions = Array.from(
+          new Set(discoveredPaths.map((candidatePath) => path.extname(candidatePath).toLowerCase())),
+        ).join(', ');
+        throw new Error(
+          `Downloaded files did not match the selected ${downloadFormat.toUpperCase()} format. Found: ${discoveredExtensions || 'unknown'}. Ensure ffmpeg is installed and available for yt-dlp post-processing.`,
+        );
+      }
+
+      const outputPath = expectedDiscoveredPaths[0] || '';
 
       if (!fsSync.existsSync(outputPath)) {
         throw new Error('yt-dlp finished but no output file was found at the expected location.');
       }
 
-      console.log('[backend-action] audio:download-from-url:done', outputPath, discoveredPaths.length);
+      console.log('[backend-action] audio:download-from-url:done', outputPath, expectedDiscoveredPaths.length);
       return {
         outputPath,
-        outputPaths: discoveredPaths,
+        outputPaths: expectedDiscoveredPaths,
       };
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {

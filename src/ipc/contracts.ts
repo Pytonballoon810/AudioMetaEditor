@@ -27,6 +27,7 @@ export type DownloadFromUrlPayload = {
   targetAlbumDirectory?: string;
   newAlbumName?: string;
   newAlbumParentDirectory?: string;
+  useVideoNameAsAlbum?: boolean;
   downloadFormat?: 'flac' | 'mp3' | 'wav' | 'm4a';
   splitIntoChapters?: boolean;
 };

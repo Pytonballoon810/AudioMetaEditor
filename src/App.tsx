@@ -80,7 +80,7 @@ export default function App() {
   const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState('');
-  const [downloadTargetMode, setDownloadTargetMode] = useState<'existing' | 'new'>('existing');
+  const [downloadTargetMode, setDownloadTargetMode] = useState<'existing' | 'new' | 'video-name-album'>('existing');
   const [downloadTargetExistingDirectory, setDownloadTargetExistingDirectory] = useState('');
   const [downloadTargetNewAlbumName, setDownloadTargetNewAlbumName] = useState('');
   const [downloadFormat, setDownloadFormat] = useState<'flac' | 'mp3' | 'wav' | 'm4a'>('flac');
@@ -379,6 +379,21 @@ export default function App() {
       setIsDownloadDialogOpen(false);
     }
   }, [hasWebDownloadsEnabled, isDownloadDialogOpen]);
+
+  useEffect(() => {
+    if (splitDownloadIntoChapters || downloadTargetMode !== 'video-name-album') {
+      return;
+    }
+
+    if (downloadAlbumOptions.length > 0) {
+      const hasExisting = downloadAlbumOptions.some((option) => option.directory === downloadTargetExistingDirectory);
+      setDownloadTargetExistingDirectory(hasExisting ? downloadTargetExistingDirectory : downloadAlbumOptions[0]?.directory ?? '');
+      setDownloadTargetMode('existing');
+      return;
+    }
+
+    setDownloadTargetMode('new');
+  }, [downloadAlbumOptions, downloadTargetExistingDirectory, downloadTargetMode, splitDownloadIntoChapters]);
 
   useEffect(() => {
     if (startupTimerRef.current !== null) {
@@ -703,10 +718,21 @@ export default function App() {
                     return;
                   }
 
+                  if (event.target.value === '__video_name_album__') {
+                    setDownloadTargetMode('video-name-album');
+                    return;
+                  }
+
                   setDownloadTargetMode('existing');
                   setDownloadTargetExistingDirectory(event.target.value);
                 }}
-                value={downloadTargetMode === 'new' ? '__new_album__' : downloadTargetExistingDirectory}
+                value={
+                  downloadTargetMode === 'new'
+                    ? '__new_album__'
+                    : downloadTargetMode === 'video-name-album'
+                      ? '__video_name_album__'
+                      : downloadTargetExistingDirectory
+                }
               >
                 {downloadAlbumOptions.map((option) => (
                   <option key={option.directory} value={option.directory}>
@@ -714,6 +740,9 @@ export default function App() {
                   </option>
                 ))}
                 <option value="__new_album__">Download to new album</option>
+                {splitDownloadIntoChapters ? (
+                  <option value="__video_name_album__">Use video name as Album</option>
+                ) : null}
               </select>
             </label>
 
