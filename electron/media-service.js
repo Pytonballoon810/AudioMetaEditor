@@ -1089,6 +1089,8 @@ async function editAudioSelection(filePath, startTime, endTime, mode, outputPath
 
   if (extension === '.mp3') {
     args.push('-codec:a', 'libmp3lame', '-q:a', '2');
+  } else if (extension === '.flac') {
+    args.push('-codec:a', 'flac');
   } else {
     args.push('-codec:a', 'pcm_s16le');
   }

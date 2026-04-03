@@ -45,16 +45,6 @@ export function useTransportActions({
   const [isSplittingSelection, setIsSplittingSelection] = useState(false);
   const [isDownloadingFromUrl, setIsDownloadingFromUrl] = useState(false);
 
-  function getNormalizedExtension(item: AudioLibraryItem | null) {
-    const rawExtension = (item?.extension ?? '').trim().toLowerCase().replace(/^\./, '');
-    if (rawExtension) {
-      return rawExtension;
-    }
-
-    const pathExtension = item?.path.split('.').pop()?.trim().toLowerCase() ?? '';
-    return pathExtension.replace(/^\./, '');
-  }
-
   async function handleExportClip(startTime: number, endTime: number) {
     if (!activeItem) {
       return;
@@ -132,11 +122,6 @@ export function useTransportActions({
 
   async function handleSplitSelectionToTrack(startTime: number, endTime: number, splitMode: 'keep' | 'slice') {
     if (!activeItem) {
-      return;
-    }
-
-    if (getNormalizedExtension(activeItem) !== 'wav') {
-      setStatus('Split to new track currently supports WAV files only.');
       return;
     }
 

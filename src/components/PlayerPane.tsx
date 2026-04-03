@@ -85,16 +85,6 @@ function buildRemovedRanges(edit: PendingWaveEdit, trackDuration: number): Remov
   return removedRanges;
 }
 
-function getNormalizedExtension(item: AudioLibraryItem | null) {
-  const rawExtension = (item?.extension ?? '').trim().toLowerCase().replace(/^\./, '');
-  if (rawExtension) {
-    return rawExtension;
-  }
-
-  const pathExtension = item?.path.split('.').pop()?.trim().toLowerCase() ?? '';
-  return pathExtension.replace(/^\./, '');
-}
-
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
   {
     item,
@@ -173,8 +163,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const effectiveDuration = duration || item?.metadata.duration || 0;
   const splitStartTime = normalizedSelectionStart;
   const splitEndTime = normalizedSelectionEnd;
-  const trackExtension = getNormalizedExtension(item);
-  const canSplitTrackType = trackExtension === 'wav';
+  const canSplitTrackType = Boolean(item);
   const isFullTrackSelection =
     effectiveDuration > 0.01 &&
     normalizedSelectionStart <= 0.01 &&
@@ -182,6 +171,17 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const canCutSelection =
     hasValidSelection && duration > 0.01 && !(normalizedSelectionStart <= 0.01 && normalizedSelectionEnd >= duration - 0.01);
   const canSplitSelection = hasValidSelection && (effectiveDuration <= 0.01 || !isFullTrackSelection);
+  const splitDisabledReason = !item
+    ? 'No active track'
+    : !hasValidSelection
+        ? 'Selection is too small'
+        : isFullTrackSelection
+          ? 'Selection covers full track'
+          : isSplittingSelection
+            ? 'Split already in progress'
+            : isConverting
+              ? 'Conversion in progress'
+              : null;
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
   const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
   const canCutAfterPlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
@@ -573,6 +573,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             setSplitMode('keep');
             setIsSplitModalOpen(true);
           }}
+          title={splitDisabledReason ?? 'Split selected segment into a new track'}
           type="button"
         >
           {isSplittingSelection ? 'Splitting track...' : 'Split to new track'}
@@ -665,10 +666,6 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             <p className="split-options-meta">
               Range: {formatEditTime(splitStartTime)} - {formatEditTime(splitEndTime)}
             </p>
-
-            {!canSplitTrackType ? (
-              <p className="split-options-warning">Split currently supports WAV files only.</p>
-            ) : null}
 
             <div className="download-dialog-actions">
               <button

@@ -757,9 +757,6 @@ app.whenReady().then(async () => {
 
     const sourcePath = path.resolve(payload.filePath);
     const extension = path.extname(sourcePath).toLowerCase();
-    if (extension !== '.wav') {
-      throw new Error('Split to new track currently supports WAV source files only.');
-    }
 
     const safeTitle = payload.title.trim().replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, ' ');
     if (!safeTitle) {
