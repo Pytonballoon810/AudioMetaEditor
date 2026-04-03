@@ -13,7 +13,7 @@
 
 ## Style
 
-- [x] the styling of the album metadata should be more concise. the bar currently extends too far beyond the actual buttons and i want the toolbar and the cover to be combined in one section like it is done in the track metadata panel
+- [x] The apply toggles in the album metadata panel should be replaced with sliding switches that match the overall design of the app. This will make it more visually appealing and easier to use.
 
 ## Bugs
 

@@ -214,18 +214,23 @@ function AlbumEditSuggestionInput({
       <span className="album-edit-field-head">
         <span>{label}</span>
         <span className="album-edit-toggle-wrap">
-          <input
-            checked={isApplied}
-            onChange={(event) => {
-              onToggleApply(event.target.checked);
-              if (!event.target.checked) {
-                setIsOpen(false);
-                setQuery('');
-              }
-            }}
-            type="checkbox"
-          />
-          Apply
+          <span className="album-edit-toggle-label">Apply</span>
+          <span className="album-edit-switch">
+            <input
+              aria-label={`Apply ${label} value to album`}
+              checked={isApplied}
+              className="album-edit-switch-input"
+              onChange={(event) => {
+                onToggleApply(event.target.checked);
+                if (!event.target.checked) {
+                  setIsOpen(false);
+                  setQuery('');
+                }
+              }}
+              type="checkbox"
+            />
+            <span aria-hidden="true" className="album-edit-switch-track" />
+          </span>
         </span>
       </span>
       <div className="suggestion-input-wrap">
