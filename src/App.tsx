@@ -3,7 +3,7 @@ import { LibraryPane } from './components/LibraryPane';
 import { MetadataEditor } from './components/MetadataEditor';
 import { PlayerPane, type PlayerPaneHandle } from './components/PlayerPane';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Copy01Icon } from '@hugeicons/core-free-icons';
+import { Copy01Icon, Settings01Icon } from '@hugeicons/core-free-icons';
 import { requireAudioMetaApi } from './services/audioMetaApi';
 import { useLibraryState } from './features/library/useLibraryState';
 import { useSessionRestore } from './features/library/useSessionRestore';
@@ -16,6 +16,7 @@ import { endPerfTimer, logMemorySnapshot, startPerfTimer } from './lib/performan
 
 const LAYOUT_METADATA_WIDTH_KEY = 'audioMetaEditor:layout:metadataWidth';
 const LAYOUT_STATUS_HEIGHT_KEY = 'audioMetaEditor:layout:statusHeight';
+const SETTINGS_YTDLP_PATH_KEY = 'audioMetaEditor:settings:ytDlpPath';
 
 function readStoredDimension(key: string, min: number, max: number, fallback: number) {
   if (typeof window === 'undefined') {
@@ -35,6 +36,15 @@ function readStoredDimension(key: string, min: number, max: number, fallback: nu
   return Math.max(min, Math.min(max, Math.round(parsed)));
 }
 
+function readStoredString(key: string, fallback = '') {
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  const raw = window.localStorage.getItem(key);
+  return raw ?? fallback;
+}
+
 export default function App() {
   const MIN_METADATA_WIDTH = 320;
   const MAX_METADATA_WIDTH = 760;
@@ -45,7 +55,9 @@ export default function App() {
   const startupTimerRef = useRef<number | null>(startPerfTimer());
   const [status, setStatus] = useState('Open a file or directory to start.');
   const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
+  const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState('');
+  const [ytDlpPathDraft, setYtDlpPathDraft] = useState(() => readStoredString(SETTINGS_YTDLP_PATH_KEY, ''));
   const [metadataWidth, setMetadataWidth] = useState(() =>
     readStoredDimension(LAYOUT_METADATA_WIDTH_KEY, MIN_METADATA_WIDTH, MAX_METADATA_WIDTH, 400),
   );
@@ -349,6 +361,18 @@ export default function App() {
     await loadPaths(loadedSourcePaths, activePath);
   }
 
+  function openSettingsDialog() {
+    setYtDlpPathDraft(readStoredString(SETTINGS_YTDLP_PATH_KEY, ''));
+    setIsSettingsDialogOpen(true);
+  }
+
+  function saveSettings() {
+    const nextValue = ytDlpPathDraft.trim();
+    window.localStorage.setItem(SETTINGS_YTDLP_PATH_KEY, nextValue);
+    setStatus(nextValue ? `Saved yt-dlp path: ${nextValue}` : 'Saved yt-dlp path as empty.');
+    setIsSettingsDialogOpen(false);
+  }
+
   function truncateStatusMessage(message: string, maxLength = 110) {
     if (message.length <= maxLength) {
       return message;
@@ -387,6 +411,15 @@ export default function App() {
           </button>
           <button className="primary-button" onClick={() => void handleOpenDirectory()} type="button">
             Open directory
+          </button>
+          <button
+            aria-label="Open settings"
+            className="secondary-button action-icon-button"
+            onClick={openSettingsDialog}
+            title="Settings"
+            type="button"
+          >
+            <HugeiconsIcon icon={Settings01Icon} size={18} strokeWidth={1.9} />
           </button>
         </div>
       </header>
@@ -526,6 +559,50 @@ export default function App() {
                 type="button"
               >
                 {isDownloadingFromUrl ? 'Downloading...' : 'Download'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isSettingsDialogOpen ? (
+        <div
+          className="download-dialog-backdrop"
+          onClick={() => setIsSettingsDialogOpen(false)}
+          role="presentation"
+        >
+          <section className="download-dialog settings-dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="download-dialog-heading">
+              <p className="eyebrow">Settings</p>
+              <h2>Download tools</h2>
+              <p>Set an optional yt-dlp path for environments where it is available.</p>
+            </div>
+
+            <label className="settings-field">
+              yt-dlp path
+              <input
+                autoFocus
+                onChange={(event) => setYtDlpPathDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    saveSettings();
+                  }
+                }}
+                placeholder="yt-dlp or C:\\Tools\\yt-dlp.exe"
+                value={ytDlpPathDraft}
+              />
+              <span className="settings-help">
+                Leave empty if not installed. You can enter an executable path or a command alias if it exists on PATH.
+              </span>
+            </label>
+
+            <div className="download-dialog-actions">
+              <button className="secondary-button" onClick={() => setIsSettingsDialogOpen(false)} type="button">
+                Cancel
+              </button>
+              <button className="primary-button" onClick={saveSettings} type="button">
+                Save
               </button>
             </div>
           </section>
