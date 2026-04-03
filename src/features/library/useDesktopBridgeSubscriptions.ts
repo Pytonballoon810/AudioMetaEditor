@@ -115,6 +115,52 @@ function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLi
   return Array.from(merged.values()).sort((left, right) => left.path.localeCompare(right.path));
 }
 
+function findLoadedItemPath(items: AudioLibraryItem[], pathValue: string) {
+  const match = items.find((item) => isSamePath(item.path, pathValue) && item.isMetadataLoaded);
+  return match?.path ?? null;
+}
+
+function pickRelevantActivePath(
+  previousLibrary: AudioLibraryItem[],
+  nextLibrary: AudioLibraryItem[],
+  currentActivePath: string | null,
+) {
+  if (!currentActivePath) {
+    return nextLibrary.find((item) => item.isMetadataLoaded)?.path ?? null;
+  }
+
+  const persistedActivePath = findLoadedItemPath(nextLibrary, currentActivePath);
+  if (persistedActivePath) {
+    return persistedActivePath;
+  }
+
+  const previousIndex = previousLibrary.findIndex((item) => isSamePath(item.path, currentActivePath));
+  if (previousIndex >= 0) {
+    const aboveItem = previousLibrary[previousIndex - 1];
+    if (aboveItem) {
+      const abovePath = findLoadedItemPath(nextLibrary, aboveItem.path);
+      if (abovePath) {
+        return abovePath;
+      }
+    }
+
+    const belowItem = previousLibrary[previousIndex + 1];
+    if (belowItem) {
+      const belowPath = findLoadedItemPath(nextLibrary, belowItem.path);
+      if (belowPath) {
+        return belowPath;
+      }
+    }
+
+    const nearestByIndex = nextLibrary[Math.min(previousIndex, Math.max(0, nextLibrary.length - 1))];
+    if (nearestByIndex?.isMetadataLoaded) {
+      return nearestByIndex.path;
+    }
+  }
+
+  return nextLibrary.find((item) => item.isMetadataLoaded)?.path ?? null;
+}
+
 export function useDesktopBridgeSubscriptions({
   audioMetaApi,
   library,
@@ -249,7 +295,9 @@ export function useDesktopBridgeSubscriptions({
           }
 
           try {
-            let nextLibrary = removeLibraryPaths(libraryRef.current, removedPaths);
+            const previousLibrary = libraryRef.current;
+            const previousActivePath = activePathRef.current;
+            let nextLibrary = removeLibraryPaths(previousLibrary, removedPaths);
             const pathsToRefresh = uniquePaths([...addedPaths, ...changedPaths]);
 
             if (pathsToRefresh.length > 0) {
@@ -263,16 +311,18 @@ export function useDesktopBridgeSubscriptions({
               nextLibrary = mergeIncrementalItems(nextLibrary, refreshedItems, loadedSourcePathsRef.current);
             }
 
+            const nextActivePath = pickRelevantActivePath(previousLibrary, nextLibrary, previousActivePath);
+            const previousActiveStillExists = previousActivePath
+              ? Boolean(findLoadedItemPath(nextLibrary, previousActivePath))
+              : false;
+            const didReplaceRemovedActivePath = Boolean(previousActivePath) && !previousActiveStillExists && Boolean(nextActivePath);
+            const didClearRemovedActivePath = Boolean(previousActivePath) && !previousActiveStillExists && !nextActivePath;
+
             libraryRef.current = nextLibrary;
             setLibrary(nextLibrary);
             setLibraryWidth(estimateLibraryWidthForItems(nextLibrary));
-            setActivePath((currentPath) => {
-              if (currentPath && nextLibrary.some((item) => item.path === currentPath && item.isMetadataLoaded)) {
-                return currentPath;
-              }
-
-              return nextLibrary.find((item) => item.isMetadataLoaded)?.path ?? null;
-            });
+            setActivePath(nextActivePath);
+            activePathRef.current = nextActivePath;
 
             const summaryParts: string[] = [];
             if (addedPaths.length > 0) {
@@ -287,7 +337,11 @@ export function useDesktopBridgeSubscriptions({
 
             setStatus(
               summaryParts.length > 0
-                ? `Applied incremental library update (${summaryParts.join(' ')}).`
+                ? didReplaceRemovedActivePath
+                  ? `Applied incremental library update (${summaryParts.join(' ')}). Selected track was removed, so focus moved to a nearby track.`
+                  : didClearRemovedActivePath
+                    ? `Applied incremental library update (${summaryParts.join(' ')}). Selected track was removed, so no track is selected.`
+                  : `Applied incremental library update (${summaryParts.join(' ')}).`
                 : 'Applied incremental library update.',
             );
           } catch (error) {
