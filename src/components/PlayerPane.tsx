@@ -85,6 +85,16 @@ function buildRemovedRanges(edit: PendingWaveEdit, trackDuration: number): Remov
   return removedRanges;
 }
 
+function getNormalizedExtension(item: AudioLibraryItem | null) {
+  const rawExtension = (item?.extension ?? '').trim().toLowerCase().replace(/^\./, '');
+  if (rawExtension) {
+    return rawExtension;
+  }
+
+  const pathExtension = item?.path.split('.').pop()?.trim().toLowerCase() ?? '';
+  return pathExtension.replace(/^\./, '');
+}
+
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
   {
     item,
@@ -163,7 +173,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const effectiveDuration = duration || item?.metadata.duration || 0;
   const splitStartTime = normalizedSelectionStart;
   const splitEndTime = normalizedSelectionEnd;
-  const canSplitTrackType = item?.extension.toLowerCase() === 'wav';
+  const trackExtension = getNormalizedExtension(item);
+  const canSplitTrackType = trackExtension === 'wav';
   const isFullTrackSelection =
     effectiveDuration > 0.01 &&
     normalizedSelectionStart <= 0.01 &&
