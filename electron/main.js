@@ -1114,6 +1114,14 @@ app.whenReady().then(async () => {
       : '%(section_title)s.%(ext)s';
     const expectedExtension = `.${downloadFormat.toLowerCase()}`;
     const commandStartedAt = Date.now();
+    const normalizeChapterKey = (value) =>
+      String(value || '')
+        .toLowerCase()
+        .replace(/[_-]+/g, ' ')
+        .replace(/[^a-z0-9\s]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    let chapterOrderHints = [];
     const normalizePathForComparison = (candidatePath) => {
       const normalized = path.resolve(candidatePath).replace(/\\/g, '/').replace(/\/+$/g, '');
       return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
@@ -1127,6 +1135,42 @@ app.whenReady().then(async () => {
 
     if (splitIntoChapters) {
       splitFullLengthTempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'ame-yt-split-'));
+
+      try {
+        const metadataArgs = [
+          '--no-playlist',
+          '--dump-single-json',
+          '--skip-download',
+          '--no-warnings',
+          parsedUrl.toString(),
+        ];
+        const { stdout: metadataStdout } = await runCommandCapture(ytDlpPath, metadataArgs);
+        const metadataLines = metadataStdout
+          .split(/\r?\n/g)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        let metadataPayload = null;
+
+        for (let index = metadataLines.length - 1; index >= 0; index -= 1) {
+          try {
+            metadataPayload = JSON.parse(metadataLines[index]);
+            break;
+          } catch {
+            // Continue scanning lines until a valid JSON payload is found.
+          }
+        }
+
+        if (metadataPayload && Array.isArray(metadataPayload.chapters)) {
+          chapterOrderHints = metadataPayload.chapters
+            .map((chapter, index) => ({
+              index: index + 1,
+              title: typeof chapter?.title === 'string' ? chapter.title.trim() : '',
+            }))
+            .filter((chapter) => Boolean(chapter.title));
+        }
+      } catch (chapterMetadataError) {
+        console.warn('[backend-action] audio:download-from-url:chapter-metadata-read-failed', chapterMetadataError);
+      }
     }
 
     try {
@@ -1257,6 +1301,53 @@ app.whenReady().then(async () => {
       if (splitIntoChapters && resolvedOutputPaths.length > 0) {
         try {
           const toPathKey = (candidatePath) => normalizePathForComparison(candidatePath);
+          const chapterIndicesByKey = new Map();
+
+          for (const chapter of chapterOrderHints) {
+            const key = normalizeChapterKey(chapter.title);
+            if (!key) {
+              continue;
+            }
+
+            const current = chapterIndicesByKey.get(key) ?? [];
+            current.push(chapter.index);
+            chapterIndicesByKey.set(key, current);
+          }
+
+          const orderedCandidates = resolvedOutputPaths.map((candidatePath, index) => {
+            const fileBaseName = path.parse(candidatePath).name;
+            const chapterKey = normalizeChapterKey(fileBaseName);
+            const chapterIndexes = chapterIndicesByKey.get(chapterKey);
+            const matchedChapterIndex = Array.isArray(chapterIndexes) && chapterIndexes.length > 0 ? chapterIndexes.shift() : null;
+
+            return {
+              candidatePath,
+              discoveredOrder: index,
+              matchedChapterIndex,
+            };
+          });
+
+          orderedCandidates.sort((left, right) => {
+            const leftMatched = typeof left.matchedChapterIndex === 'number';
+            const rightMatched = typeof right.matchedChapterIndex === 'number';
+
+            if (leftMatched && rightMatched) {
+              return left.matchedChapterIndex - right.matchedChapterIndex;
+            }
+
+            if (leftMatched) {
+              return -1;
+            }
+
+            if (rightMatched) {
+              return 1;
+            }
+
+            return left.discoveredOrder - right.discoveredOrder;
+          });
+
+          resolvedOutputPaths = orderedCandidates.map((entry) => entry.candidatePath);
+
           const chapterOrderByPath = new Map(
             resolvedOutputPaths.map((candidatePath, index) => [toPathKey(candidatePath), index + 1]),
           );
