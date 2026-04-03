@@ -52,7 +52,7 @@ type UseWaveSurferOptions = {
 
 const ZOOM_STEP_PX_PER_SEC = 20;
 const MAX_ZOOM_PX_PER_SEC = 400;
-const HORIZONTAL_SCROLL_SENSITIVITY = 1;
+const HORIZONTAL_SCROLL_SENSITIVITY = 12;
 const SELECTION_SNAP_TO_PLAYHEAD_SECONDS = 0.12;
 const DEFAULT_TIME_RULER_STEP_SECONDS = 5;
 
@@ -70,6 +70,32 @@ function pickTimeRulerStepSeconds(visibleDuration: number) {
   }
 
   return 60;
+}
+
+function getWaveSurferScrollElement(waveSurfer: WaveSurfer) {
+  const wrapper = (waveSurfer as WaveSurfer & { getWrapper?: () => HTMLElement }).getWrapper?.();
+  if (!wrapper) {
+    return null;
+  }
+
+  const root = wrapper.getRootNode();
+  if (!(root instanceof ShadowRoot)) {
+    return null;
+  }
+
+  return root.querySelector<HTMLElement>('[part="scroll"]');
+}
+
+function wheelDeltaToPixels(event: WheelEvent, delta: number, pageSize: number) {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return delta * 16;
+  }
+
+  if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+    return delta * Math.max(1, pageSize);
+  }
+
+  return delta;
 }
 
 function applyPersistentScrollbarStyle(waveSurfer: WaveSurfer) {
@@ -108,7 +134,7 @@ function applyPersistentScrollbarStyle(waveSurfer: WaveSurfer) {
     root.appendChild(style);
   }
 
-  const scrollElement = root.querySelector<HTMLElement>('[part="scroll"]');
+  const scrollElement = getWaveSurferScrollElement(waveSurfer);
   if (scrollElement) {
     scrollElement.style.overflowX = 'scroll';
   }
@@ -168,6 +194,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
 
     waveSurferRef.current = waveSurfer;
     applyPersistentScrollbarStyle(waveSurfer);
+    const scrollElement = getWaveSurferScrollElement(waveSurfer);
 
     const updateVisibleTimeframe = () => {
       if (waveSurferRef.current !== waveSurfer) {
@@ -327,7 +354,9 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       const hasHorizontalDelta = Math.abs(event.deltaX) > 0.01;
       const useShiftAsHorizontal = !hasHorizontalDelta && event.shiftKey && Math.abs(event.deltaY) > 0.01;
       if (hasHorizontalDelta || useShiftAsHorizontal) {
-        const delta = (hasHorizontalDelta ? event.deltaX : event.deltaY) * HORIZONTAL_SCROLL_SENSITIVITY;
+        const rawDelta = hasHorizontalDelta ? event.deltaX : event.deltaY;
+        const pageSize = scrollElement?.clientWidth || containerElement.clientWidth || 1;
+        const delta = wheelDeltaToPixels(event, rawDelta, pageSize) * HORIZONTAL_SCROLL_SENSITIVITY;
         const scrollableWaveSurfer = waveSurfer as WaveSurfer & {
           getScroll?: () => number;
           setScroll?: (value: number) => void;
@@ -362,14 +391,19 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       updateVisibleTimeframe();
     };
 
-    containerElement.addEventListener('wheel', handleWheelInteraction, { passive: false });
+    const wheelTargets = scrollElement && scrollElement !== containerElement ? [containerElement, scrollElement] : [containerElement];
+    wheelTargets.forEach((target) => {
+      target.addEventListener('wheel', handleWheelInteraction, { passive: false });
+    });
 
     return () => {
       if (hideSpinnerTimerRef.current !== null) {
         window.clearTimeout(hideSpinnerTimerRef.current);
         hideSpinnerTimerRef.current = null;
       }
-      containerElement.removeEventListener('wheel', handleWheelInteraction);
+      wheelTargets.forEach((target) => {
+        target.removeEventListener('wheel', handleWheelInteraction);
+      });
       waveSurfer.destroy();
       waveSurferRef.current = null;
       regionsPluginRef.current = null;
