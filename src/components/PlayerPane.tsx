@@ -49,11 +49,46 @@ function formatEditTime(seconds: number) {
 }
 
 function formatStepLabel(stepSeconds: number) {
+  if (stepSeconds < 1) {
+    const precision = stepSeconds < 0.5 ? 2 : 1;
+    return `${stepSeconds.toFixed(precision)}s`;
+  }
+
   if (stepSeconds >= 60 && stepSeconds % 60 === 0) {
     return `${Math.round(stepSeconds / 60)}m`;
   }
 
   return `${Math.round(stepSeconds)}s`;
+}
+
+function formatTimelineTickLabel(seconds: number, stepSeconds: number) {
+  if (stepSeconds >= 1) {
+    return formatDuration(seconds);
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.max(0, seconds - minutes * 60);
+  return `${String(minutes).padStart(2, '0')}:${remainder.toFixed(1).padStart(4, '0')}`;
+}
+
+function pickRulerTickStepSeconds(visibleSpanSeconds: number, preferredStepSeconds: number) {
+  if (visibleSpanSeconds <= 6) {
+    return 0.5;
+  }
+
+  if (visibleSpanSeconds <= 14) {
+    return 1;
+  }
+
+  if (visibleSpanSeconds <= 28) {
+    return 2;
+  }
+
+  if (visibleSpanSeconds <= 60) {
+    return 5;
+  }
+
+  return Math.max(5, preferredStepSeconds);
 }
 
 const MIN_VOLUME_DB = -48;
@@ -216,7 +251,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     ? Math.max(rulerStart, visibleTimeframe.end > rulerStart ? visibleTimeframe.end : fallbackRulerEnd)
     : 0;
   const rulerSpan = Math.max(0.01, rulerEnd - rulerStart);
-  const baseTickStepSeconds = Math.max(5, visibleTimeframe.tickStepSeconds || 5);
+  const preferredTickStepSeconds = Math.max(0.5, visibleTimeframe.tickStepSeconds || 5);
+  const baseTickStepSeconds = pickRulerTickStepSeconds(rulerSpan, preferredTickStepSeconds);
   const estimatedTickCount = Math.floor(rulerSpan / baseTickStepSeconds) + 1;
   const tickRenderStride = estimatedTickCount > 36 ? Math.ceil(estimatedTickCount / 36) : 1;
   const renderedTickStepSeconds = baseTickStepSeconds * tickRenderStride;
@@ -230,6 +266,13 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
       }
 
       timelineTicks.push(Number(tick.toFixed(4)));
+    }
+  }
+
+  if (item && timelineTicks.length === 0 && rulerEnd >= rulerStart) {
+    timelineTicks.push(Number(rulerStart.toFixed(4)));
+    if (rulerEnd - rulerStart > 0.2) {
+      timelineTicks.push(Number(rulerEnd.toFixed(4)));
     }
   }
 
@@ -521,14 +564,15 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           </span>
           <span>{item ? formatDuration(duration || item.metadata.duration) : '00:00'}</span>
         </div>
-        {item && timelineTicks.length > 0 ? (
+        {item ? (
           <div className="wave-time-ruler" aria-hidden="true">
             {timelineTicks.map((tick) => {
               const leftPercent = ((tick - rulerStart) / rulerSpan) * 100;
+              const shouldShowLabel = renderedTickStepSeconds >= 1 || Math.abs(tick - Math.round(tick)) < 0.001;
 
               return (
                 <div className="wave-time-tick" key={tick} style={{ left: `${Math.max(0, Math.min(100, leftPercent))}%` }}>
-                  <span>{formatDuration(tick)}</span>
+                  {shouldShowLabel ? <span>{formatTimelineTickLabel(tick, renderedTickStepSeconds)}</span> : null}
                 </div>
               );
             })}
