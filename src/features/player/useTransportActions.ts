@@ -638,9 +638,38 @@ export function useTransportActions({
 
         if (refreshedItems.length > 0) {
           setLibrary((items) => {
+            const canonicalCoverByAlbum = new Map<string, string>();
+            for (const item of items) {
+              const coverArt = item.metadata.coverArt;
+              if (!coverArt) {
+                continue;
+              }
+
+              const albumKey = normalizePathForComparison(item.directory);
+              if (!canonicalCoverByAlbum.has(albumKey)) {
+                canonicalCoverByAlbum.set(albumKey, coverArt);
+              }
+            }
+
             let nextItems = items;
             for (const refreshedItem of refreshedItems) {
-              nextItems = upsertLibraryItem(nextItems, refreshedItem);
+              const albumKey = normalizePathForComparison(refreshedItem.directory);
+              const canonicalCover = canonicalCoverByAlbum.get(albumKey);
+              let nextRefreshedItem = refreshedItem;
+
+              if (canonicalCover && refreshedItem.metadata.coverArt && refreshedItem.metadata.coverArt !== canonicalCover) {
+                nextRefreshedItem = {
+                  ...refreshedItem,
+                  metadata: {
+                    ...refreshedItem.metadata,
+                    coverArt: canonicalCover,
+                  },
+                };
+              } else if (!canonicalCover && refreshedItem.metadata.coverArt) {
+                canonicalCoverByAlbum.set(albumKey, refreshedItem.metadata.coverArt);
+              }
+
+              nextItems = upsertLibraryItem(nextItems, nextRefreshedItem);
             }
 
             setLibraryWidth(estimateLibraryWidthForItems(nextItems));
