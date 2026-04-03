@@ -16,6 +16,9 @@ export type LibraryProgressPayload = {
 
 export type LibraryChangedPayload = {
   changedPath: string;
+  addedPaths: string[];
+  removedPaths: string[];
+  changedPaths: string[];
   timestamp: number;
 };
 
@@ -60,6 +63,7 @@ export interface AudioMetaApi {
   openAudioFiles: () => Promise<string[]>;
   openDirectory: () => Promise<string[]>;
   loadLibrary: (paths: string[]) => Promise<AudioLibraryItem[]>;
+  loadLibraryIncremental: (paths: string[]) => Promise<AudioLibraryItem[]>;
   downloadFromUrl: (payload: DownloadFromUrlPayload) => Promise<DownloadFromUrlResult>;
   saveMetadata: (payload: SaveMetadataPayload) => Promise<SaveMetadataResult>;
   moveTrackToAlbum: (payload: MoveTrackToAlbumPayload) => Promise<MoveTrackToAlbumResult>;

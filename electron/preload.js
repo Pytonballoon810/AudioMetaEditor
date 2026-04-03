@@ -50,6 +50,12 @@ function describeAction(callName, phase, args, result, error) {
     if (phase === 'done') return `Library scan finished. Loaded ${Array.isArray(result) ? result.length : 0} track(s).`;
   }
 
+  if (callName === 'loadLibraryIncremental') {
+    const pathCount = Array.isArray(args?.[0]) ? args[0].length : 0;
+    if (phase === 'start') return `Refreshing ${pathCount} changed path(s) in the current library.`;
+    if (phase === 'done') return `Incremental library refresh finished. Loaded ${Array.isArray(result) ? result.length : 0} track(s).`;
+  }
+
   if (callName === 'saveMetadata') {
     const filePath = args?.[0]?.filePath;
     const name = fileNameFromPath(filePath);
@@ -161,6 +167,7 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   openAudioFiles: () => invokeLogged('openAudioFiles', 'dialog:open-audio-files'),
   openDirectory: () => invokeLogged('openDirectory', 'dialog:open-directory'),
   loadLibrary: (paths) => invokeLogged('loadLibrary', 'library:load', paths),
+  loadLibraryIncremental: (paths) => invokeLogged('loadLibraryIncremental', 'library:load-incremental', paths),
   downloadFromUrl: (payload) => invokeLogged('downloadFromUrl', 'audio:download-from-url', payload),
   saveMetadata: (payload) => invokeLogged('saveMetadata', 'metadata:save', payload),
   moveTrackToAlbum: (payload) => invokeLogged('moveTrackToAlbum', 'track:move-to-album', payload),

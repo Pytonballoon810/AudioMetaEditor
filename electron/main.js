@@ -62,7 +62,11 @@ let mainWindow = null;
 let pendingPaths = [];
 let libraryWatcher = null;
 let libraryWatcherDebounceTimer = null;
-let pendingLibraryChangedPath = null;
+let pendingLibraryChanges = {
+  added: new Set(),
+  removed: new Set(),
+  changed: new Set(),
+};
 let libraryWatcherReady = false;
 let libraryWatcherSuppressUntil = 0;
 let metadataWorker = null;
@@ -388,7 +392,11 @@ async function disposeLibraryWatcher() {
     libraryWatcherDebounceTimer = null;
   }
 
-  pendingLibraryChangedPath = null;
+  pendingLibraryChanges = {
+    added: new Set(),
+    removed: new Set(),
+    changed: new Set(),
+  };
   libraryWatcherReady = false;
   libraryWatcherSuppressUntil = 0;
 
@@ -406,7 +414,7 @@ async function disposeLibraryWatcher() {
   }
 }
 
-function scheduleLibraryChangedRefresh(changedPath) {
+function scheduleLibraryChangedRefresh(eventName, changedPath) {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
@@ -415,7 +423,19 @@ function scheduleLibraryChangedRefresh(changedPath) {
     return;
   }
 
-  pendingLibraryChangedPath = changedPath || pendingLibraryChangedPath || '(unknown path)';
+  const normalizedPath = changedPath || '(unknown path)';
+
+  if (eventName === 'add' || eventName === 'addDir') {
+    pendingLibraryChanges.added.add(normalizedPath);
+    pendingLibraryChanges.removed.delete(normalizedPath);
+    pendingLibraryChanges.changed.delete(normalizedPath);
+  } else if (eventName === 'unlink' || eventName === 'unlinkDir') {
+    pendingLibraryChanges.removed.add(normalizedPath);
+    pendingLibraryChanges.added.delete(normalizedPath);
+    pendingLibraryChanges.changed.delete(normalizedPath);
+  } else if (!pendingLibraryChanges.added.has(normalizedPath) && !pendingLibraryChanges.removed.has(normalizedPath)) {
+    pendingLibraryChanges.changed.add(normalizedPath);
+  }
 
   if (libraryWatcherDebounceTimer) {
     clearTimeout(libraryWatcherDebounceTimer);
@@ -425,15 +445,31 @@ function scheduleLibraryChangedRefresh(changedPath) {
     libraryWatcherDebounceTimer = null;
 
     if (!mainWindow || mainWindow.isDestroyed()) {
-      pendingLibraryChangedPath = null;
+      pendingLibraryChanges = {
+        added: new Set(),
+        removed: new Set(),
+        changed: new Set(),
+      };
       return;
     }
 
+    const addedPaths = Array.from(pendingLibraryChanges.added);
+    const removedPaths = Array.from(pendingLibraryChanges.removed);
+    const changedPaths = Array.from(pendingLibraryChanges.changed);
+    const changedPath = addedPaths[0] || removedPaths[0] || changedPaths[0] || '(unknown path)';
+
     mainWindow.webContents.send('library:changed', {
-      changedPath: pendingLibraryChangedPath || '(unknown path)',
+      changedPath,
+      addedPaths,
+      removedPaths,
+      changedPaths,
       timestamp: Date.now(),
     });
-    pendingLibraryChangedPath = null;
+    pendingLibraryChanges = {
+      added: new Set(),
+      removed: new Set(),
+      changed: new Set(),
+    };
   }, 420);
 }
 
@@ -480,7 +516,7 @@ async function configureLibraryWatcher(pathsToScan) {
       return;
     }
 
-    scheduleLibraryChangedRefresh(normalizedPath);
+    scheduleLibraryChangedRefresh(eventName, normalizedPath);
   };
 
   watcher.on('ready', () => {
@@ -662,6 +698,14 @@ app.whenReady().then(async () => {
     });
     await configureLibraryWatcher(pathsToScan);
     console.log('[backend-action] library:load:done', result.length);
+    return result;
+  });
+
+  registerIpcHandler('library:load-incremental', async (_event, pathsToScan) => {
+    validateLibraryLoadPayload(pathsToScan);
+    console.log('[backend-action] library:load-incremental:start', Array.isArray(pathsToScan) ? pathsToScan.length : 0);
+    const result = await buildLibrary(pathsToScan);
+    console.log('[backend-action] library:load-incremental:done', result.length);
     return result;
   });
 
