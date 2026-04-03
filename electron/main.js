@@ -2,6 +2,7 @@ const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { Worker } = require('node:worker_threads');
 const chokidar = require('chokidar');
 const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu, screen, shell } = require('electron');
 
@@ -9,7 +10,6 @@ const {
   buildLibrary,
   editAudioSelection,
   exportAudioSegment,
-  saveMetadata,
   convertAudioFormat,
   __testables,
 } = require('./media-service');
@@ -62,6 +62,9 @@ let pendingPaths = [];
 let libraryWatcher = null;
 let libraryWatcherDebounceTimer = null;
 let pendingLibraryChangedPath = null;
+let metadataWorker = null;
+let metadataWorkerRequestSequence = 0;
+const pendingMetadataWorkerRequests = new Map();
 const MAX_AUDIO_BLOB_BYTES = 80 * 1024 * 1024;
 const DEFAULT_WINDOW_WIDTH = 1520;
 const DEFAULT_WINDOW_HEIGHT = 940;
@@ -278,6 +281,96 @@ function registerIpcHandler(channel, handler) {
       throw new Error(`[${channel}] ${message}`);
     }
   });
+}
+
+function rejectPendingMetadataWorkerRequests(reason) {
+  if (pendingMetadataWorkerRequests.size === 0) {
+    return;
+  }
+
+  const error = reason instanceof Error ? reason : new Error(String(reason));
+  for (const pending of pendingMetadataWorkerRequests.values()) {
+    pending.reject(error);
+  }
+  pendingMetadataWorkerRequests.clear();
+}
+
+function ensureMetadataWorker() {
+  if (metadataWorker) {
+    return metadataWorker;
+  }
+
+  const worker = new Worker(path.join(__dirname, 'metadata-worker.js'));
+
+  worker.on('message', (payload) => {
+    const requestId = payload?.requestId;
+    if (typeof requestId !== 'number') {
+      return;
+    }
+
+    const pending = pendingMetadataWorkerRequests.get(requestId);
+    if (!pending) {
+      return;
+    }
+
+    pendingMetadataWorkerRequests.delete(requestId);
+
+    if (payload?.ok) {
+      pending.resolve(payload.result);
+      return;
+    }
+
+    pending.reject(new Error(payload?.error || 'Metadata save worker failed.'));
+  });
+
+  worker.on('error', (error) => {
+    console.error('[metadata-worker] Worker error:', error);
+    metadataWorker = null;
+    rejectPendingMetadataWorkerRequests(error);
+  });
+
+  worker.on('exit', (code) => {
+    metadataWorker = null;
+    if (code !== 0) {
+      rejectPendingMetadataWorkerRequests(new Error(`[metadata-worker] Exited with code ${code}`));
+    }
+  });
+
+  metadataWorker = worker;
+  return worker;
+}
+
+function saveMetadataInWorker(filePath, metadata) {
+  const worker = ensureMetadataWorker();
+  const requestId = metadataWorkerRequestSequence;
+  metadataWorkerRequestSequence += 1;
+
+  return new Promise((resolve, reject) => {
+    pendingMetadataWorkerRequests.set(requestId, { resolve, reject });
+    try {
+      worker.postMessage({ requestId, filePath, metadata });
+    } catch (error) {
+      pendingMetadataWorkerRequests.delete(requestId);
+      reject(error);
+    }
+  });
+}
+
+async function disposeMetadataWorker() {
+  rejectPendingMetadataWorkerRequests(new Error('Metadata worker is shutting down.'));
+
+  if (!metadataWorker) {
+    return;
+  }
+
+  const worker = metadataWorker;
+  metadataWorker = null;
+
+  try {
+    await worker.terminate();
+  } catch (error) {
+    console.warn('[metadata-worker] Failed to terminate cleanly:', error);
+  }
 }
 
 async function disposeLibraryWatcher() {
@@ -548,7 +641,7 @@ app.whenReady().then(async () => {
   registerIpcHandler('metadata:save', async (_event, payload) => {
     validateMetadataSavePayload(payload);
     console.log('[backend-action] metadata:save:start', payload?.filePath);
-    const result = await saveMetadata(payload.filePath, payload.metadata);
+    const result = await saveMetadataInWorker(payload.filePath, payload.metadata);
     console.log('[backend-action] metadata:save:done', result?.filePath || payload?.filePath);
     return {
       sourcePath: payload.filePath,
@@ -829,4 +922,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   void disposeLibraryWatcher();
+  void disposeMetadataWorker();
 });
