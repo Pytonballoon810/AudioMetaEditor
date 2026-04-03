@@ -39,6 +39,22 @@ export function useTransportActions({
   setDownloadUrl,
   setIsDownloadDialogOpen,
 }: UseTransportActionsArgs) {
+  const normalizePathForComparison = (pathValue: string) => pathValue.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
+
+  const upsertLibraryItem = (items: AudioLibraryItem[], nextItem: AudioLibraryItem) => {
+    const normalizedPath = normalizePathForComparison(nextItem.path);
+    const existingIndex = items.findIndex((item) => normalizePathForComparison(item.path) === normalizedPath);
+    if (existingIndex >= 0) {
+      const updated = [...items];
+      updated[existingIndex] = nextItem;
+      return updated;
+    }
+
+    const inserted = [...items, nextItem];
+    inserted.sort((left, right) => left.path.localeCompare(right.path));
+    return inserted;
+  };
+
   const [isExporting, setIsExporting] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isEditingSelection, setIsEditingSelection] = useState(false);
@@ -183,7 +199,29 @@ export function useTransportActions({
         nextSourcePaths.push(result.outputPath);
       }
 
-      await loadPaths(nextSourcePaths, result.outputPath);
+      if (!api.loadLibraryIncremental) {
+        await loadPaths(nextSourcePaths, result.outputPath);
+        setStatus(`Created split track at ${result.outputPath}.`);
+        return;
+      }
+
+      const refreshedItems = await api.loadLibraryIncremental([result.outputPath, activeItem.path]);
+      const refreshedOutputItem = refreshedItems.find(
+        (item) => normalizePathForComparison(item.path) === normalizePathForComparison(result.outputPath),
+      );
+
+      if (refreshedItems.length > 0) {
+        let mergedLibrary = library;
+        for (const refreshedItem of refreshedItems) {
+          mergedLibrary = upsertLibraryItem(mergedLibrary, refreshedItem);
+        }
+
+        setLibrary(mergedLibrary);
+        setLibraryWidth(estimateLibraryWidthForItems(mergedLibrary));
+      }
+
+      setLoadedSourcePaths(nextSourcePaths);
+      setActivePath(refreshedOutputItem?.path ?? result.outputPath);
       setStatus(`Created split track at ${result.outputPath}.`);
     } catch (error) {
       setStatus(toUserErrorMessage(error, 'Unable to split selected segment into a new track.'));
