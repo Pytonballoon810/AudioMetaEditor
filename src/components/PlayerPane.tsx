@@ -48,6 +48,16 @@ function formatEditTime(seconds: number) {
   return `${formatDuration(seconds)} (${seconds.toFixed(2)}s)`;
 }
 
+function formatDigitalSelectionTime(seconds: number) {
+  const totalHundredths = Math.max(0, Math.round(seconds * 100));
+  const minutes = Math.floor(totalHundredths / 6000);
+  const remainingHundredths = totalHundredths % 6000;
+  const wholeSeconds = Math.floor(remainingHundredths / 100);
+  const hundredths = remainingHundredths % 100;
+
+  return `${String(minutes).padStart(2, '0')}:${String(wholeSeconds).padStart(2, '0')}.${String(hundredths).padStart(2, '0')}`;
+}
+
 function formatStepLabel(stepSeconds: number) {
   if (stepSeconds < 1) {
     const precision = stepSeconds < 0.5 ? 2 : 1;
@@ -626,27 +636,42 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           Jump to selection
         </button>
         <div className="selection-grid">
-          <label>
-            Start
-            <input
-              min={0}
-              step={0.01}
-              type="number"
-              value={selection.start.toFixed(2)}
-              onChange={(event) =>
-                setSelection(Number(event.target.value), Math.max(Number(event.target.value), selection.end))
-              }
-            />
+          <label className="selection-tech-field">
+            <span className="selection-tech-label">Start</span>
+            <span className="selection-tech-readout">{formatDigitalSelectionTime(selection.start)}</span>
+            <span className="selection-tech-input-shell">
+              <span className="selection-tech-prefix">T+</span>
+              <input
+                className="selection-tech-input"
+                inputMode="decimal"
+                min={0}
+                step={0.01}
+                type="number"
+                value={selection.start.toFixed(2)}
+                onChange={(event) =>
+                  setSelection(Number(event.target.value), Math.max(Number(event.target.value), selection.end))
+                }
+              />
+              <span className="selection-tech-unit">s</span>
+            </span>
           </label>
-          <label>
-            End
-            <input
-              min={selection.start}
-              step={0.01}
-              type="number"
-              value={selection.end.toFixed(2)}
-              onChange={(event) => setSelection(selection.start, Number(event.target.value))}
-            />
+
+          <label className="selection-tech-field">
+            <span className="selection-tech-label">End</span>
+            <span className="selection-tech-readout">{formatDigitalSelectionTime(selection.end)}</span>
+            <span className="selection-tech-input-shell">
+              <span className="selection-tech-prefix">T+</span>
+              <input
+                className="selection-tech-input"
+                inputMode="decimal"
+                min={selection.start}
+                step={0.01}
+                type="number"
+                value={selection.end.toFixed(2)}
+                onChange={(event) => setSelection(selection.start, Number(event.target.value))}
+              />
+              <span className="selection-tech-unit">s</span>
+            </span>
           </label>
         </div>
         <div

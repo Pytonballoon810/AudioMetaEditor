@@ -1877,6 +1877,85 @@ textarea {
   flex: 1;
 }
 
+.selection-tech-field {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.5rem 0.6rem 0.55rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(12, 17, 22, 0.92), rgba(20, 26, 33, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+}
+
+.selection-tech-label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: rgba(117, 201, 255, 0.96);
+}
+
+.selection-tech-readout {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  font-size: 0.98rem;
+  color: rgba(255, 196, 217, 0.96);
+  text-shadow: 0 0 10px rgba(255, 94, 168, 0.28);
+}
+
+.selection-tech-input-shell {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 14, 18, 0.82);
+  padding: 0.32rem 0.45rem;
+}
+
+.selection-tech-prefix,
+.selection-tech-unit {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
+  font-variant-numeric: tabular-nums;
+  color: rgba(158, 178, 177, 0.92);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+}
+
+.selection-tech-input {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  padding: 0.36rem 0.5rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.selection-tech-input:focus {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 0 0 2px rgba(255, 94, 168, 0.2);
+}
+
+.selection-tech-input::-webkit-outer-spin-button,
+.selection-tech-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.selection-tech-input[type='number'] {
+  -moz-appearance: textfield;
+}
+
 .selection-grid label,
 .metadata-grid label {
   color: var(--muted);
