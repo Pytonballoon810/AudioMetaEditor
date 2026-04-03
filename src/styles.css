@@ -1499,6 +1499,13 @@ textarea {
   color: #eafff4;
 }
 
+.daw-tool-button-active:hover:not(:disabled),
+.daw-tool-button-active:focus-visible:not(:disabled) {
+  border-color: rgba(148, 255, 203, 0.9);
+  background: linear-gradient(180deg, rgba(54, 111, 86, 0.94), rgba(32, 68, 51, 0.98));
+  color: #f2fff8;
+}
+
 .daw-tool-button-accent {
   border-color: rgba(255, 142, 195, 0.45);
   background: linear-gradient(180deg, rgba(80, 55, 76, 0.9), rgba(46, 35, 44, 0.95));
