@@ -633,7 +633,32 @@ export function useTransportActions({
             )
           : downloadedPaths;
 
-      await loadPaths(nextSourcePaths, result.outputPath);
+      if (api.loadLibraryIncremental) {
+        const refreshedItems = await api.loadLibraryIncremental(downloadedPaths);
+
+        if (refreshedItems.length > 0) {
+          setLibrary((items) => {
+            let nextItems = items;
+            for (const refreshedItem of refreshedItems) {
+              nextItems = upsertLibraryItem(nextItems, refreshedItem);
+            }
+
+            setLibraryWidth(estimateLibraryWidthForItems(nextItems));
+            return nextItems;
+          });
+
+          const refreshedOutputPath =
+            refreshedItems.find((item) => isSamePath(item.path, result.outputPath))?.path ?? result.outputPath;
+          setActivePath(refreshedOutputPath);
+          setLoadedSourcePaths(nextSourcePaths);
+        } else {
+          // Fallback for environments where watcher updates are unavailable.
+          await loadPaths(nextSourcePaths, result.outputPath);
+        }
+      } else {
+        await loadPaths(nextSourcePaths, result.outputPath);
+      }
+
       setStatus(
         splitDownloadIntoChapters
           ? `Downloaded and split into ${downloadedPaths.length} chapter file${downloadedPaths.length === 1 ? '' : 's'}.`
