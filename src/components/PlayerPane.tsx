@@ -102,6 +102,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [waveformReloadSignal, setWaveformReloadSignal] = useState(0);
   const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [splitMode, setSplitMode] = useState<'keep' | 'slice'>('keep');
@@ -127,6 +128,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     audioUrl,
     onReady: handleReady,
     onTimeUpdate: setCurrentTime,
+    reloadSignal: waveformReloadSignal,
   });
 
   useImperativeHandle(
@@ -424,6 +426,19 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               </div>
             ) : null}
           </div>
+        </div>
+
+        <div className="daw-toolbar-group daw-toolbar-group-right">
+          <button
+            aria-label={isWaveformLoading ? 'Reloading waveform' : 'Reload waveform'}
+            className="daw-tool-button"
+            disabled={!item || isWaveformLoading}
+            onClick={() => setWaveformReloadSignal((current) => current + 1)}
+            title={isWaveformLoading ? 'Reloading waveform' : 'Reload waveform'}
+            type="button"
+          >
+            <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
+          </button>
         </div>
       </div>
 

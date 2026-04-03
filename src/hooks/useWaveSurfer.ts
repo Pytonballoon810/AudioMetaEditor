@@ -48,9 +48,10 @@ type UseWaveSurferOptions = {
   audioUrl: string | null;
   onReady?: (duration: number) => void;
   onTimeUpdate?: (currentTime: number) => void;
+  reloadSignal?: number;
 };
 
-export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurferOptions) {
+export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, reloadSignal = 0 }: UseWaveSurferOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null);
@@ -274,7 +275,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     return () => {
       isMounted = false;
     };
-  }, [audioUrl]);
+  }, [audioUrl, reloadSignal]);
 
   return {
     containerRef,
