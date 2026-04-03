@@ -161,6 +161,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const splitStartTime = hasValidSelection ? selection.start : 0;
   const splitEndTime = hasValidSelection ? selection.end : effectiveDuration;
   const hasValidSplitRange = splitEndTime > splitStartTime + 0.01;
+  const isFullTrackSplitRange =
+    hasValidSplitRange && splitStartTime <= 0.01 && splitEndTime >= Math.max(0, effectiveDuration - 0.01);
   const canSplitTrackType = item?.extension.toLowerCase() === 'wav';
   const canCutSelection =
     hasValidSelection && duration > 0.01 && !(selection.start <= 0.01 && selection.end >= duration - 0.01);
@@ -537,7 +539,9 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         </div>
         <button
           className="accent-button"
-          disabled={!item || isSplittingSelection || isConverting}
+          disabled={
+            !item || !hasValidSplitRange || isFullTrackSplitRange || !canSplitTrackType || isSplittingSelection || isConverting
+          }
           onClick={() => {
             setSplitMode('keep');
             setIsSplitModalOpen(true);
@@ -650,7 +654,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               </button>
               <button
                 className="primary-button"
-                disabled={!item || !canSplitTrackType || !hasValidSplitRange || isSplittingSelection}
+                disabled={!item || !canSplitTrackType || !hasValidSplitRange || isFullTrackSplitRange || isSplittingSelection}
                 onClick={() => void onSplitSelection(splitStartTime, splitEndTime, splitMode)}
                 type="button"
               >
