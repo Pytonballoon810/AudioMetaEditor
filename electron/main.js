@@ -3,6 +3,7 @@ const fsSync = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { Worker } = require('node:worker_threads');
+const { spawn } = require('node:child_process');
 const chokidar = require('chokidar');
 const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu, screen, shell } = require('electron');
 
@@ -15,9 +16,6 @@ const {
 } = require('./media-service');
 const { readFileAsBase64WithLimit } = require('./file-io');
 const {
-  getSupportedExtensionFromUrl,
-  extensionFromContentType,
-  fileNameFromUrl,
   ensureUniquePath,
   getLaunchPaths,
   isAllowedDownloadUrl,
@@ -211,6 +209,39 @@ async function moveFileWithFallback(sourcePath, destinationPath) {
     throw new Error('Moved file size mismatch after cross-device copy operation. Source was not removed.');
   }
   await fs.unlink(sourcePath);
+}
+
+function runCommandCapture(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (error) => {
+      reject(error);
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+        return;
+      }
+
+      reject(new Error(stderr || `${command} exited with code ${code}`));
+    });
+  });
 }
 
 function delay(milliseconds) {
@@ -879,6 +910,11 @@ app.whenReady().then(async () => {
       throw new Error('A valid URL is required.');
     }
 
+    const ytDlpPath = typeof payload.ytDlpPath === 'string' ? payload.ytDlpPath.trim() : '';
+    if (!ytDlpPath) {
+      throw new Error('A yt-dlp command path or alias is required.');
+    }
+
     let parsedUrl;
     try {
       parsedUrl = new URL(payload.url.trim());
@@ -893,24 +929,16 @@ app.whenReady().then(async () => {
       );
     }
 
-    const response = await net.fetch(parsedUrl.toString());
-    if (!response.ok) {
-      throw new Error(`Download failed (${response.status}).`);
-    }
-
-    const contentType = response.headers.get('content-type') || '';
-    const extension = extensionFromContentType(contentType) || getSupportedExtensionFromUrl(parsedUrl.toString());
-    if (!extension) {
-      throw new Error(
-        'Only direct MP3/WAV file URLs are supported. Streaming platform page URLs are not downloadable here.',
-      );
-    }
-
-    const defaultPath = path.join(app.getPath('downloads'), fileNameFromUrl(parsedUrl.toString(), extension));
+    const rawPathName = path.basename(parsedUrl.pathname || '').trim();
+    const safeBaseName = (rawPathName || 'audio-download')
+      .replace(/[<>:"/\\|?*]+/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const defaultPath = path.join(app.getPath('downloads'), safeBaseName || 'audio-download');
     const saveResult = await dialog.showSaveDialog({
-      title: 'Download audio from URL',
+      title: 'Download audio via yt-dlp',
       defaultPath,
-      filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac'] }],
+      filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac', 'm4a', 'opus', 'aac', 'ogg'] }],
     });
 
     if (saveResult.canceled || !saveResult.filePath) {
@@ -918,12 +946,44 @@ app.whenReady().then(async () => {
       return null;
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    await fs.writeFile(saveResult.filePath, Buffer.from(arrayBuffer));
+    const targetOutputPath = path.resolve(saveResult.filePath);
+    await fs.mkdir(path.dirname(targetOutputPath), { recursive: true });
 
-    console.log('[backend-action] audio:download-from-url:done', saveResult.filePath);
+    try {
+      const { stdout } = await runCommandCapture(ytDlpPath, [
+        '--no-playlist',
+        '--no-progress',
+        '--no-warnings',
+        '--print',
+        'after_move:filepath',
+        '--output',
+        targetOutputPath,
+        parsedUrl.toString(),
+      ]);
 
-    return { outputPath: saveResult.filePath };
+      const printedLines = stdout
+        .split(/\r?\n/g)
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const existingPrintedPath = printedLines
+        .slice()
+        .reverse()
+        .find((line) => fsSync.existsSync(line));
+      const outputPath = existingPrintedPath || targetOutputPath;
+
+      if (!fsSync.existsSync(outputPath)) {
+        throw new Error('yt-dlp finished but no output file was found at the expected location.');
+      }
+
+      console.log('[backend-action] audio:download-from-url:done', outputPath);
+      return { outputPath };
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        throw new Error(`Unable to run yt-dlp command "${ytDlpPath}". Check your Settings path or alias.`);
+      }
+
+      throw error;
+    }
   });
 
   registerIpcHandler('track:move-to-album', async (_event, payload) => {

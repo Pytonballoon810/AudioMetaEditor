@@ -20,6 +20,7 @@ type UseTransportActionsArgs = {
   downloadUrl: string;
   setDownloadUrl: (url: string) => void;
   setIsDownloadDialogOpen: (open: boolean) => void;
+  ytDlpPath: string;
 };
 
 export function useTransportActions({
@@ -38,6 +39,7 @@ export function useTransportActions({
   downloadUrl,
   setDownloadUrl,
   setIsDownloadDialogOpen,
+  ytDlpPath,
 }: UseTransportActionsArgs) {
   const normalizePathForComparison = (pathValue: string) => pathValue.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
 
@@ -416,12 +418,18 @@ export function useTransportActions({
       return;
     }
 
+    const ytDlpExecutable = ytDlpPath.trim();
+    if (!ytDlpExecutable) {
+      setStatus('Configure a yt-dlp path in Settings first.');
+      return;
+    }
+
     setIsDownloadingFromUrl(true);
     setStatus('Downloading audio from URL...');
 
     try {
       const api = requireAudioMetaApi();
-      const result = await api.downloadFromUrl({ url });
+      const result = await api.downloadFromUrl({ url, ytDlpPath: ytDlpExecutable });
       if (!result) {
         setStatus('Download cancelled.');
         return;

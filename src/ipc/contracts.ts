@@ -22,7 +22,7 @@ export type LibraryChangedPayload = {
   timestamp: number;
 };
 
-export type DownloadFromUrlPayload = { url: string };
+export type DownloadFromUrlPayload = { url: string; ytDlpPath?: string };
 export type DownloadFromUrlResult = { outputPath: string } | null;
 
 export type SaveMetadataPayload = { filePath: string; metadata: EditableMetadata };

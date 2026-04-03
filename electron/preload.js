@@ -146,7 +146,7 @@ function describeAction(callName, phase, args, result, error) {
   }
 
   if (callName === 'downloadFromUrl') {
-    if (phase === 'start') return 'Starting URL download. This supports direct MP3/WAV/FLAC file links only.';
+    if (phase === 'start') return 'Starting URL download via yt-dlp.';
     if (phase === 'done')
       return result ? `Download finished and saved to ${result.outputPath}.` : 'Download was cancelled by user.';
   }

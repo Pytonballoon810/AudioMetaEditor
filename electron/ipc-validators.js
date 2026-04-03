@@ -96,6 +96,10 @@ function validateDownloadFromUrlPayload(payload) {
   }
 
   assertString(payload.url, 'payload.url');
+
+  if (payload.ytDlpPath !== undefined) {
+    assertString(payload.ytDlpPath, 'payload.ytDlpPath');
+  }
 }
 
 function validateMoveTrackPayload(payload) {

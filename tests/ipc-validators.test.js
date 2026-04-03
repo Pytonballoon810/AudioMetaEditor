@@ -69,7 +69,11 @@ describe('ipc validators', () => {
 
   it('validates download payload', () => {
     expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3' })).not.toThrow();
+    expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3', ytDlpPath: 'yt-dlp' })).not.toThrow();
     expect(() => validateDownloadFromUrlPayload({ url: '' })).toThrow(/payload.url/);
+    expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3', ytDlpPath: '' })).toThrow(
+      /payload.ytDlpPath/,
+    );
     expect(() => validateDownloadFromUrlPayload(null)).toThrow(/payload/);
   });
 

@@ -57,6 +57,7 @@ export default function App() {
   const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
   const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState('');
+  const [ytDlpPath, setYtDlpPath] = useState(() => readStoredString(SETTINGS_YTDLP_PATH_KEY, ''));
   const [ytDlpPathDraft, setYtDlpPathDraft] = useState(() => readStoredString(SETTINGS_YTDLP_PATH_KEY, ''));
   const [metadataWidth, setMetadataWidth] = useState(() =>
     readStoredDimension(LAYOUT_METADATA_WIDTH_KEY, MIN_METADATA_WIDTH, MAX_METADATA_WIDTH, 400),
@@ -91,6 +92,7 @@ export default function App() {
   } = useLibraryState({ setStatus });
 
   const isAnyResizing = isLibraryResizing || isMetadataResizing || isStatusResizing;
+  const hasYtDlpConfigured = ytDlpPath.trim().length > 0;
 
   const composedLayoutStyle = useMemo(
     () =>
@@ -301,7 +303,14 @@ export default function App() {
     downloadUrl,
     setDownloadUrl,
     setIsDownloadDialogOpen,
+    ytDlpPath,
   });
+
+  useEffect(() => {
+    if (!hasYtDlpConfigured && isDownloadDialogOpen) {
+      setIsDownloadDialogOpen(false);
+    }
+  }, [hasYtDlpConfigured, isDownloadDialogOpen]);
 
   useEffect(() => {
     if (startupTimerRef.current !== null) {
@@ -362,13 +371,14 @@ export default function App() {
   }
 
   function openSettingsDialog() {
-    setYtDlpPathDraft(readStoredString(SETTINGS_YTDLP_PATH_KEY, ''));
+    setYtDlpPathDraft(ytDlpPath);
     setIsSettingsDialogOpen(true);
   }
 
   function saveSettings() {
     const nextValue = ytDlpPathDraft.trim();
     window.localStorage.setItem(SETTINGS_YTDLP_PATH_KEY, nextValue);
+    setYtDlpPath(nextValue);
     setStatus(nextValue ? `Saved yt-dlp path: ${nextValue}` : 'Saved yt-dlp path as empty.');
     setIsSettingsDialogOpen(false);
   }
@@ -403,9 +413,11 @@ export default function App() {
           <h1>Audio Meta Editor</h1>
         </div>
         <div className="action-row">
-          <button className="secondary-button" onClick={() => setIsDownloadDialogOpen(true)} type="button">
-            Download from URL
-          </button>
+          {hasYtDlpConfigured ? (
+            <button className="secondary-button" onClick={() => setIsDownloadDialogOpen(true)} type="button">
+              Download from URL
+            </button>
+          ) : null}
           <button className="secondary-button" onClick={() => void handleOpenFiles()} type="button">
             Open file
           </button>
@@ -524,7 +536,7 @@ export default function App() {
             <div className="download-dialog-heading">
               <p className="eyebrow">Import audio</p>
               <h2>Download from URL</h2>
-              <p>Supports direct MP3/WAV/FLAC file URLs.</p>
+              <p>Uses yt-dlp to download audio from supported URLs.</p>
             </div>
 
             <label>
@@ -575,7 +587,7 @@ export default function App() {
             <div className="download-dialog-heading">
               <p className="eyebrow">Settings</p>
               <h2>Download tools</h2>
-              <p>Set an optional yt-dlp path for environments where it is available.</p>
+              <p>Set the yt-dlp command path or alias used by Download from URL.</p>
             </div>
 
             <label className="settings-field">
