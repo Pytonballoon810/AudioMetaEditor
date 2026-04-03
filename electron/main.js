@@ -1113,6 +1113,20 @@ app.whenReady().then(async () => {
       : '%(section_title)s.%(ext)s';
     const expectedExtension = `.${downloadFormat.toLowerCase()}`;
     const commandStartedAt = Date.now();
+    const normalizePathForComparison = (candidatePath) => {
+      const normalized = path.resolve(candidatePath).replace(/\\/g, '/').replace(/\/+$/g, '');
+      return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    };
+    const isPathWithinDirectory = (candidatePath, directoryPath) => {
+      const normalizedCandidate = normalizePathForComparison(candidatePath);
+      const normalizedDirectory = normalizePathForComparison(directoryPath);
+      return normalizedCandidate === normalizedDirectory || normalizedCandidate.startsWith(`${normalizedDirectory}/`);
+    };
+    let splitFullLengthTempDirectory = null;
+
+    if (splitIntoChapters) {
+      splitFullLengthTempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'ame-yt-split-'));
+    }
 
     try {
       const commandArgs = [
@@ -1123,8 +1137,6 @@ app.whenReady().then(async () => {
         '--audio-format',
         downloadFormat,
         '--no-keep-video',
-        '--paths',
-        targetAlbumDirectory,
         '--no-progress',
         '--no-warnings',
         '--print',
@@ -1133,12 +1145,14 @@ app.whenReady().then(async () => {
 
       if (splitIntoChapters) {
         commandArgs.push('--split-chapters');
-        commandArgs.push('--output', `chapter:${chapterOutputTemplate}`);
+        commandArgs.push('--output', `chapter:${path.join(targetAlbumDirectory, chapterOutputTemplate)}`);
       }
 
       commandArgs.push(
         '--output',
-        outputTemplate,
+        splitIntoChapters
+          ? path.join(splitFullLengthTempDirectory, outputTemplate)
+          : path.join(targetAlbumDirectory, outputTemplate),
         parsedUrl.toString(),
       );
 
@@ -1160,32 +1174,32 @@ app.whenReady().then(async () => {
         }
       }
 
+      const collectRecentFiles = async (rootDirectory) => {
+        const stack = [rootDirectory];
+        const files = [];
+
+        while (stack.length > 0) {
+          const nextDirectory = stack.pop();
+          const entries = await fs.readdir(nextDirectory, { withFileTypes: true });
+
+          for (const entry of entries) {
+            const fullPath = path.join(nextDirectory, entry.name);
+            if (entry.isDirectory()) {
+              stack.push(fullPath);
+            } else if (entry.isFile()) {
+              files.push(fullPath);
+            }
+          }
+        }
+
+        return files;
+      };
+
       const expectedDiscoveredPaths = discoveredPaths.filter(
         (candidatePath) => path.extname(candidatePath).toLowerCase() === expectedExtension,
       );
 
       if (expectedDiscoveredPaths.length === 0) {
-        const collectRecentFiles = async (rootDirectory) => {
-          const stack = [rootDirectory];
-          const files = [];
-
-          while (stack.length > 0) {
-            const nextDirectory = stack.pop();
-            const entries = await fs.readdir(nextDirectory, { withFileTypes: true });
-
-            for (const entry of entries) {
-              const fullPath = path.join(nextDirectory, entry.name);
-              if (entry.isDirectory()) {
-                stack.push(fullPath);
-              } else if (entry.isFile()) {
-                files.push(fullPath);
-              }
-            }
-          }
-
-          return files;
-        };
-
         const candidatePaths = await collectRecentFiles(targetAlbumDirectory);
         const candidateStats = await Promise.all(
           candidatePaths
@@ -1219,12 +1233,30 @@ app.whenReady().then(async () => {
 
       let resolvedOutputPaths = [...expectedDiscoveredPaths];
 
+      if (splitIntoChapters) {
+        resolvedOutputPaths = resolvedOutputPaths.filter((candidatePath) => isPathWithinDirectory(candidatePath, targetAlbumDirectory));
+
+        if (resolvedOutputPaths.length === 0) {
+          const candidatePaths = await collectRecentFiles(targetAlbumDirectory);
+          const candidateStats = await Promise.all(
+            candidatePaths
+              .filter((candidatePath) => path.extname(candidatePath).toLowerCase() === expectedExtension)
+              .map(async (candidatePath) => ({
+                candidatePath,
+                stats: await fs.stat(candidatePath),
+              })),
+          );
+
+          resolvedOutputPaths = candidateStats
+            .filter((candidate) => candidate.stats.isFile() && candidate.stats.mtimeMs >= commandStartedAt - 5000)
+            .sort((left, right) => right.stats.mtimeMs - left.stats.mtimeMs)
+            .map((candidate) => candidate.candidatePath);
+        }
+      }
+
       if (isExistingAlbumTarget && resolvedOutputPaths.length > 0) {
         try {
-          const toPathKey = (candidatePath) => {
-            const normalized = path.resolve(candidatePath).replace(/\\/g, '/');
-            return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
-          };
+          const toPathKey = (candidatePath) => normalizePathForComparison(candidatePath);
           const downloadedPathKeys = new Set(resolvedOutputPaths.map((candidatePath) => toPathKey(candidatePath)));
           const albumItems = await buildLibrary([targetAlbumDirectory]);
           const sourceAlbumItem = albumItems.find(
@@ -1287,6 +1319,10 @@ app.whenReady().then(async () => {
       }
 
       throw error;
+    } finally {
+      if (splitFullLengthTempDirectory) {
+        await fs.rm(splitFullLengthTempDirectory, { recursive: true, force: true });
+      }
     }
   });
 

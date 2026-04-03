@@ -82,6 +82,13 @@ export function useTransportActions({
   };
 
   const getDirectoryParent = (directoryPath: string) => directoryPath.replace(/[/\\][^/\\]+$/, '');
+  const inferPathSeparator = (pathValue: string) => {
+    const lastForwardSlash = pathValue.lastIndexOf('/');
+    const lastBackslash = pathValue.lastIndexOf('\\');
+    return lastBackslash > lastForwardSlash ? '\\' : '/';
+  };
+  const appendPathSegment = (basePath: string, segment: string) =>
+    `${basePath.replace(/[/\\]+$/, '')}${inferPathSeparator(basePath)}${segment}`;
   const resolveDownloadParentDirectory = (existingDirectory: string) =>
     activeItem?.openedDirectoryRoot?.trim() ||
     library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot?.trim() ||
@@ -535,7 +542,7 @@ export function useTransportActions({
 
       payload.newAlbumName = newAlbumName;
       payload.newAlbumParentDirectory = parentDirectoryCandidate;
-      destinationDirectory = `${parentDirectoryCandidate.replace(/[/\\]+$/, '')}/${newAlbumName}`;
+      destinationDirectory = appendPathSegment(parentDirectoryCandidate, newAlbumName);
     } else {
       if (!splitDownloadIntoChapters) {
         setStatus('Enable chapter splitting to use video name as album.');
@@ -550,13 +557,13 @@ export function useTransportActions({
 
       payload.useVideoNameAsAlbum = true;
       payload.newAlbumParentDirectory = parentDirectoryCandidate;
-      destinationDirectory = `${parentDirectoryCandidate.replace(/[/\\]+$/, '')}/(video title)`;
+      destinationDirectory = appendPathSegment(parentDirectoryCandidate, '(video title)');
     }
 
     const startedAt = Date.now();
     const pendingPlaceholderPath = `__pending_download__/${startedAt}-${Math.random().toString(36).slice(2)}.pending`;
     let outputPlaceholderPaths: string[] = [];
-    const normalizedDestinationDirectory = destinationDirectory.replace(/\\/g, '/').replace(/\/+$/g, '') || destinationDirectory;
+    const normalizedDestinationDirectory = destinationDirectory.replace(/[/\\]+$/g, '') || destinationDirectory;
     const openedDirectoryRoot =
       activeItem?.openedDirectoryRoot ||
       library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot ||
