@@ -1162,10 +1162,7 @@ app.whenReady().then(async () => {
         .split(/\r?\n/g)
         .map((line) => line.trim())
         .filter(Boolean);
-      const existingPrintedPaths = printedLines
-        .slice()
-        .reverse()
-        .filter((line) => fsSync.existsSync(line));
+      const existingPrintedPaths = printedLines.filter((line) => fsSync.existsSync(line));
       const discoveredPaths = [];
 
       for (const candidatePath of existingPrintedPaths) {
@@ -1212,7 +1209,9 @@ app.whenReady().then(async () => {
 
         const recentFileCandidates = candidateStats
           .filter((candidate) => candidate.stats.isFile() && candidate.stats.mtimeMs >= commandStartedAt - 5000)
-          .sort((left, right) => right.stats.mtimeMs - left.stats.mtimeMs)
+          .sort((left, right) =>
+            splitIntoChapters ? left.stats.mtimeMs - right.stats.mtimeMs : right.stats.mtimeMs - left.stats.mtimeMs,
+          )
           .map((candidate) => candidate.candidatePath);
 
         for (const candidatePath of recentFileCandidates) {
@@ -1249,8 +1248,45 @@ app.whenReady().then(async () => {
 
           resolvedOutputPaths = candidateStats
             .filter((candidate) => candidate.stats.isFile() && candidate.stats.mtimeMs >= commandStartedAt - 5000)
-            .sort((left, right) => right.stats.mtimeMs - left.stats.mtimeMs)
+            .sort((left, right) => left.stats.mtimeMs - right.stats.mtimeMs)
             .map((candidate) => candidate.candidatePath);
+        }
+      }
+
+      if (splitIntoChapters && resolvedOutputPaths.length > 0) {
+        try {
+          const toPathKey = (candidatePath) => normalizePathForComparison(candidatePath);
+          const chapterOrderByPath = new Map(
+            resolvedOutputPaths.map((candidatePath, index) => [toPathKey(candidatePath), index + 1]),
+          );
+          const downloadedPathKeys = new Set(Array.from(chapterOrderByPath.keys()));
+          const albumItems = await buildLibrary([targetAlbumDirectory]);
+          const downloadedMetadataByPath = new Map(
+            albumItems
+              .filter((item) => downloadedPathKeys.has(toPathKey(item.path)) && item.isMetadataLoaded)
+              .map((item) => [toPathKey(item.path), item.metadata]),
+          );
+
+          const renumberedOutputPaths = [];
+          for (const outputCandidatePath of resolvedOutputPaths) {
+            const outputPathKey = toPathKey(outputCandidatePath);
+            const chapterTrackNumber = chapterOrderByPath.get(outputPathKey);
+            const currentMetadata = downloadedMetadataByPath.get(outputPathKey);
+            if (!chapterTrackNumber || !currentMetadata) {
+              renumberedOutputPaths.push(outputCandidatePath);
+              continue;
+            }
+
+            const saveResult = await saveMetadataInWorker(outputCandidatePath, {
+              ...currentMetadata,
+              track: String(chapterTrackNumber),
+            });
+            renumberedOutputPaths.push(saveResult.filePath);
+          }
+
+          resolvedOutputPaths = renumberedOutputPaths;
+        } catch (trackNumberApplyError) {
+          console.warn('[backend-action] audio:download-from-url:chapter-track-number-apply-failed', trackNumberApplyError);
         }
       }
 

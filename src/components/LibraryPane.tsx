@@ -147,6 +147,21 @@ function isSameDirectoryPath(leftPath: string, rightPath: string) {
   return normalizePathForUiComparison(leftPath) === normalizePathForUiComparison(rightPath);
 }
 
+function parseTrackNumber(value: string) {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const matched = normalized.match(/\d+/);
+  if (!matched) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(matched[0], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function clampMenuToPanel(panelRect: DOMRect, anchorX: number, anchorY: number, menuWidth: number, menuHeight: number) {
   const panelPadding = 8;
   const localX = anchorX - panelRect.left;
@@ -514,6 +529,23 @@ export function LibraryPane({
     });
 
     const trackComparator = (left: AudioLibraryItem, right: AudioLibraryItem) => {
+      const leftTrackNumber = parseTrackNumber(left.metadata.track);
+      const rightTrackNumber = parseTrackNumber(right.metadata.track);
+
+      if (leftTrackNumber !== null || rightTrackNumber !== null) {
+        if (leftTrackNumber === null) {
+          return 1;
+        }
+
+        if (rightTrackNumber === null) {
+          return -1;
+        }
+
+        if (leftTrackNumber !== rightTrackNumber) {
+          return leftTrackNumber - rightTrackNumber;
+        }
+      }
+
       if (sortMethod === 'title-asc') {
         return (left.metadata.title || left.name).localeCompare(right.metadata.title || right.name);
       }
