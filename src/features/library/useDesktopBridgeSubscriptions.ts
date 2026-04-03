@@ -81,9 +81,7 @@ function inferOpenedDirectoryRoot(filePath: string, loadedSourcePaths: string[])
 }
 
 function albumCoverGroupKey(item: AudioLibraryItem) {
-  const normalizedDirectory = normalizePathForComparison(item.directory);
-  const normalizedAlbum = (item.metadata.album || '').trim().toLowerCase();
-  return `${normalizedDirectory}::${normalizedAlbum}`;
+  return normalizePathForComparison(item.directory);
 }
 
 function removeLibraryPaths(items: AudioLibraryItem[], removedPaths: string[]) {
