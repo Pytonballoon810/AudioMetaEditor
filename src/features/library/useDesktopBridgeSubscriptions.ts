@@ -302,8 +302,7 @@ export function useDesktopBridgeSubscriptions({
 
             if (pathsToRefresh.length > 0) {
               if (!audioMetaApi.loadLibraryIncremental) {
-                setStatus(`Detected library file changes at ${nextBatch[0]?.changedPath || '(unknown path)'}. Refreshing...`);
-                await loadPaths(loadedSourcePathsRef.current, activePathRef.current);
+                setStatus('Incremental library refresh is unavailable. Restart the app to apply file updates without full reindexing.');
                 continue;
               }
 
@@ -367,5 +366,5 @@ export function useDesktopBridgeSubscriptions({
       dispose();
     };
 
-  }, [audioMetaApi, estimateLibraryWidthForItems, loadPaths, setActivePath, setLibrary, setLibraryWidth, setStatus]);
+  }, [audioMetaApi, estimateLibraryWidthForItems, setActivePath, setLibrary, setLibraryWidth, setStatus]);
 }

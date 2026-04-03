@@ -369,6 +369,15 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     ? pendingEdits.flatMap((edit) => buildRemovedRanges(edit, effectiveDuration))
     : [];
 
+  const confirmSplitSelection = () => {
+    if (!item || !canSplitTrackType || !canSplitSelection || !splitTrackTitleTrimmed) {
+      return;
+    }
+
+    setIsSplitModalOpen(false);
+    void onSplitSelection(splitStartTime, splitEndTime, splitMode, splitTrackTitleTrimmed);
+  };
+
   return (
     <section className="panel player-panel">
       <div className="hero-card">
@@ -763,7 +772,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' && item && canSplitTrackType && canSplitSelection && splitTrackTitleTrimmed) {
                     event.preventDefault();
-                    void onSplitSelection(splitStartTime, splitEndTime, splitMode, splitTrackTitleTrimmed);
+                    confirmSplitSelection();
                   }
                 }}
                 placeholder="Split track title"
@@ -818,7 +827,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               <button
                 className="primary-button"
                 disabled={!item || !canSplitTrackType || !canSplitSelection || isSplittingSelection || !splitTrackTitleTrimmed}
-                onClick={() => void onSplitSelection(splitStartTime, splitEndTime, splitMode, splitTrackTitleTrimmed)}
+                onClick={confirmSplitSelection}
                 type="button"
               >
                 {isSplittingSelection ? 'Splitting...' : 'Continue'}

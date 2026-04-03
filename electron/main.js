@@ -425,11 +425,11 @@ function scheduleLibraryChangedRefresh(eventName, changedPath) {
 
   const normalizedPath = changedPath || '(unknown path)';
 
-  if (eventName === 'add' || eventName === 'addDir') {
+  if (eventName === 'add') {
     pendingLibraryChanges.added.add(normalizedPath);
     pendingLibraryChanges.removed.delete(normalizedPath);
     pendingLibraryChanges.changed.delete(normalizedPath);
-  } else if (eventName === 'unlink' || eventName === 'unlinkDir') {
+  } else if (eventName === 'unlink') {
     pendingLibraryChanges.removed.add(normalizedPath);
     pendingLibraryChanges.added.delete(normalizedPath);
     pendingLibraryChanges.changed.delete(normalizedPath);
@@ -511,8 +511,7 @@ async function configureLibraryWatcher(pathsToScan) {
 
   const onFsChanged = (eventName, changedPath) => {
     const normalizedPath = typeof changedPath === 'string' ? path.resolve(changedPath) : '(unknown path)';
-    const isDirectoryEvent = eventName === 'addDir' || eventName === 'unlinkDir';
-    if (!isDirectoryEvent && !isAudioFilePath(normalizedPath)) {
+    if (!isAudioFilePath(normalizedPath)) {
       return;
     }
 
@@ -526,8 +525,6 @@ async function configureLibraryWatcher(pathsToScan) {
   watcher.on('add', (changedPath) => onFsChanged('add', changedPath));
   watcher.on('change', (changedPath) => onFsChanged('change', changedPath));
   watcher.on('unlink', (changedPath) => onFsChanged('unlink', changedPath));
-  watcher.on('addDir', (changedPath) => onFsChanged('addDir', changedPath));
-  watcher.on('unlinkDir', (changedPath) => onFsChanged('unlinkDir', changedPath));
   watcher.on('error', (error) => {
     console.warn('[library-watcher] Watcher error:', error);
   });
