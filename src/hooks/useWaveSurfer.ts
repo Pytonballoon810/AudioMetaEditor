@@ -346,23 +346,42 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     waveSurfer.on('zoom', updateVisibleTimeframe);
     waveSurfer.on('scroll', updateVisibleTimeframe);
 
-    const handleWheelInteraction = (event: WheelEvent) => {
+    const handleWheelInteraction = (rawEvent: Event) => {
+      const event = rawEvent as WheelEvent & { wheelDeltaX?: number };
       if (waveSurferRef.current !== waveSurfer || durationRef.current <= 0) {
         return;
       }
 
       const hasHorizontalDelta = Math.abs(event.deltaX) > 0.01;
-      const useShiftAsHorizontal = !hasHorizontalDelta && event.shiftKey && Math.abs(event.deltaY) > 0.01;
-      if (hasHorizontalDelta || useShiftAsHorizontal) {
-        const rawDelta = hasHorizontalDelta ? event.deltaX : event.deltaY;
+      const legacyHorizontalDelta =
+        typeof event.wheelDeltaX === 'number' && Math.abs(event.wheelDeltaX) > 0.01
+          ? (-event.wheelDeltaX / 120) * 40
+          : 0;
+      const hasLegacyHorizontalDelta = Math.abs(legacyHorizontalDelta) > 0.01;
+      const useShiftAsHorizontal = !hasHorizontalDelta && !hasLegacyHorizontalDelta && event.shiftKey && Math.abs(event.deltaY) > 0.01;
+      if (hasHorizontalDelta || hasLegacyHorizontalDelta || useShiftAsHorizontal) {
         const pageSize = scrollElement?.clientWidth || containerElement.clientWidth || 1;
-        const delta = wheelDeltaToPixels(event, rawDelta, pageSize) * HORIZONTAL_SCROLL_SENSITIVITY;
+        const rawDelta = hasHorizontalDelta
+          ? wheelDeltaToPixels(event, event.deltaX, pageSize)
+          : hasLegacyHorizontalDelta
+            ? legacyHorizontalDelta
+            : wheelDeltaToPixels(event, event.deltaY, pageSize);
+        const delta = rawDelta * HORIZONTAL_SCROLL_SENSITIVITY;
         const scrollableWaveSurfer = waveSurfer as WaveSurfer & {
           getScroll?: () => number;
           setScroll?: (value: number) => void;
         };
+
+        event.preventDefault();
+
+        if (scrollElement) {
+          const maxScroll = Math.max(0, scrollElement.scrollWidth - scrollElement.clientWidth);
+          const nextScroll = Math.max(0, Math.min(maxScroll, scrollElement.scrollLeft + delta));
+          scrollElement.scrollLeft = nextScroll;
+          return;
+        }
+
         if (scrollableWaveSurfer.getScroll && scrollableWaveSurfer.setScroll) {
-          event.preventDefault();
           const currentScroll = scrollableWaveSurfer.getScroll();
           const nextScroll = Math.max(0, currentScroll + delta);
           scrollableWaveSurfer.setScroll(nextScroll);
@@ -394,6 +413,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     const wheelTargets = scrollElement && scrollElement !== containerElement ? [containerElement, scrollElement] : [containerElement];
     wheelTargets.forEach((target) => {
       target.addEventListener('wheel', handleWheelInteraction, { passive: false });
+      target.addEventListener('mousewheel', handleWheelInteraction, { passive: false });
     });
 
     return () => {
@@ -403,6 +423,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       }
       wheelTargets.forEach((target) => {
         target.removeEventListener('wheel', handleWheelInteraction);
+        target.removeEventListener('mousewheel', handleWheelInteraction);
       });
       waveSurfer.destroy();
       waveSurferRef.current = null;
