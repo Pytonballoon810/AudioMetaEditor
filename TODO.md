@@ -22,4 +22,4 @@
 
 ## CD/CI
 
-- [ ] Add a workflow to automatically build and publish the app to GitHub releases when a tag is set.
+- [x] Add a workflow to automatically build and publish the app to GitHub releases when a tag is set.
