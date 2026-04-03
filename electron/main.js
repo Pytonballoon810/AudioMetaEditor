@@ -1259,11 +1259,38 @@ app.whenReady().then(async () => {
           const toPathKey = (candidatePath) => normalizePathForComparison(candidatePath);
           const downloadedPathKeys = new Set(resolvedOutputPaths.map((candidatePath) => toPathKey(candidatePath)));
           const albumItems = await buildLibrary([targetAlbumDirectory]);
-          const sourceAlbumItem = albumItems.find(
+          const sourceAlbumItems = albumItems.filter(
             (item) => item.isMetadataLoaded && !downloadedPathKeys.has(toPathKey(item.path)),
           );
 
-          if (sourceAlbumItem) {
+          if (sourceAlbumItems.length > 0) {
+            const pickInheritedValue = (fieldName) => {
+              for (const item of sourceAlbumItems) {
+                const value = item?.metadata?.[fieldName];
+                if (typeof value === 'string' && value.trim()) {
+                  return value;
+                }
+              }
+
+              return '';
+            };
+
+            const inheritedCoverArt =
+              sourceAlbumItems.find((item) => typeof item.metadata.coverArt === 'string' && item.metadata.coverArt.trim())
+                ?.metadata.coverArt || null;
+
+            const inheritedAlbumMetadata = {
+              album: pickInheritedValue('album'),
+              artist: pickInheritedValue('artist'),
+              albumArtist: pickInheritedValue('albumArtist'),
+              composer: pickInheritedValue('composer'),
+              producer: pickInheritedValue('producer'),
+              genre: pickInheritedValue('genre'),
+              year: pickInheritedValue('year'),
+              comment: pickInheritedValue('comment'),
+              coverArt: inheritedCoverArt,
+            };
+
             const downloadedMetadataByPath = new Map(
               albumItems
                 .filter((item) => downloadedPathKeys.has(toPathKey(item.path)) && item.isMetadataLoaded)
@@ -1283,11 +1310,16 @@ app.whenReady().then(async () => {
               const supportsCoverWrite = extension === '.mp3';
               const nextMetadata = {
                 ...currentMetadata,
-                album: sourceAlbumItem.metadata.album || currentMetadata.album,
-                artist: sourceAlbumItem.metadata.artist || currentMetadata.artist,
-                albumArtist: sourceAlbumItem.metadata.albumArtist || currentMetadata.albumArtist,
+                album: inheritedAlbumMetadata.album || currentMetadata.album,
+                artist: inheritedAlbumMetadata.artist || currentMetadata.artist,
+                albumArtist: inheritedAlbumMetadata.albumArtist || currentMetadata.albumArtist,
+                composer: inheritedAlbumMetadata.composer || currentMetadata.composer,
+                producer: inheritedAlbumMetadata.producer || currentMetadata.producer,
+                genre: inheritedAlbumMetadata.genre || currentMetadata.genre,
+                year: inheritedAlbumMetadata.year || currentMetadata.year,
+                comment: inheritedAlbumMetadata.comment || currentMetadata.comment,
                 coverArt: supportsCoverWrite
-                  ? sourceAlbumItem.metadata.coverArt || currentMetadata.coverArt
+                  ? inheritedAlbumMetadata.coverArt || currentMetadata.coverArt
                   : currentMetadata.coverArt,
               };
 
