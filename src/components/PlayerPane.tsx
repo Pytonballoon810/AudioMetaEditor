@@ -144,6 +144,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     setSelection,
     seekTo,
     reloadWaveform,
+    isAutoScrollEnabled,
+    toggleAutoScroll,
     setVolume: setWaveSurferVolume,
     visibleTimeframe,
   } = useWaveSurfer({
@@ -487,6 +489,16 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         </div>
 
         <div className="daw-toolbar-group daw-toolbar-group-right">
+          <button
+            aria-label={isAutoScrollEnabled ? 'Disable auto-scroll with playhead' : 'Enable auto-scroll with playhead'}
+            className={`daw-tool-button daw-tool-button-text${isAutoScrollEnabled ? ' daw-tool-button-active' : ''}`}
+            disabled={!item}
+            onClick={toggleAutoScroll}
+            title={isAutoScrollEnabled ? 'Auto-scroll: on' : 'Auto-scroll: off'}
+            type="button"
+          >
+            AS
+          </button>
           <button
             aria-label={isWaveformLoading ? 'Reloading waveform' : 'Reload waveform'}
             className="daw-tool-button"

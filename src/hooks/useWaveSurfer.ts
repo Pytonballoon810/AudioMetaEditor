@@ -53,6 +53,7 @@ type UseWaveSurferOptions = {
 const ZOOM_STEP_PX_PER_SEC = 20;
 const MAX_ZOOM_PX_PER_SEC = 400;
 const HORIZONTAL_SCROLL_SENSITIVITY = 1;
+const SELECTION_SNAP_TO_PLAYHEAD_SECONDS = 0.12;
 const DEFAULT_TIME_RULER_STEP_SECONDS = 5;
 
 function pickTimeRulerStepSeconds(visibleDuration: number) {
@@ -124,9 +125,11 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
   const loadingStartedAtRef = useRef(0);
   const hideSpinnerTimerRef = useRef<number | null>(null);
   const zoomPxPerSecRef = useRef(0);
+  const autoScrollEnabledRef = useRef(false);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isWaveformLoading, setIsWaveformLoading] = useState(false);
+  const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(false);
   const [visibleTimeframe, setVisibleTimeframe] = useState({
     start: 0,
     end: 0,
@@ -158,6 +161,8 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       barRadius: 999,
       normalize: true,
       dragToSeek: true,
+      autoScroll: autoScrollEnabledRef.current,
+      autoCenter: false,
       plugins: [regionsPlugin],
     });
 
@@ -278,11 +283,35 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     waveSurfer.on('finish', () => setIsPlaying(false));
 
     const handleRegionChange = (region: Region) => {
-      if (region.id === 'selection') {
-        const nextSelection = { start: region.start, end: region.end };
-        selectionRef.current = nextSelection;
-        setSelection(nextSelection);
+      if (region.id !== 'selection') {
+        return;
       }
+
+      const playhead = waveSurfer.getCurrentTime();
+      const shouldSnapStart = Math.abs(region.start - playhead) <= SELECTION_SNAP_TO_PLAYHEAD_SECONDS;
+      const shouldSnapEnd = Math.abs(region.end - playhead) <= SELECTION_SNAP_TO_PLAYHEAD_SECONDS;
+
+      let nextStart = shouldSnapStart ? playhead : region.start;
+      let nextEnd = shouldSnapEnd ? playhead : region.end;
+
+      if (nextEnd < nextStart) {
+        const normalizedStart = Math.max(0, nextEnd);
+        nextEnd = nextStart;
+        nextStart = normalizedStart;
+      }
+
+      const hasSnapAdjustment = Math.abs(nextStart - region.start) > 0.0001 || Math.abs(nextEnd - region.end) > 0.0001;
+      if (hasSnapAdjustment) {
+        try {
+          region.setOptions({ start: nextStart, end: nextEnd });
+        } catch (error) {
+          debugLog('[useWaveSurfer] Ignoring stale region snap update:', error);
+        }
+      }
+
+      const nextSelection = { start: nextStart, end: nextEnd };
+      selectionRef.current = nextSelection;
+      setSelection(nextSelection);
     };
 
     regionsPlugin.on('region-update', handleRegionChange);
@@ -450,10 +479,27 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     reloadWaveformSource(audioUrl);
   }, [audioUrl, reloadWaveformSource]);
 
+  const toggleAutoScroll = useCallback(() => {
+    const nextAutoScroll = !autoScrollEnabledRef.current;
+    autoScrollEnabledRef.current = nextAutoScroll;
+    setIsAutoScrollEnabled(nextAutoScroll);
+
+    const configurableWaveSurfer = waveSurferRef.current as
+      | (WaveSurfer & {
+          setOptions?: (options: { autoScroll?: boolean; autoCenter?: boolean }) => void;
+        })
+      | null;
+    configurableWaveSurfer?.setOptions?.({
+      autoScroll: nextAutoScroll,
+      autoCenter: false,
+    });
+  }, []);
+
   return {
     containerRef,
     isPlaying,
     isWaveformLoading,
+    isAutoScrollEnabled,
     visibleTimeframe,
     selection,
     playPause: () => {
@@ -516,5 +562,6 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     reloadWaveform: () => {
       reloadWaveformSource(audioUrl);
     },
+    toggleAutoScroll,
   };
 }
