@@ -179,46 +179,21 @@ async function getMusicMetadata() {
   return import('music-metadata');
 }
 
-async function scanDirectory(directoryPath, onTraversalProgress, traversalState) {
+async function scanDirectory(directoryPath) {
   const entries = await fs.readdir(directoryPath, { withFileTypes: true });
   const results = [];
 
-  if (traversalState && typeof traversalState === 'object') {
-    traversalState.totalEntries += entries.length;
-  }
-
   for (const entry of entries) {
     const resolvedPath = path.join(directoryPath, entry.name);
-    if (traversalState && typeof traversalState === 'object') {
-      traversalState.processedEntries += 1;
-    }
 
     if (entry.isDirectory()) {
       // Depth-first traversal keeps memory usage predictable on large libraries.
-      results.push(...(await scanDirectory(resolvedPath, onTraversalProgress, traversalState)));
-      if (typeof onTraversalProgress === 'function' && traversalState) {
-        onTraversalProgress({
-          processedEntries: traversalState.processedEntries,
-          totalEntries: traversalState.totalEntries,
-          discoveredFiles: traversalState.discoveredFiles,
-        });
-      }
+      results.push(...(await scanDirectory(resolvedPath)));
       continue;
     }
 
     if (entry.isFile() && isSupportedAudioFile(resolvedPath)) {
       results.push(resolvedPath);
-      if (traversalState && typeof traversalState === 'object') {
-        traversalState.discoveredFiles += 1;
-      }
-    }
-
-    if (typeof onTraversalProgress === 'function' && traversalState) {
-      onTraversalProgress({
-        processedEntries: traversalState.processedEntries,
-        totalEntries: traversalState.totalEntries,
-        discoveredFiles: traversalState.discoveredFiles,
-      });
     }
   }
 
@@ -530,33 +505,12 @@ async function extractMetadata(filePath) {
 async function buildLibrary(pathsToScan, onProgress) {
   const seen = new Set();
   const files = [];
-  const traversalState = {
-    processedEntries: 0,
-    totalEntries: 0,
-    discoveredFiles: 0,
-  };
-
-  const emitIndexingProgress = () => {
-    if (typeof onProgress !== 'function') {
-      return;
-    }
-
-    onProgress({
-      phase: 'indexing',
-      loaded: traversalState.processedEntries,
-      total: Math.max(traversalState.totalEntries, 1),
-      indexed: traversalState.discoveredFiles,
-      items: [],
-    });
-  };
 
   for (const selectedPath of pathsToScan) {
     const stats = await fs.stat(selectedPath);
     if (stats.isDirectory()) {
       const rootDirectory = path.resolve(selectedPath);
-      const nested = await scanDirectory(selectedPath, () => {
-        emitIndexingProgress();
-      }, traversalState);
+      const nested = await scanDirectory(selectedPath);
       for (const nestedPath of nested) {
         if (!seen.has(nestedPath)) {
           seen.add(nestedPath);
@@ -572,10 +526,6 @@ async function buildLibrary(pathsToScan, onProgress) {
 
     if (stats.isFile() && isSupportedAudioFile(selectedPath) && !seen.has(selectedPath)) {
       seen.add(selectedPath);
-      traversalState.processedEntries += 1;
-      traversalState.totalEntries += 1;
-      traversalState.discoveredFiles += 1;
-      emitIndexingProgress();
       files.push({
         path: selectedPath,
         openedDirectoryRoot: null,
@@ -598,7 +548,7 @@ async function buildLibrary(pathsToScan, onProgress) {
 
   if (typeof onProgress === 'function') {
     onProgress({
-      phase: 'metadata',
+      phase: 'discovering',
       loaded: 0,
       total: sortedFiles.length,
       indexed: sortedFiles.length,
@@ -622,7 +572,7 @@ async function buildLibrary(pathsToScan, onProgress) {
 
     if (typeof onProgress === 'function') {
       onProgress({
-        phase: 'metadata',
+        phase: 'indexing',
         loaded: index + 1,
         total: sortedFiles.length,
         indexed: sortedFiles.length,

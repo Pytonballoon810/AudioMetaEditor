@@ -7,7 +7,7 @@ export type ApiLogPayload = {
 };
 
 export type LibraryProgressPayload = {
-  phase?: 'indexing' | 'metadata';
+  phase?: 'discovering' | 'indexing';
   loaded: number;
   total: number;
   indexed?: number;

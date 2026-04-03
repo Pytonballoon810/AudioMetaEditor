@@ -88,14 +88,20 @@ export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
   const [libraryWidth, setLibraryWidth] = useState(initialLibraryWidthRef.current ?? 320);
   const [isLibraryResizing, setIsLibraryResizing] = useState(false);
   const layoutRef = useRef<HTMLElement | null>(null);
+  const isLoadingLibraryRef = useRef(false);
+  const activeLoadSignatureRef = useRef<string | null>(null);
+  const inFlightLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const queuedLoadRequestRef = useRef<{ paths: string[]; preferredActivePath: string | null; signature: string } | null>(
+    null,
+  );
   const audioMetaApi = getAudioMetaApi();
 
-  const loadPaths = useCallback(
-    async (paths: string[], preferredActivePath?: string | null) => {
-      if (paths.length === 0) {
-        return;
-      }
+  useEffect(() => {
+    isLoadingLibraryRef.current = isLoadingLibrary;
+  }, [isLoadingLibrary]);
 
+  const runLibraryLoad = useCallback(
+    async (paths: string[], preferredActivePath?: string | null) => {
       if (!audioMetaApi?.loadLibrary) {
         setStatus(DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE);
         return;
@@ -109,7 +115,7 @@ export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
       try {
         const items = await audioMetaApi.loadLibrary(paths);
         const preferredExists = preferredActivePath && items.some((item) => item.path === preferredActivePath);
-        const nextActivePath = preferredExists ? preferredActivePath : (items[0]?.path ?? null);
+        const nextActivePath = preferredExists ? preferredActivePath : (items.find((item) => item.isMetadataLoaded)?.path ?? null);
 
         setLibrary(items);
         setLoadedSourcePaths(paths);
@@ -139,6 +145,55 @@ export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
       }
     },
     [audioMetaApi, setStatus],
+  );
+
+  const loadPaths = useCallback(
+    async (paths: string[], preferredActivePath?: string | null) => {
+      if (paths.length === 0) {
+        return;
+      }
+
+      if (!audioMetaApi?.loadLibrary) {
+        setStatus(DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE);
+        return;
+      }
+
+      const signature = JSON.stringify({ paths, preferredActivePath: preferredActivePath ?? null });
+
+      if (isLoadingLibraryRef.current) {
+        if (activeLoadSignatureRef.current === signature && inFlightLoadPromiseRef.current) {
+          return inFlightLoadPromiseRef.current;
+        }
+
+        queuedLoadRequestRef.current = {
+          paths: [...paths],
+          preferredActivePath: preferredActivePath ?? null,
+          signature,
+        };
+        return inFlightLoadPromiseRef.current ?? Promise.resolve();
+      }
+
+      activeLoadSignatureRef.current = signature;
+
+      const inFlightPromise = runLibraryLoad(paths, preferredActivePath)
+        .finally(() => {
+          inFlightLoadPromiseRef.current = null;
+          activeLoadSignatureRef.current = null;
+        })
+        .then(async () => {
+          const queued = queuedLoadRequestRef.current;
+          queuedLoadRequestRef.current = null;
+          if (!queued || queued.signature === signature) {
+            return;
+          }
+
+          await loadPaths(queued.paths, queued.preferredActivePath);
+        });
+
+      inFlightLoadPromiseRef.current = inFlightPromise;
+      return inFlightPromise;
+    },
+    [audioMetaApi, runLibraryLoad, setStatus],
   );
 
   const startLibraryResize = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {

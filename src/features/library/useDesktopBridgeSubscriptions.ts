@@ -64,14 +64,8 @@ export function useDesktopBridgeSubscriptions({
     }
 
     const dispose = audioMetaApi.onLibraryProgress((payload: LibraryProgressPayload) => {
-      const phase = payload.phase ?? 'metadata';
+      const phase = payload.phase ?? 'indexing';
       onLibraryProgressPayload?.(payload);
-
-      if (phase === 'indexing') {
-        const discoveredCount = payload.indexed ?? 0;
-        setStatus(`Indexing directory entries... ${payload.loaded}/${payload.total} (${discoveredCount} track(s) found)`);
-        return;
-      }
 
       setLibrary(payload.items);
       setLibraryWidth(estimateLibraryWidthForItems(payload.items));
@@ -82,7 +76,13 @@ export function useDesktopBridgeSubscriptions({
 
         return payload.items.find((item) => item.isMetadataLoaded)?.path ?? null;
       });
-      setStatus(`Loading track metadata... ${payload.loaded}/${payload.total}`);
+
+      if (phase === 'discovering') {
+        setStatus(`Discovered ${payload.total} track(s). Preparing index...`);
+        return;
+      }
+
+      setStatus(`Indexing track metadata... ${payload.loaded}/${payload.total}`);
     });
 
     return dispose;
