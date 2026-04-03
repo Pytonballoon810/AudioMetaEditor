@@ -346,12 +346,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     waveSurfer.on('zoom', updateVisibleTimeframe);
     waveSurfer.on('scroll', updateVisibleTimeframe);
 
-    const handleWheelInteraction = (rawEvent: Event) => {
-      const event = rawEvent as WheelEvent & { wheelDeltaX?: number };
-      if (waveSurferRef.current !== waveSurfer || durationRef.current <= 0) {
-        return;
-      }
-
+    const scrollWaveformHorizontally = (event: WheelEvent & { wheelDeltaX?: number }) => {
       const hasHorizontalDelta = Math.abs(event.deltaX) > 0.01;
       const legacyHorizontalDelta =
         typeof event.wheelDeltaX === 'number' && Math.abs(event.wheelDeltaX) > 0.01
@@ -359,34 +354,53 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
           : 0;
       const hasLegacyHorizontalDelta = Math.abs(legacyHorizontalDelta) > 0.01;
       const useShiftAsHorizontal = !hasHorizontalDelta && !hasLegacyHorizontalDelta && event.shiftKey && Math.abs(event.deltaY) > 0.01;
-      if (hasHorizontalDelta || hasLegacyHorizontalDelta || useShiftAsHorizontal) {
-        const pageSize = scrollElement?.clientWidth || containerElement.clientWidth || 1;
-        const rawDelta = hasHorizontalDelta
-          ? wheelDeltaToPixels(event, event.deltaX, pageSize)
-          : hasLegacyHorizontalDelta
-            ? legacyHorizontalDelta
-            : wheelDeltaToPixels(event, event.deltaY, pageSize);
-        const delta = rawDelta * HORIZONTAL_SCROLL_SENSITIVITY;
-        const scrollableWaveSurfer = waveSurfer as WaveSurfer & {
-          getScroll?: () => number;
-          setScroll?: (value: number) => void;
-        };
+      if (!hasHorizontalDelta && !hasLegacyHorizontalDelta && !useShiftAsHorizontal) {
+        return false;
+      }
 
-        event.preventDefault();
+      const pageSize = scrollElement?.clientWidth || containerElement.clientWidth || 1;
+      const rawDelta = hasHorizontalDelta
+        ? wheelDeltaToPixels(event, event.deltaX, pageSize)
+        : hasLegacyHorizontalDelta
+          ? legacyHorizontalDelta
+          : wheelDeltaToPixels(event, event.deltaY, pageSize);
+      const delta = rawDelta * HORIZONTAL_SCROLL_SENSITIVITY;
+      const scrollableWaveSurfer = waveSurfer as WaveSurfer & {
+        getScroll?: () => number;
+        setScroll?: (value: number) => void;
+      };
 
-        if (scrollElement) {
-          const maxScroll = Math.max(0, scrollElement.scrollWidth - scrollElement.clientWidth);
-          const nextScroll = Math.max(0, Math.min(maxScroll, scrollElement.scrollLeft + delta));
-          scrollElement.scrollLeft = nextScroll;
-          return;
-        }
+      event.preventDefault();
 
-        if (scrollableWaveSurfer.getScroll && scrollableWaveSurfer.setScroll) {
-          const currentScroll = scrollableWaveSurfer.getScroll();
-          const nextScroll = Math.max(0, currentScroll + delta);
-          scrollableWaveSurfer.setScroll(nextScroll);
-          return;
-        }
+      if (scrollElement) {
+        const maxScroll = Math.max(0, scrollElement.scrollWidth - scrollElement.clientWidth);
+        const nextScroll = Math.max(0, Math.min(maxScroll, scrollElement.scrollLeft + delta));
+        scrollElement.scrollLeft = nextScroll;
+        return true;
+      }
+
+      if (scrollableWaveSurfer.getScroll && scrollableWaveSurfer.setScroll) {
+        const currentScroll = scrollableWaveSurfer.getScroll();
+        const nextScroll = Math.max(0, currentScroll + delta);
+        scrollableWaveSurfer.setScroll(nextScroll);
+        return true;
+      }
+
+      return false;
+    };
+
+    const handleWheelInteraction = (rawEvent: Event) => {
+      const event = rawEvent as WheelEvent & { wheelDeltaX?: number };
+      if (waveSurferRef.current !== waveSurfer || durationRef.current <= 0) {
+        return;
+      }
+
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (scrollWaveformHorizontally(event)) {
+        return;
       }
 
       if (event.deltaY === 0) {
@@ -416,6 +430,18 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       target.addEventListener('mousewheel', handleWheelInteraction, { passive: false });
     });
 
+    const handleGlobalHorizontalWheel = (rawEvent: Event) => {
+      const event = rawEvent as WheelEvent & { wheelDeltaX?: number };
+      if (waveSurferRef.current !== waveSurfer || durationRef.current <= 0 || event.defaultPrevented) {
+        return;
+      }
+
+      scrollWaveformHorizontally(event);
+    };
+
+    window.addEventListener('wheel', handleGlobalHorizontalWheel, { passive: false, capture: true });
+    window.addEventListener('mousewheel', handleGlobalHorizontalWheel, { passive: false, capture: true });
+
     return () => {
       if (hideSpinnerTimerRef.current !== null) {
         window.clearTimeout(hideSpinnerTimerRef.current);
@@ -425,6 +451,8 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
         target.removeEventListener('wheel', handleWheelInteraction);
         target.removeEventListener('mousewheel', handleWheelInteraction);
       });
+      window.removeEventListener('wheel', handleGlobalHorizontalWheel, { capture: true });
+      window.removeEventListener('mousewheel', handleGlobalHorizontalWheel, { capture: true });
       waveSurfer.destroy();
       waveSurferRef.current = null;
       regionsPluginRef.current = null;
