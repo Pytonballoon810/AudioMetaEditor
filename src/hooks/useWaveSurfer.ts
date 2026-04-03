@@ -130,14 +130,30 @@ function applyPersistentScrollbarStyle(waveSurfer: WaveSurfer) {
         border-radius: 999px;
         border: 2px solid rgba(16, 20, 22, 0.85);
       }
-      :host .region[data-id="selection"],
-      :host [part~="region"][data-id="selection"] {
-        pointer-events: none;
-      }
-      :host .region[data-id="selection"] .region-handle,
-      :host [part~="region"][data-id="selection"] .region-handle,
-      :host [part~="region"][data-id="selection"] [part~="region-handle"] {
+      :host .cursor,
+      :host [part~="cursor"] {
+        width: 14px !important;
+        margin-left: -7px;
+        background: transparent !important;
         pointer-events: auto;
+        cursor: ew-resize;
+        z-index: 8;
+      }
+
+      :host .cursor::before,
+      :host [part~="cursor"]::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 2px;
+        height: 100%;
+        transform: translateX(-50%);
+        background: #f4f1de;
+      }
+
+      :host .region-handle,
+      :host [part~="region-handle"] {
         cursor: ew-resize;
       }
     `;
@@ -267,7 +283,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
           id: 'selection',
           start: 0,
           end: duration,
-          drag: false,
+          drag: true,
           resize: true,
           color: 'rgba(255, 94, 168, 0.2)',
         });
