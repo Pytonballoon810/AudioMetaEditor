@@ -47,6 +47,19 @@ function formatEditTime(seconds: number) {
   return `${formatDuration(seconds)} (${seconds.toFixed(2)}s)`;
 }
 
+const MIN_VOLUME_DB = -48;
+
+function perceivedSliderToGain(sliderValue: number) {
+  const clampedSlider = Math.max(0, Math.min(1, sliderValue));
+  if (clampedSlider <= 0) {
+    return 0;
+  }
+
+  // Map linear slider travel to dB, then convert dB to amplitude gain.
+  const dbValue = MIN_VOLUME_DB + clampedSlider * Math.abs(MIN_VOLUME_DB);
+  return Math.pow(10, dbValue / 20);
+}
+
 function buildRemovedRanges(edit: PendingWaveEdit, trackDuration: number): RemovedRangeGuide[] {
   const normalizedStart = Math.max(0, Math.min(edit.startTime, trackDuration));
   const normalizedEnd = Math.max(normalizedStart, Math.min(edit.endTime, trackDuration));
@@ -140,7 +153,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
 
   const handleVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
-    setWaveSurferVolume(newVolume);
+    setWaveSurferVolume(perceivedSliderToGain(newVolume));
   };
 
   useEffect(() => {
