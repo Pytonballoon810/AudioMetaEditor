@@ -655,6 +655,48 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
     });
   }, []);
 
+  const playPause = useCallback(() => {
+    const waveSurfer = waveSurferRef.current;
+    if (!waveSurfer) {
+      return;
+    }
+
+    const duration = durationRef.current;
+    const { start, end } = selectionRef.current;
+    const epsilon = 0.03;
+    const hasPartialSelection = duration > epsilon && start > epsilon && end < duration - epsilon;
+
+    if (!waveSurfer.isPlaying() && hasPartialSelection) {
+      const currentTime = waveSurfer.getCurrentTime();
+      if (currentTime < start || currentTime > end) {
+        waveSurfer.seekTo(start / duration);
+      }
+    }
+
+    waveSurfer.playPause();
+  }, []);
+
+  const play = useCallback(() => {
+    const waveSurfer = waveSurferRef.current;
+    if (!waveSurfer || waveSurfer.isPlaying()) {
+      return;
+    }
+
+    const duration = durationRef.current;
+    const { start, end } = selectionRef.current;
+    const epsilon = 0.03;
+    const hasPartialSelection = duration > epsilon && start > epsilon && end < duration - epsilon;
+
+    if (hasPartialSelection) {
+      const currentTime = waveSurfer.getCurrentTime();
+      if (currentTime < start || currentTime > end) {
+        waveSurfer.seekTo(start / duration);
+      }
+    }
+
+    void waveSurfer.play();
+  }, []);
+
   return {
     containerRef,
     isPlaying,
@@ -662,46 +704,8 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
     isAutoScrollEnabled,
     visibleTimeframe,
     selection,
-    playPause: () => {
-      const waveSurfer = waveSurferRef.current;
-      if (!waveSurfer) {
-        return;
-      }
-
-      const duration = durationRef.current;
-      const { start, end } = selectionRef.current;
-      const epsilon = 0.03;
-      const hasPartialSelection = duration > epsilon && start > epsilon && end < duration - epsilon;
-
-      if (!waveSurfer.isPlaying() && hasPartialSelection) {
-        const currentTime = waveSurfer.getCurrentTime();
-        if (currentTime < start || currentTime > end) {
-          waveSurfer.seekTo(start / duration);
-        }
-      }
-
-      waveSurfer.playPause();
-    },
-    play: () => {
-      const waveSurfer = waveSurferRef.current;
-      if (!waveSurfer || waveSurfer.isPlaying()) {
-        return;
-      }
-
-      const duration = durationRef.current;
-      const { start, end } = selectionRef.current;
-      const epsilon = 0.03;
-      const hasPartialSelection = duration > epsilon && start > epsilon && end < duration - epsilon;
-
-      if (hasPartialSelection) {
-        const currentTime = waveSurfer.getCurrentTime();
-        if (currentTime < start || currentTime > end) {
-          waveSurfer.seekTo(start / duration);
-        }
-      }
-
-      void waveSurfer.play();
-    },
+    playPause,
+    play,
     seekTo: (time: number) => {
       const waveSurfer = waveSurferRef.current;
       if (!waveSurfer) {
