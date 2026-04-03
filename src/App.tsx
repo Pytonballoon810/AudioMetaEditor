@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
-import { LibraryPane } from './components/LibraryPane';
+import { LibraryPane, type LibraryPanePlaybackOrderGroup } from './components/LibraryPane';
 import { MetadataEditor } from './components/MetadataEditor';
 import { PlayerPane, type PlayerPaneHandle } from './components/PlayerPane';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -177,6 +177,7 @@ export default function App() {
   const [isStatusResizing, setIsStatusResizing] = useState(false);
   const [lastErrorStatus, setLastErrorStatus] = useState<string | null>(null);
   const [libraryLoadingProgress, setLibraryLoadingProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const playbackOrderGroupsRef = useRef<LibraryPanePlaybackOrderGroup[]>([]);
   const playerPaneRef = useRef<PlayerPaneHandle>(null);
   const mainColumnRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -452,13 +453,18 @@ export default function App() {
       return false;
     }
 
-    const playableItems = library.filter((item) => item.isMetadataLoaded);
-    const currentIndex = playableItems.findIndex((item) => item.path === activeItem.path);
-    if (currentIndex < 0 || currentIndex >= playableItems.length - 1) {
+    const activeGroup = playbackOrderGroupsRef.current.find((group) => group.trackPaths.includes(activeItem.path));
+    if (!activeGroup || activeGroup.trackPaths.length === 0) {
       return false;
     }
 
-    const nextItem = playableItems[currentIndex + 1];
+    const currentIndex = activeGroup.trackPaths.findIndex((trackPath) => trackPath === activeItem.path);
+    if (currentIndex < 0) {
+      return false;
+    }
+
+    const nextPath = activeGroup.trackPaths[(currentIndex + 1) % activeGroup.trackPaths.length];
+    const nextItem = library.find((item) => item.path === nextPath && item.isMetadataLoaded);
     if (!nextItem) {
       return false;
     }
@@ -467,6 +473,10 @@ export default function App() {
     setStatus(`Now playing: ${nextItem.metadata.title || nextItem.name}`);
     return true;
   }, [activeItem, library, setActivePath]);
+
+  const handlePlaybackOrderChange = useCallback((groups: LibraryPanePlaybackOrderGroup[]) => {
+    playbackOrderGroupsRef.current = groups;
+  }, []);
 
   useEffect(() => {
     if (!hasWebDownloadsEnabled && isDownloadDialogOpen) {
@@ -816,6 +826,7 @@ export default function App() {
           currentPath={activeItem?.path ?? null}
           isLoading={isLoadingLibrary}
           loadingProgress={libraryLoadingProgress}
+          onPlaybackOrderChange={handlePlaybackOrderChange}
           onApplyAlbumFields={handleApplyAlbumFields}
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
           onDuplicateTrack={handleDuplicateTrack}

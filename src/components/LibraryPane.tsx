@@ -30,6 +30,7 @@ type LibraryPaneProps = {
   currentPath: string | null;
   isLoading: boolean;
   loadingProgress: { loaded: number; total: number } | null;
+  onPlaybackOrderChange?: (groups: LibraryPanePlaybackOrderGroup[]) => void;
   onSelect: (item: AudioLibraryItem) => void;
   onApplyAlbumFields: (folderPath: string, metadata: AlbumBulkEditFields) => Promise<void>;
   onMoveTrackToAlbum: (item: AudioLibraryItem, targetDirectory: string) => Promise<void>;
@@ -37,6 +38,12 @@ type LibraryPaneProps = {
   onDeleteTrack: (item: AudioLibraryItem) => Promise<void>;
   onOpenFileLocation: (item: AudioLibraryItem) => Promise<void>;
   onReloadLibrary: () => Promise<void>;
+};
+
+export type LibraryPanePlaybackOrderGroup = {
+  groupKey: string;
+  folderPath: string;
+  trackPaths: string[];
 };
 
 export type AlbumBulkEditableValues = Pick<
@@ -344,6 +351,7 @@ export function LibraryPane({
   currentPath,
   isLoading,
   loadingProgress,
+  onPlaybackOrderChange,
   onSelect,
   onApplyAlbumFields,
   onMoveTrackToAlbum,
@@ -636,6 +644,20 @@ export function LibraryPane({
       })
       .sort(groupComparator);
   }, [filteredItems, sortMethod]);
+
+  useEffect(() => {
+    if (!onPlaybackOrderChange) {
+      return;
+    }
+
+    onPlaybackOrderChange(
+      groupedItems.map((group) => ({
+        groupKey: group.groupKey,
+        folderPath: group.folderPath,
+        trackPaths: group.items.filter((item) => item.isMetadataLoaded).map((item) => item.path),
+      })),
+    );
+  }, [groupedItems, onPlaybackOrderChange]);
 
   const albumEditSuggestions = useMemo<Record<AlbumEditableTextFieldKey, string[]>>(
     () => ({
