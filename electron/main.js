@@ -1121,6 +1121,8 @@ app.whenReady().then(async () => {
         .replace(/[^a-z0-9\s]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+    const normalizeDownloadedChapterName = (value) =>
+      normalizeChapterKey(String(value || '').replace(/\s*\(\d+\)\s*$/, ''));
     let chapterOrderHints = [];
     const normalizePathForComparison = (candidatePath) => {
       const normalized = path.resolve(candidatePath).replace(/\\/g, '/').replace(/\/+$/g, '');
@@ -1301,24 +1303,31 @@ app.whenReady().then(async () => {
       if (splitIntoChapters && resolvedOutputPaths.length > 0) {
         try {
           const toPathKey = (candidatePath) => normalizePathForComparison(candidatePath);
-          const chapterIndicesByKey = new Map();
-
-          for (const chapter of chapterOrderHints) {
-            const key = normalizeChapterKey(chapter.title);
-            if (!key) {
-              continue;
-            }
-
-            const current = chapterIndicesByKey.get(key) ?? [];
-            current.push(chapter.index);
-            chapterIndicesByKey.set(key, current);
-          }
+          const remainingChapterHints = chapterOrderHints
+            .map((chapter) => ({
+              index: chapter.index,
+              key: normalizeChapterKey(chapter.title),
+            }))
+            .filter((chapter) => Boolean(chapter.key));
 
           const orderedCandidates = resolvedOutputPaths.map((candidatePath, index) => {
             const fileBaseName = path.parse(candidatePath).name;
-            const chapterKey = normalizeChapterKey(fileBaseName);
-            const chapterIndexes = chapterIndicesByKey.get(chapterKey);
-            const matchedChapterIndex = Array.isArray(chapterIndexes) && chapterIndexes.length > 0 ? chapterIndexes.shift() : null;
+            const chapterKey = normalizeDownloadedChapterName(fileBaseName);
+            let matchedChapterIndex = null;
+
+            const exactMatchIndex = remainingChapterHints.findIndex((chapter) => chapter.key === chapterKey);
+            if (exactMatchIndex >= 0) {
+              const [matched] = remainingChapterHints.splice(exactMatchIndex, 1);
+              matchedChapterIndex = matched?.index ?? null;
+            } else if (chapterKey) {
+              const fuzzyMatchIndex = remainingChapterHints.findIndex(
+                (chapter) => chapter.key.includes(chapterKey) || chapterKey.includes(chapter.key),
+              );
+              if (fuzzyMatchIndex >= 0) {
+                const [matched] = remainingChapterHints.splice(fuzzyMatchIndex, 1);
+                matchedChapterIndex = matched?.index ?? null;
+              }
+            }
 
             return {
               candidatePath,
@@ -1369,11 +1378,24 @@ app.whenReady().then(async () => {
               continue;
             }
 
-            const saveResult = await saveMetadataInWorker(outputCandidatePath, {
-              ...currentMetadata,
-              track: String(chapterTrackNumber),
-            });
-            renumberedOutputPaths.push(saveResult.filePath);
+            const extension = path.extname(outputCandidatePath).toLowerCase();
+            const supportsCoverWrite = extension === '.mp3';
+
+            try {
+              const saveResult = await saveMetadataInWorker(outputCandidatePath, {
+                ...currentMetadata,
+                track: String(chapterTrackNumber),
+                coverArt: supportsCoverWrite ? currentMetadata.coverArt : null,
+              });
+              renumberedOutputPaths.push(saveResult.filePath);
+            } catch (chapterNumberWriteError) {
+              console.warn(
+                '[backend-action] audio:download-from-url:chapter-track-number-write-failed',
+                outputCandidatePath,
+                chapterNumberWriteError,
+              );
+              renumberedOutputPaths.push(outputCandidatePath);
+            }
           }
 
           resolvedOutputPaths = renumberedOutputPaths;
