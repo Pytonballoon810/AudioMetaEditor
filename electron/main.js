@@ -1106,11 +1106,10 @@ app.whenReady().then(async () => {
 
     await fs.mkdir(targetAlbumDirectory, { recursive: true });
 
-    const outputTemplatePath = splitIntoChapters
-      ? useVideoNameAsAlbum
-        ? path.join(targetAlbumDirectory, '%(title)s', '%(section_title)s.%(ext)s')
-        : path.join(targetAlbumDirectory, '%(section_title)s.%(ext)s')
-      : path.join(targetAlbumDirectory, '%(title)s.%(ext)s');
+    const outputTemplate = '%(title)s.%(ext)s';
+    const chapterOutputTemplate = useVideoNameAsAlbum
+      ? '%(title)s/%(section_title)s.%(ext)s'
+      : '%(section_title)s.%(ext)s';
     const expectedExtension = `.${downloadFormat.toLowerCase()}`;
     const commandStartedAt = Date.now();
 
@@ -1123,6 +1122,8 @@ app.whenReady().then(async () => {
         '--audio-format',
         downloadFormat,
         '--no-keep-video',
+        '--paths',
+        targetAlbumDirectory,
         '--no-progress',
         '--no-warnings',
         '--print',
@@ -1131,11 +1132,12 @@ app.whenReady().then(async () => {
 
       if (splitIntoChapters) {
         commandArgs.push('--split-chapters');
+        commandArgs.push('--output', `chapter:${chapterOutputTemplate}`);
       }
 
       commandArgs.push(
         '--output',
-        outputTemplatePath,
+        outputTemplate,
         parsedUrl.toString(),
       );
 
