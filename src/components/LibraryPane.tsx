@@ -1321,12 +1321,14 @@ export function LibraryPane({
                     </div>
                   ) : group.uniqueCovers.length > 0 ? (
                     <div className="library-album-covers" aria-hidden="true">
-                      <img
-                        key={`${group.folderPath}-cover`}
-                        className="library-album-cover"
-                        src={group.uniqueCovers[0] ?? undefined}
-                        alt=""
-                      />
+                      {group.uniqueCovers.map((cover, index) => (
+                        <img
+                          key={`${group.folderPath}-cover-${index}`}
+                          className="library-album-cover"
+                          src={cover ?? undefined}
+                          alt=""
+                        />
+                      ))}
                     </div>
                   ) : (
                     <div className="library-album-covers placeholder" aria-hidden="true" />

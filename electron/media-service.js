@@ -875,7 +875,6 @@ async function saveMetadata(filePath, metadata) {
   const parsedCoverArt = parseDataUrl(metadata.coverArt);
   const coverArt = normalizeCoverArt(parsedCoverArt);
   const tempCoverSourcePath = coverArt ? path.join(os.tmpdir(), `cover-src-${Date.now()}.${coverArt.extension}`) : null;
-  const tempCoverPath = coverArt ? path.join(os.tmpdir(), `cover-${Date.now()}.jpg`) : null;
   const supportsEmbeddedCover = extension === '.mp3';
   const backupPath = await createSafetyBackup(filePath);
   let commitSucceeded = false;
@@ -917,21 +916,21 @@ async function saveMetadata(filePath, metadata) {
   }
 
   if (supportsEmbeddedCover) {
-    // Always remap MP3 output from audio stream, then optionally attach a normalized JPEG cover.
-    // This prevents stale/unsupported artwork payloads and improves external server compatibility.
+    // Remap MP3 output from audio stream, then optionally attach the provided cover image.
+    // Preserve PNG/JPEG format so copied artwork remains byte-stable across album tracks.
     outputArgs.push('-map', '0:a', '-c:a', 'copy');
 
-    if (tempCoverSourcePath && tempCoverPath) {
+    if (tempCoverSourcePath && coverArt) {
       await fs.writeFile(tempCoverSourcePath, coverArt.buffer);
-      await runFfmpeg(['-y', '-i', tempCoverSourcePath, '-frames:v', '1', '-q:v', '2', tempCoverPath]);
+      args.push('-i', tempCoverSourcePath);
 
-      args.push('-i', tempCoverPath);
+      const coverCodec = coverArt.extension === 'png' ? 'png' : 'mjpeg';
 
       outputArgs.push(
         '-map',
         '1:v',
         '-c:v',
-        'mjpeg',
+        coverCodec,
         '-metadata:s:v',
         'title=Album cover',
         '-metadata:s:v',
@@ -1035,9 +1034,6 @@ async function saveMetadata(filePath, metadata) {
     await fs.rm(tempOutput, { force: true });
     if (tempCoverSourcePath) {
       await fs.rm(tempCoverSourcePath, { force: true });
-    }
-    if (tempCoverPath) {
-      await fs.rm(tempCoverPath, { force: true });
     }
 
     if (backupPath && (commitSucceeded || rollbackCompleted)) {
