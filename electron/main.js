@@ -1071,8 +1071,9 @@ app.whenReady().then(async () => {
     const splitIntoChapters = payload.splitIntoChapters === true;
     const useVideoNameAsAlbum = payload.useVideoNameAsAlbum === true;
 
+    const isExistingAlbumTarget = typeof payload.targetAlbumDirectory === 'string' && payload.targetAlbumDirectory.trim();
     let targetAlbumDirectory = '';
-    if (typeof payload.targetAlbumDirectory === 'string' && payload.targetAlbumDirectory.trim()) {
+    if (isExistingAlbumTarget) {
       const rawTargetDirectory = payload.targetAlbumDirectory.trim();
       if (!path.isAbsolute(rawTargetDirectory)) {
         throw new Error('Download target directory must be an absolute path.');
@@ -1216,16 +1217,69 @@ app.whenReady().then(async () => {
         );
       }
 
-      const outputPath = expectedDiscoveredPaths[0] || '';
+      let resolvedOutputPaths = [...expectedDiscoveredPaths];
+
+      if (isExistingAlbumTarget && resolvedOutputPaths.length > 0) {
+        try {
+          const toPathKey = (candidatePath) => {
+            const normalized = path.resolve(candidatePath).replace(/\\/g, '/');
+            return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+          };
+          const downloadedPathKeys = new Set(resolvedOutputPaths.map((candidatePath) => toPathKey(candidatePath)));
+          const albumItems = await buildLibrary([targetAlbumDirectory]);
+          const sourceAlbumItem = albumItems.find(
+            (item) => item.isMetadataLoaded && !downloadedPathKeys.has(toPathKey(item.path)),
+          );
+
+          if (sourceAlbumItem) {
+            const downloadedMetadataByPath = new Map(
+              albumItems
+                .filter((item) => downloadedPathKeys.has(toPathKey(item.path)) && item.isMetadataLoaded)
+                .map((item) => [toPathKey(item.path), item.metadata]),
+            );
+            const nextOutputPaths = [];
+
+            for (const outputCandidatePath of resolvedOutputPaths) {
+              const outputPathKey = toPathKey(outputCandidatePath);
+              const currentMetadata = downloadedMetadataByPath.get(outputPathKey);
+              if (!currentMetadata) {
+                nextOutputPaths.push(outputCandidatePath);
+                continue;
+              }
+
+              const extension = path.extname(outputCandidatePath).toLowerCase();
+              const supportsCoverWrite = extension === '.mp3';
+              const nextMetadata = {
+                ...currentMetadata,
+                album: sourceAlbumItem.metadata.album || currentMetadata.album,
+                artist: sourceAlbumItem.metadata.artist || currentMetadata.artist,
+                albumArtist: sourceAlbumItem.metadata.albumArtist || currentMetadata.albumArtist,
+                coverArt: supportsCoverWrite
+                  ? sourceAlbumItem.metadata.coverArt || currentMetadata.coverArt
+                  : currentMetadata.coverArt,
+              };
+
+              const saveResult = await saveMetadataInWorker(outputCandidatePath, nextMetadata);
+              nextOutputPaths.push(saveResult.filePath);
+            }
+
+            resolvedOutputPaths = nextOutputPaths;
+          }
+        } catch (metadataApplyError) {
+          console.warn('[backend-action] audio:download-from-url:album-metadata-apply-failed', metadataApplyError);
+        }
+      }
+
+      const outputPath = resolvedOutputPaths[0] || '';
 
       if (!fsSync.existsSync(outputPath)) {
         throw new Error('yt-dlp finished but no output file was found at the expected location.');
       }
 
-      console.log('[backend-action] audio:download-from-url:done', outputPath, expectedDiscoveredPaths.length);
+      console.log('[backend-action] audio:download-from-url:done', outputPath, resolvedOutputPaths.length);
       return {
         outputPath,
-        outputPaths: expectedDiscoveredPaths,
+        outputPaths: resolvedOutputPaths,
       };
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
