@@ -180,6 +180,26 @@ function normalizeAlbumValue(rawValue: string) {
   return value || '(empty)';
 }
 
+function pickCanonicalAlbumName(albumCounts: Map<string, number>) {
+  const entries = Array.from(albumCounts.entries());
+  if (entries.length === 0) {
+    return '(empty)';
+  }
+
+  const nonEmptyEntries = entries.filter(([albumName]) => albumName !== '(empty)');
+  const source = nonEmptyEntries.length > 0 ? nonEmptyEntries : entries;
+
+  source.sort((left, right) => {
+    if (right[1] !== left[1]) {
+      return right[1] - left[1];
+    }
+
+    return left[0].localeCompare(right[0]);
+  });
+
+  return source[0]?.[0] ?? '(empty)';
+}
+
 function mostFrequentMetadataValue(items: AudioLibraryItem[], selector: (item: AudioLibraryItem) => string) {
   const counts = new Map<string, number>();
   let mostCommon = '';
@@ -583,14 +603,7 @@ export function LibraryPane({
           loadedAlbumCounts.set(albumName, (loadedAlbumCounts.get(albumName) ?? 0) + 1);
         });
 
-        const albumNameEntries = Array.from(loadedAlbumCounts.entries()).sort((left, right) => {
-          if (right[1] !== left[1]) {
-            return right[1] - left[1];
-          }
-
-          return left[0].localeCompare(right[0]);
-        });
-        const canonicalAlbumName = albumNameEntries[0]?.[0] ?? '(empty)';
+        const canonicalAlbumName = pickCanonicalAlbumName(loadedAlbumCounts);
         const mismatchedTrackPaths = new Set(
           loadedItems
             .filter((item) => normalizeAlbumValue(item.metadata.album) !== canonicalAlbumName)

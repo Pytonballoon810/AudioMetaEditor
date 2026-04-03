@@ -12,21 +12,37 @@ function normalizeMetadataValue(value: string) {
 
 function mostFrequentValue(items: AudioLibraryItem[], selector: (item: AudioLibraryItem) => string) {
   const counts = new Map<string, number>();
-  let candidate = '';
-  let highestCount = 0;
+  const nonEmptyCounts = new Map<string, number>();
 
   items.forEach((item) => {
     const value = normalizeMetadataValue(selector(item));
     const nextCount = (counts.get(value) ?? 0) + 1;
     counts.set(value, nextCount);
 
-    if (nextCount > highestCount || (nextCount === highestCount && value.localeCompare(candidate) < 0)) {
-      highestCount = nextCount;
-      candidate = value;
+    if (value) {
+      nonEmptyCounts.set(value, (nonEmptyCounts.get(value) ?? 0) + 1);
     }
   });
 
-  return candidate;
+  const selectBest = (source: Map<string, number>) => {
+    let candidate = '';
+    let highestCount = 0;
+
+    source.forEach((count, value) => {
+      if (count > highestCount || (count === highestCount && value.localeCompare(candidate) < 0)) {
+        highestCount = count;
+        candidate = value;
+      }
+    });
+
+    return candidate;
+  };
+
+  if (nonEmptyCounts.size > 0) {
+    return selectBest(nonEmptyCounts);
+  }
+
+  return selectBest(counts);
 }
 
 function folderNameFromPath(directoryPath: string) {
