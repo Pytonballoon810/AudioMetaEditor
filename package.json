@@ -82,7 +82,9 @@
       "mimeTypes": [
         "audio/mpeg",
         "audio/wav",
-        "audio/x-wav"
+        "audio/x-wav",
+        "audio/flac",
+        "audio/x-flac"
       ]
     },
     "mac": {
@@ -107,12 +109,19 @@
         "name": "WAV Audio",
         "mimeType": "audio/wav",
         "role": "Viewer"
+      },
+      {
+        "ext": "flac",
+        "name": "FLAC Audio",
+        "mimeType": "audio/flac",
+        "role": "Viewer"
       }
     ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "perMachine": false
+      "perMachine": false,
+      "include": "build/installer/windows-associations.nsh"
     }
   }
 }
