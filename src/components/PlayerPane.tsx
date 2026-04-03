@@ -639,39 +639,11 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           <label className="selection-tech-field">
             <span className="selection-tech-label">Start</span>
             <span className="selection-tech-readout">{formatDigitalSelectionTime(selection.start)}</span>
-            <span className="selection-tech-input-shell">
-              <span className="selection-tech-prefix">T+</span>
-              <input
-                className="selection-tech-input"
-                inputMode="decimal"
-                min={0}
-                step={0.01}
-                type="number"
-                value={selection.start.toFixed(2)}
-                onChange={(event) =>
-                  setSelection(Number(event.target.value), Math.max(Number(event.target.value), selection.end))
-                }
-              />
-              <span className="selection-tech-unit">s</span>
-            </span>
           </label>
 
           <label className="selection-tech-field">
             <span className="selection-tech-label">End</span>
             <span className="selection-tech-readout">{formatDigitalSelectionTime(selection.end)}</span>
-            <span className="selection-tech-input-shell">
-              <span className="selection-tech-prefix">T+</span>
-              <input
-                className="selection-tech-input"
-                inputMode="decimal"
-                min={selection.start}
-                step={0.01}
-                type="number"
-                value={selection.end.toFixed(2)}
-                onChange={(event) => setSelection(selection.start, Number(event.target.value))}
-              />
-              <span className="selection-tech-unit">s</span>
-            </span>
           </label>
         </div>
         <div
