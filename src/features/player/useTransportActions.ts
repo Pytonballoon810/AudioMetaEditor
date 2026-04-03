@@ -200,7 +200,8 @@ export function useTransportActions({
       }
 
       if (!api.loadLibraryIncremental) {
-        await loadPaths(nextSourcePaths, result.outputPath);
+        setLoadedSourcePaths(nextSourcePaths);
+        setActivePath(result.outputPath);
         setStatus(`Created split track at ${result.outputPath}.`);
         return;
       }
