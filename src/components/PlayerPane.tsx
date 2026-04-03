@@ -155,9 +155,12 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   }, [item?.path]);
 
   const hasValidSelection = selection.end > selection.start + 0.01;
+  const effectiveDuration = duration || item?.metadata.duration || 0;
+  const splitStartTime = hasValidSelection ? selection.start : 0;
+  const splitEndTime = hasValidSelection ? selection.end : effectiveDuration;
+  const hasValidSplitRange = splitEndTime > splitStartTime + 0.01;
   const canCutSelection =
     hasValidSelection && duration > 0.01 && !(selection.start <= 0.01 && selection.end >= duration - 0.01);
-  const effectiveDuration = duration || item?.metadata.duration || 0;
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
   const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
   const canCutAfterPlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
@@ -525,12 +528,12 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           className="accent-button"
           disabled={
             !item ||
-            selection.end <= selection.start ||
+            !hasValidSplitRange ||
             item.extension.toLowerCase() !== 'wav' ||
             isSplittingSelection ||
             isConverting
           }
-          onClick={() => void onSplitSelection(selection.start, selection.end)}
+          onClick={() => void onSplitSelection(splitStartTime, splitEndTime)}
           type="button"
         >
           {isSplittingSelection ? 'Splitting track...' : 'Split to new track'}
