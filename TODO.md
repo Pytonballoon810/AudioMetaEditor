@@ -17,8 +17,8 @@
 
 ## Bugs
 
-- [x] Setting the track cover sometimes is only displayed in app and not after reloading the directory.
-- [x] Some cover images are displayed correctly in the app but not in Navidrome web ui.
+- [x] Spacebar isnt handled as input when editing track metadata, like entering the track title. This is because spacebar is used to play/pause the track, but it should be possible to use spacebar as input when text fields are focused.
+- [ ] Loading progress is not updated when indexing a directory.
 
 ## CD/CI
 

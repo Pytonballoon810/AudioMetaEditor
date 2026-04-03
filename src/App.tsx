@@ -288,6 +288,17 @@ export default function App() {
     }
 
     const handleKeyPress = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      const isTypingTarget =
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLSelectElement ||
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable);
+
+      if (isTypingTarget) {
+        return;
+      }
+
       if (e.code === 'Space' && activeItem) {
         e.preventDefault();
         playerPaneRef.current?.playPause();
