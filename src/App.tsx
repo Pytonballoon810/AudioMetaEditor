@@ -19,6 +19,7 @@ const LAYOUT_METADATA_WIDTH_KEY = 'audioMetaEditor:layout:metadataWidth';
 const LAYOUT_STATUS_HEIGHT_KEY = 'audioMetaEditor:layout:statusHeight';
 const SETTINGS_USE_WEB_DOWNLOADS_KEY = 'audioMetaEditor:settings:useWebDownloads';
 const SETTINGS_VST_PLUGIN_PATHS_KEY = 'audioMetaEditor:settings:vstPluginPaths';
+const SETTINGS_VST_HOST_PATH_KEY = 'audioMetaEditor:settings:vstHostPath';
 const LEGACY_SETTINGS_YTDLP_PATH_KEY = 'audioMetaEditor:settings:ytDlpPath';
 const MAX_VST_RACK_SLOTS = 10;
 
@@ -162,6 +163,10 @@ export default function App() {
     normalizeStoredPluginPaths(readStoredStringArray(SETTINGS_VST_PLUGIN_PATHS_KEY)),
   );
   const [vstPluginPathDraftInput, setVstPluginPathDraftInput] = useState('');
+  const [vstHostExecutablePath, setVstHostExecutablePath] = useState(() => readStoredString(SETTINGS_VST_HOST_PATH_KEY, ''));
+  const [vstHostExecutablePathDraft, setVstHostExecutablePathDraft] = useState(() =>
+    readStoredString(SETTINGS_VST_HOST_PATH_KEY, ''),
+  );
   const [isDiscoveringDefaultVstPaths, setIsDiscoveringDefaultVstPaths] = useState(false);
   const [isScanningVstPlugins, setIsScanningVstPlugins] = useState(false);
   const [vstPlugins, setVstPlugins] = useState<VstPluginDescriptor[]>([]);
@@ -594,6 +599,7 @@ export default function App() {
     setIsWebDownloadNoticeOpen(false);
     setVstPluginPathsDraft(vstPluginPaths);
     setVstPluginPathDraftInput('');
+    setVstHostExecutablePathDraft(vstHostExecutablePath);
     setIsSettingsDialogOpen(true);
   }
 
@@ -685,11 +691,41 @@ export default function App() {
   }
 
   async function applyVstRackToTrack() {
+    if (!activeItem) {
+      setStatus('Select a track first.');
+      return;
+    }
+
+    const pluginById = new Map(vstPlugins.map((plugin) => [plugin.id, plugin.filePath]));
+    const enabledPluginPaths = vstRackSlots
+      .filter((slot) => slot.enabled && slot.pluginId)
+      .map((slot) => (slot.pluginId ? pluginById.get(slot.pluginId) : null))
+      .filter((pluginPath): pluginPath is string => typeof pluginPath === 'string' && pluginPath.trim().length > 0);
+
+    if (enabledPluginPaths.length === 0) {
+      setStatus('Enable at least one rack plugin before applying.');
+      return;
+    }
+
     setIsApplyingVstRack(true);
     try {
-      setStatus(
-        'VST rack save integration scaffolded. Real-time playback and destructive render require a native VST host engine and are not yet active.',
-      );
+      setStatus(`Rendering rack with ${enabledPluginPaths.length} plugin${enabledPluginPaths.length === 1 ? '' : 's'}...`);
+
+      const api = requireAudioMetaApi();
+      const trimmedHostPath = vstHostExecutablePath.trim();
+      const result = await api.applyVstRack({
+        filePath: activeItem.path,
+        pluginPaths: enabledPluginPaths,
+        ...(trimmedHostPath ? { hostExecutablePath: trimmedHostPath } : {}),
+      });
+
+      if (!result) {
+        setStatus('VST rack render cancelled.');
+        return;
+      }
+
+      await loadPaths([result.outputPath], result.outputPath);
+      setStatus(`Rendered VST rack to ${result.outputPath}.`);
     } finally {
       setIsApplyingVstRack(false);
     }
@@ -714,6 +750,7 @@ export default function App() {
     const nextEnabled = isWebDownloadEnabledDraft;
     const enablingNow = nextEnabled && !isWebDownloadEnabled;
     const nextPluginPaths = normalizeStoredPluginPaths(vstPluginPathsDraft);
+    const nextVstHostExecutablePath = vstHostExecutablePathDraft.trim();
 
     if (enablingNow && !hasAcceptedWebDownloadNoticeDraft) {
       setIsWebDownloadNoticeOpen(true);
@@ -731,9 +768,11 @@ export default function App() {
       });
       window.localStorage.setItem(SETTINGS_USE_WEB_DOWNLOADS_KEY, String(nextEnabled));
       window.localStorage.setItem(SETTINGS_VST_PLUGIN_PATHS_KEY, JSON.stringify(nextPluginPaths));
+      window.localStorage.setItem(SETTINGS_VST_HOST_PATH_KEY, nextVstHostExecutablePath);
       window.localStorage.removeItem(LEGACY_SETTINGS_YTDLP_PATH_KEY);
       setIsWebDownloadEnabled(nextEnabled);
       setVstPluginPaths(nextPluginPaths);
+      setVstHostExecutablePath(nextVstHostExecutablePath);
       setIsSettingsDialogOpen(false);
       setIsWebDownloadNoticeOpen(false);
       setHasAcceptedWebDownloadNoticeDraft(nextEnabled);
@@ -1168,6 +1207,19 @@ export default function App() {
 
               <p className="settings-help">
                 Last scan found {vstPlugins.length} plugin{vstPlugins.length === 1 ? '' : 's'}.
+              </p>
+
+              <label className="settings-field">
+                VST host executable (optional)
+                <input
+                  onChange={(event) => setVstHostExecutablePathDraft(event.target.value)}
+                  placeholder="mrswatson64"
+                  value={vstHostExecutablePathDraft}
+                />
+              </label>
+
+              <p className="settings-help">
+                Leave empty to auto-detect mrswatson64 or mrswatson from PATH.
               </p>
             </section>
 

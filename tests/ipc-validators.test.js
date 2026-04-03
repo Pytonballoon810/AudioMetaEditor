@@ -12,6 +12,7 @@ const {
   validateDownloadFromUrlPayload,
   validateConfigureWebDownloadToolsPayload,
   validateScanVstPluginsPayload,
+  validateApplyVstRackPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,
@@ -174,6 +175,34 @@ describe('ipc validators', () => {
     expect(() => validateScanVstPluginsPayload({ paths: 'nope' })).toThrow(/payload.paths/);
     expect(() => validateScanVstPluginsPayload({ paths: ['/tmp/vst', 42] })).toThrow(/payload.paths/);
     expect(() => validateScanVstPluginsPayload(null)).toThrow(/payload/);
+  });
+
+  it('validates apply VST rack payload', () => {
+    expect(() =>
+      validateApplyVstRackPayload({
+        filePath: '/tmp/a.wav',
+        pluginPaths: ['/tmp/p1.vst3'],
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateApplyVstRackPayload({
+        filePath: '/tmp/a.wav',
+        pluginPaths: ['/tmp/p1.vst3'],
+        hostExecutablePath: '/usr/local/bin/mrswatson',
+      }),
+    ).not.toThrow();
+    expect(() => validateApplyVstRackPayload({ filePath: '/tmp/a.wav', pluginPaths: [] })).toThrow(/at least one/);
+    expect(() => validateApplyVstRackPayload({ filePath: '/tmp/a.wav', pluginPaths: 'nope' })).toThrow(
+      /pluginPaths/,
+    );
+    expect(() => validateApplyVstRackPayload({ filePath: '', pluginPaths: ['/tmp/p1.vst3'] })).toThrow(/filePath/);
+    expect(() =>
+      validateApplyVstRackPayload({
+        filePath: '/tmp/a.wav',
+        pluginPaths: ['/tmp/p1.vst3'],
+        hostExecutablePath: '',
+      }),
+    ).toThrow(/hostExecutablePath/);
   });
 
   it('validates move track payload', () => {

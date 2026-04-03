@@ -48,6 +48,12 @@ export type VstPluginDescriptor = {
   format: VstPluginFormat;
 };
 export type ScanVstPluginsPayload = { paths: string[] };
+export type ApplyVstRackPayload = {
+  filePath: string;
+  pluginPaths: string[];
+  hostExecutablePath?: string;
+};
+export type ApplyVstRackResult = { outputPath: string } | null;
 
 export type SaveMetadataPayload = { filePath: string; metadata: EditableMetadata };
 export type SaveMetadataResult = {
@@ -95,6 +101,7 @@ export interface AudioMetaApi {
   configureWebDownloadTools: (payload: ConfigureWebDownloadToolsPayload) => Promise<ConfigureWebDownloadToolsResult>;
   discoverDefaultPluginPaths: () => Promise<string[]>;
   scanVstPlugins: (payload: ScanVstPluginsPayload) => Promise<VstPluginDescriptor[]>;
+  applyVstRack: (payload: ApplyVstRackPayload) => Promise<ApplyVstRackResult>;
   restartApplication: () => Promise<{ restarting: boolean }>;
   downloadFromUrl: (payload: DownloadFromUrlPayload) => Promise<DownloadFromUrlResult>;
   saveMetadata: (payload: SaveMetadataPayload) => Promise<SaveMetadataResult>;

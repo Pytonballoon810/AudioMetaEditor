@@ -175,6 +175,12 @@ function describeAction(callName, phase, args, result, error) {
     if (phase === 'done') return `Found ${Array.isArray(result) ? result.length : 0} plugin(s).`;
   }
 
+  if (callName === 'applyVstRack') {
+    const pluginCount = Array.isArray(args?.[0]?.pluginPaths) ? args[0].pluginPaths.length : 0;
+    if (phase === 'start') return `Applying ${pluginCount} plugin(s) to the active track.`;
+    if (phase === 'done') return result ? `VST rack rendered to ${result.outputPath}.` : 'VST rack render was cancelled.';
+  }
+
   if (callName === 'restartApplication') {
     if (phase === 'start') return 'Restarting application.';
     if (phase === 'done') {
@@ -217,6 +223,7 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
     invokeLogged('configureWebDownloadTools', 'settings:configure-web-download-tools', payload),
   discoverDefaultPluginPaths: () => invokeLogged('discoverDefaultPluginPaths', 'plugins:discover-default-paths'),
   scanVstPlugins: (payload) => invokeLogged('scanVstPlugins', 'plugins:scan', payload),
+  applyVstRack: (payload) => invokeLogged('applyVstRack', 'audio:apply-vst-rack', payload),
   restartApplication: () => invokeLogged('restartApplication', 'app:restart'),
   downloadFromUrl: (payload) => invokeLogged('downloadFromUrl', 'audio:download-from-url', payload),
   saveMetadata: (payload) => invokeLogged('saveMetadata', 'metadata:save', payload),
