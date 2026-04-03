@@ -157,17 +157,20 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     setRedoPendingEdits([]);
   }, [item?.path]);
 
-  const hasValidSelection = selection.end > selection.start + 0.01;
+  const normalizedSelectionStart = Math.max(0, selection.start);
+  const normalizedSelectionEnd = Math.max(normalizedSelectionStart, selection.end);
+  const hasValidSelection = normalizedSelectionEnd > normalizedSelectionStart + 0.01;
   const effectiveDuration = duration || item?.metadata.duration || 0;
-  const splitStartTime = selection.start;
-  const splitEndTime = selection.end;
+  const splitStartTime = normalizedSelectionStart;
+  const splitEndTime = normalizedSelectionEnd;
   const canSplitTrackType = item?.extension.toLowerCase() === 'wav';
-  const canCutSelection =
-    hasValidSelection && duration > 0.01 && !(selection.start <= 0.01 && selection.end >= duration - 0.01);
-  const canSplitSelection =
-    hasValidSelection &&
+  const isFullTrackSelection =
     effectiveDuration > 0.01 &&
-    !(selection.start <= 0.01 && selection.end >= effectiveDuration - 0.01);
+    normalizedSelectionStart <= 0.01 &&
+    normalizedSelectionEnd >= effectiveDuration - 0.01;
+  const canCutSelection =
+    hasValidSelection && duration > 0.01 && !(normalizedSelectionStart <= 0.01 && normalizedSelectionEnd >= duration - 0.01);
+  const canSplitSelection = hasValidSelection && (effectiveDuration <= 0.01 || !isFullTrackSelection);
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
   const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
   const canCutAfterPlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
