@@ -15,6 +15,7 @@ concurrency:
 env:
   CI: true
   CSC_IDENTITY_AUTO_DISCOVERY: false
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
 jobs:
   quality:
