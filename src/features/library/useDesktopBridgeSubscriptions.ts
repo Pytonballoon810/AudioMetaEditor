@@ -85,24 +85,44 @@ function removeLibraryPaths(items: AudioLibraryItem[], removedPaths: string[]) {
     return items;
   }
 
-  return items.filter((item) => !removedPaths.some((removedPath) => isSameOrChildPath(item.path, removedPath)));
+  let nextItems = [...items];
+
+  for (const removedPath of removedPaths) {
+    const normalizedRemovedPath = normalizePathForComparison(removedPath);
+    const { found, index } = findItemIndexByPath(nextItems, normalizedRemovedPath);
+    if (found) {
+      nextItems.splice(index, 1);
+      continue;
+    }
+
+    // Fallback for uncommon watcher payloads that reference a parent path.
+    nextItems = nextItems.filter((item) => !isSameOrChildPath(item.path, removedPath));
+  }
+
+  return nextItems;
 }
 
-function findInsertIndexByPath(items: AudioLibraryItem[], itemPath: string) {
+function findItemIndexByPath(items: AudioLibraryItem[], normalizedTargetPath: string) {
   let low = 0;
   let high = items.length;
 
   while (low < high) {
     const mid = Math.floor((low + high) / 2);
     const midItem = items[mid];
-    if (!midItem || midItem.path.localeCompare(itemPath) <= 0) {
+    const midNormalizedPath = midItem ? normalizePathForComparison(midItem.path) : '';
+
+    if (midNormalizedPath === normalizedTargetPath) {
+      return { found: true, index: mid };
+    }
+
+    if (!midItem || midNormalizedPath < normalizedTargetPath) {
       low = mid + 1;
     } else {
       high = mid;
     }
   }
 
-  return low;
+  return { found: false, index: low };
 }
 
 function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLibraryItem[], loadedSourcePaths: string[]) {
@@ -111,16 +131,6 @@ function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLi
   }
 
   const merged = [...items];
-  const indexByPath = new Map<string, number>();
-
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (!item) {
-      continue;
-    }
-
-    indexByPath.set(normalizePathForComparison(item.path), index);
-  }
 
   for (const incomingItem of incomingItems) {
     const inferredRoot = incomingItem.openedDirectoryRoot || inferOpenedDirectoryRoot(incomingItem.path, loadedSourcePaths);
@@ -133,14 +143,13 @@ function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLi
       : incomingItem;
 
     const normalizedPath = normalizePathForComparison(nextItem.path);
-    const existingIndex = indexByPath.get(normalizedPath);
-    if (existingIndex !== undefined) {
-      merged[existingIndex] = nextItem;
+    const { found, index } = findItemIndexByPath(merged, normalizedPath);
+    if (found) {
+      merged[index] = nextItem;
       continue;
     }
 
-    const insertIndex = findInsertIndexByPath(merged, nextItem.path);
-    merged.splice(insertIndex, 0, nextItem);
+    merged.splice(index, 0, nextItem);
   }
 
   return merged;
@@ -350,9 +359,6 @@ export function useDesktopBridgeSubscriptions({
 
             libraryRef.current = nextLibrary;
             setLibrary(nextLibrary);
-            if (addedPaths.length > 0 || removedPaths.length > 0) {
-              setLibraryWidth(estimateLibraryWidthForItems(nextLibrary));
-            }
             setActivePath(nextActivePath);
             activePathRef.current = nextActivePath;
 
