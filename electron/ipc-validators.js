@@ -61,6 +61,14 @@ function validateSplitSelectionPayload(payload) {
 
   assertString(payload.title, 'payload.title');
 
+  if (payload.splitMode !== 'keep' && payload.splitMode !== 'slice') {
+    throw new Error("payload.splitMode must be either 'keep' or 'slice'.");
+  }
+
+  if (payload.sliceFromOriginal !== undefined && typeof payload.sliceFromOriginal !== 'boolean') {
+    throw new Error('payload.sliceFromOriginal must be a boolean when provided.');
+  }
+
   if (!payload.metadata || typeof payload.metadata !== 'object') {
     throw new Error('payload.metadata must be an object.');
   }

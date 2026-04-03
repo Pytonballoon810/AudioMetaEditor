@@ -1190,6 +1190,58 @@ textarea {
   flex-wrap: wrap;
 }
 
+.split-options-dialog {
+  width: min(620px, 100%);
+}
+
+.split-options-group {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.split-option-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.68rem 0.72rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.split-option-card input[type='radio'] {
+  margin-top: 0.18rem;
+  accent-color: var(--cool);
+}
+
+.split-option-copy {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.split-option-copy strong {
+  color: var(--text);
+}
+
+.split-option-copy span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.split-options-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.split-options-warning {
+  margin: 0;
+  color: #ffc47f;
+  font-size: 0.84rem;
+}
+
 .hero-card,
 .wave-shell,
 .detail-strip,

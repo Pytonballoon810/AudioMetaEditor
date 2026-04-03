@@ -120,7 +120,7 @@ export function useTransportActions({
     }
   }
 
-  async function handleSplitSelectionToTrack(startTime: number, endTime: number) {
+  async function handleSplitSelectionToTrack(startTime: number, endTime: number, splitMode: 'keep' | 'slice') {
     if (!activeItem) {
       return;
     }
@@ -159,7 +159,11 @@ export function useTransportActions({
     };
 
     setIsSplittingSelection(true);
-    setStatus(`Splitting selection into new track "${nextTitle}"...`);
+    setStatus(
+      splitMode === 'slice'
+        ? `Splitting selection into new track "${nextTitle}" and slicing from original...`
+        : `Splitting selection into new track "${nextTitle}"...`,
+    );
 
     try {
       const api = requireAudioMetaApi();
@@ -168,6 +172,8 @@ export function useTransportActions({
         startTime,
         endTime,
         title: nextTitle,
+        splitMode,
+        sliceFromOriginal: splitMode === 'slice',
         metadata: metadataPayload,
       });
 

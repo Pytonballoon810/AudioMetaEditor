@@ -23,7 +23,7 @@ type PlayerPaneProps = {
   onExportClip: (startTime: number, endTime: number) => Promise<void>;
   onConvertAudio: (targetFormat: 'mp3' | 'flac') => Promise<void>;
   onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
-  onSplitSelection: (startTime: number, endTime: number) => Promise<void>;
+  onSplitSelection: (startTime: number, endTime: number, splitMode: 'keep' | 'slice') => Promise<void>;
   isExporting: boolean;
   isConverting: boolean;
   isEditingSelection: boolean;
@@ -103,6 +103,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isConvertMenuOpen, setIsConvertMenuOpen] = useState(false);
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [splitMode, setSplitMode] = useState<'keep' | 'slice'>('keep');
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
   const audioUrl = item ? item.path : null;
@@ -159,6 +161,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const splitStartTime = hasValidSelection ? selection.start : 0;
   const splitEndTime = hasValidSelection ? selection.end : effectiveDuration;
   const hasValidSplitRange = splitEndTime > splitStartTime + 0.01;
+  const canSplitTrackType = item?.extension.toLowerCase() === 'wav';
   const canCutSelection =
     hasValidSelection && duration > 0.01 && !(selection.start <= 0.01 && selection.end >= duration - 0.01);
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
@@ -179,6 +182,14 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     const fullDuration = duration || item?.metadata.duration || 0;
     setSelection(0, fullDuration);
   };
+
+  useEffect(() => {
+    if (isSplittingSelection) {
+      return;
+    }
+
+    setIsSplitModalOpen(false);
+  }, [isSplittingSelection]);
 
   const queueEdit = (mode: 'trim' | 'cut', startTime: number, endTime: number, label: string) => {
     if (!item || endTime <= startTime + 0.01) {
@@ -526,14 +537,11 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         </div>
         <button
           className="accent-button"
-          disabled={
-            !item ||
-            !hasValidSplitRange ||
-            item.extension.toLowerCase() !== 'wav' ||
-            isSplittingSelection ||
-            isConverting
-          }
-          onClick={() => void onSplitSelection(splitStartTime, splitEndTime)}
+          disabled={!item || isSplittingSelection || isConverting}
+          onClick={() => {
+            setSplitMode('keep');
+            setIsSplitModalOpen(true);
+          }}
           type="button"
         >
           {isSplittingSelection ? 'Splitting track...' : 'Split to new track'}
@@ -568,6 +576,90 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           <span>{Math.round(volume * 100)}%</span>
         </div>
       </div>
+
+      {isSplitModalOpen ? (
+        <div
+          className="download-dialog-backdrop"
+          onClick={() => {
+            if (isSplittingSelection) {
+              return;
+            }
+
+            setIsSplitModalOpen(false);
+          }}
+          role="presentation"
+        >
+          <div
+            className="download-dialog split-options-dialog"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Split track options"
+          >
+            <div className="download-dialog-heading">
+              <h2>Split to separate track</h2>
+              <p>Choose how the original file should be handled after creating the split track.</p>
+            </div>
+
+            <div className="split-options-group" role="radiogroup" aria-label="Original file behavior">
+              <label className="split-option-card">
+                <input
+                  checked={splitMode === 'keep'}
+                  onChange={() => setSplitMode('keep')}
+                  name="split-mode"
+                  type="radio"
+                  value="keep"
+                />
+                <span className="split-option-copy">
+                  <strong>Keep original</strong>
+                  <span>Create the split track and leave the source file unchanged.</span>
+                </span>
+              </label>
+
+              <label className="split-option-card">
+                <input
+                  checked={splitMode === 'slice'}
+                  onChange={() => setSplitMode('slice')}
+                  name="split-mode"
+                  type="radio"
+                  value="slice"
+                />
+                <span className="split-option-copy">
+                  <strong>Slice from original</strong>
+                  <span>Create the split track and remove the selected range from the source file.</span>
+                </span>
+              </label>
+            </div>
+
+            <p className="split-options-meta">
+              Range: {formatEditTime(splitStartTime)} - {formatEditTime(splitEndTime)}
+            </p>
+
+            {!canSplitTrackType ? (
+              <p className="split-options-warning">Split currently supports WAV files only.</p>
+            ) : null}
+
+            <div className="download-dialog-actions">
+              <button
+                className="secondary-button"
+                disabled={isSplittingSelection}
+                onClick={() => setIsSplitModalOpen(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button"
+                disabled={!item || !canSplitTrackType || !hasValidSplitRange || isSplittingSelection}
+                onClick={() => void onSplitSelection(splitStartTime, splitEndTime, splitMode)}
+                type="button"
+              >
+                {isSplittingSelection ? 'Splitting...' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 });

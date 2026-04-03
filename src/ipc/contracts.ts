@@ -47,6 +47,8 @@ export type SplitSelectionPayload = {
   startTime: number;
   endTime: number;
   title: string;
+  splitMode: 'keep' | 'slice';
+  sliceFromOriginal?: boolean;
   metadata: EditableMetadata;
 };
 export type SplitSelectionResult = { outputPath: string } | null;

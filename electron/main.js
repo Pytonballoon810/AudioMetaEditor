@@ -776,6 +776,19 @@ app.whenReady().then(async () => {
       title: safeTitle,
     });
 
+    if (payload.splitMode === 'slice' || payload.sliceFromOriginal === true) {
+      const slicedOriginalTempPath = await ensureUniquePath(
+        path.join(targetDirectory, `${path.basename(sourcePath, extension)}-slice-temp${extension}`),
+      );
+
+      try {
+        await editAudioSelection(sourcePath, payload.startTime, payload.endTime, 'cut', slicedOriginalTempPath);
+        await fs.copyFile(slicedOriginalTempPath, sourcePath);
+      } finally {
+        await fs.rm(slicedOriginalTempPath, { force: true });
+      }
+    }
+
     console.log('[backend-action] audio:split-selection:done', metadataResult.filePath);
     return { outputPath: metadataResult.filePath };
   });
