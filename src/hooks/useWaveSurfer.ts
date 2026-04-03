@@ -50,6 +50,9 @@ type UseWaveSurferOptions = {
   onTimeUpdate?: (currentTime: number) => void;
 };
 
+const ZOOM_STEP_PX_PER_SEC = 20;
+const MAX_ZOOM_PX_PER_SEC = 400;
+
 export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurferOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
@@ -60,6 +63,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
   const loadSequenceRef = useRef(0);
   const loadingStartedAtRef = useRef(0);
   const hideSpinnerTimerRef = useRef<number | null>(null);
+  const zoomPxPerSecRef = useRef(0);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
   const [isWaveformLoading, setIsWaveformLoading] = useState(false);
@@ -73,11 +77,13 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       return undefined;
     }
 
+    const containerElement = containerRef.current;
+
     const regionsPlugin = RegionsPlugin.create();
     regionsPluginRef.current = regionsPlugin;
 
     const waveSurfer = WaveSurfer.create({
-      container: containerRef.current,
+      container: containerElement,
       height: 240,
       waveColor: '#6eb6ff',
       progressColor: '#ff5ea8',
@@ -86,6 +92,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       barWidth: 2,
       barRadius: 999,
       normalize: true,
+      dragToSeek: true,
       plugins: [regionsPlugin],
     });
 
@@ -166,11 +173,39 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     regionsPlugin.on('region-update', handleRegionChange);
     regionsPlugin.on('region-updated', handleRegionChange);
 
+    const handleWheelZoom = (event: WheelEvent) => {
+      if (waveSurferRef.current !== waveSurfer || durationRef.current <= 0) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (event.deltaY === 0) {
+        return;
+      }
+
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const step = event.shiftKey ? ZOOM_STEP_PX_PER_SEC * 2 : ZOOM_STEP_PX_PER_SEC;
+      const currentZoom = zoomPxPerSecRef.current;
+      let nextZoom = currentZoom + direction * step;
+
+      if (nextZoom < ZOOM_STEP_PX_PER_SEC / 2) {
+        nextZoom = 0;
+      }
+
+      nextZoom = Math.max(0, Math.min(MAX_ZOOM_PX_PER_SEC, nextZoom));
+      zoomPxPerSecRef.current = nextZoom;
+      waveSurfer.zoom(nextZoom);
+    };
+
+    containerElement.addEventListener('wheel', handleWheelZoom, { passive: false });
+
     return () => {
       if (hideSpinnerTimerRef.current !== null) {
         window.clearTimeout(hideSpinnerTimerRef.current);
         hideSpinnerTimerRef.current = null;
       }
+      containerElement.removeEventListener('wheel', handleWheelZoom);
       waveSurfer.destroy();
       waveSurferRef.current = null;
       regionsPluginRef.current = null;
