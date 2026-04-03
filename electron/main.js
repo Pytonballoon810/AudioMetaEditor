@@ -31,6 +31,7 @@ const {
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateConfigureWebDownloadToolsPayload,
+  validateScanVstPluginsPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,
@@ -80,6 +81,10 @@ const MIN_WINDOW_HEIGHT = 720;
 const WINDOW_STATE_FILE_PATH = path.join(app.getPath('userData'), 'window-state.json');
 const LIBRARY_WATCHER_SUPPRESS_MS = 2200;
 const YT_DLP_FALLBACK_DIR_PATH = path.join(app.getPath('userData'), 'dependencies', 'yt-dlp');
+const MAX_VST_SCAN_DEPTH = 5;
+const MAX_VST_SCAN_RESULTS = 3000;
+const VST_PLUGIN_FILE_EXTENSIONS = new Set(['.dll', '.vst3', '.vst', '.component', '.clap', '.so']);
+const VST_PLUGIN_BUNDLE_EXTENSIONS = new Set(['.vst3', '.vst', '.component', '.clap']);
 
 const YT_DLP_ASSET_BY_PLATFORM = {
   win32: { asset: 'yt-dlp.exe', fileName: 'yt-dlp.exe' },
@@ -266,6 +271,201 @@ function sanitizeFileSystemSegment(value) {
   }
 
   return cleaned.replace(/\s+/g, ' ').trim();
+}
+
+function normalizePathForDedupe(candidatePath) {
+  const resolved = path.resolve(String(candidatePath || ''));
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+function uniquePaths(pathsToNormalize) {
+  const seen = new Set();
+  const results = [];
+
+  for (const candidatePath of pathsToNormalize) {
+    const trimmedPath = String(candidatePath || '').trim();
+    if (!trimmedPath) {
+      continue;
+    }
+
+    const dedupeKey = normalizePathForDedupe(trimmedPath);
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    results.push(path.resolve(trimmedPath));
+  }
+
+  return results;
+}
+
+function getDefaultPluginPathCandidates() {
+  const homePath = os.homedir();
+
+  if (process.platform === 'win32') {
+    const programFiles = process.env.ProgramW6432 || process.env.ProgramFiles || 'C:\\Program Files';
+    const commonProgramFiles = process.env.CommonProgramW6432 || process.env.CommonProgramFiles || path.join(programFiles, 'Common Files');
+    const localAppData = process.env.LOCALAPPDATA || path.join(homePath, 'AppData', 'Local');
+
+    return [
+      path.join(commonProgramFiles, 'VST3'),
+      path.join(programFiles, 'Steinberg', 'VstPlugins'),
+      path.join(programFiles, 'VstPlugins'),
+      path.join(homePath, 'Documents', 'VST3'),
+      path.join(homePath, 'Documents', 'VSTPlugins'),
+      path.join(localAppData, 'Programs', 'Common', 'VST3'),
+    ];
+  }
+
+  if (process.platform === 'darwin') {
+    return [
+      '/Library/Audio/Plug-Ins/VST3',
+      '/Library/Audio/Plug-Ins/VST',
+      '/Library/Audio/Plug-Ins/Components',
+      path.join(homePath, 'Library', 'Audio', 'Plug-Ins', 'VST3'),
+      path.join(homePath, 'Library', 'Audio', 'Plug-Ins', 'VST'),
+      path.join(homePath, 'Library', 'Audio', 'Plug-Ins', 'Components'),
+    ];
+  }
+
+  return [
+    '/usr/lib/vst3',
+    '/usr/lib/vst',
+    '/usr/local/lib/vst3',
+    '/usr/local/lib/vst',
+    path.join(homePath, '.vst3'),
+    path.join(homePath, '.vst'),
+    path.join(homePath, '.clap'),
+  ];
+}
+
+async function filterExistingDirectories(pathsToFilter) {
+  const existingDirectories = [];
+  for (const directoryPath of uniquePaths(pathsToFilter)) {
+    try {
+      const directoryStats = await fs.stat(directoryPath);
+      if (directoryStats.isDirectory()) {
+        existingDirectories.push(directoryPath);
+      }
+    } catch {
+      // Ignore missing and inaccessible paths.
+    }
+  }
+
+  return existingDirectories;
+}
+
+function detectPluginFormatFromPath(pluginPath) {
+  const extension = path.extname(pluginPath).toLowerCase();
+  if (extension === '.vst3') {
+    return 'vst3';
+  }
+
+  if (extension === '.vst' || extension === '.dll' || extension === '.so') {
+    return 'vst2';
+  }
+
+  if (extension === '.component') {
+    return 'au';
+  }
+
+  if (extension === '.clap') {
+    return 'clap';
+  }
+
+  return 'unknown';
+}
+
+function buildPluginDescriptor(pluginPath) {
+  return {
+    id: normalizePathForDedupe(pluginPath),
+    name: path.basename(pluginPath, path.extname(pluginPath)),
+    filePath: pluginPath,
+    format: detectPluginFormatFromPath(pluginPath),
+  };
+}
+
+async function scanPluginsInDirectory(rootDirectoryPath) {
+  const discoveredPlugins = [];
+  const pendingDirectories = [{ directoryPath: rootDirectoryPath, depth: 0 }];
+
+  while (pendingDirectories.length > 0 && discoveredPlugins.length < MAX_VST_SCAN_RESULTS) {
+    const nextDirectory = pendingDirectories.pop();
+    if (!nextDirectory) {
+      continue;
+    }
+
+    let directoryEntries = [];
+    try {
+      directoryEntries = await fs.readdir(nextDirectory.directoryPath, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of directoryEntries) {
+      const fullEntryPath = path.join(nextDirectory.directoryPath, entry.name);
+      const entryExtension = path.extname(entry.name).toLowerCase();
+
+      if (entry.isDirectory()) {
+        if (VST_PLUGIN_BUNDLE_EXTENSIONS.has(entryExtension)) {
+          discoveredPlugins.push(buildPluginDescriptor(fullEntryPath));
+          if (discoveredPlugins.length >= MAX_VST_SCAN_RESULTS) {
+            break;
+          }
+
+          continue;
+        }
+
+        if (nextDirectory.depth < MAX_VST_SCAN_DEPTH) {
+          pendingDirectories.push({ directoryPath: fullEntryPath, depth: nextDirectory.depth + 1 });
+        }
+
+        continue;
+      }
+
+      if (!entry.isFile()) {
+        continue;
+      }
+
+      if (VST_PLUGIN_FILE_EXTENSIONS.has(entryExtension)) {
+        discoveredPlugins.push(buildPluginDescriptor(fullEntryPath));
+        if (discoveredPlugins.length >= MAX_VST_SCAN_RESULTS) {
+          break;
+        }
+      }
+    }
+  }
+
+  return discoveredPlugins;
+}
+
+async function scanVstPlugins(pathsToScan) {
+  const existingDirectories = await filterExistingDirectories(pathsToScan);
+  const discoveredById = new Map();
+
+  for (const directoryPath of existingDirectories) {
+    const pluginsFromDirectory = await scanPluginsInDirectory(directoryPath);
+    for (const plugin of pluginsFromDirectory) {
+      if (!discoveredById.has(plugin.id)) {
+        discoveredById.set(plugin.id, plugin);
+      }
+
+      if (discoveredById.size >= MAX_VST_SCAN_RESULTS) {
+        break;
+      }
+    }
+
+    if (discoveredById.size >= MAX_VST_SCAN_RESULTS) {
+      break;
+    }
+  }
+
+  return Array.from(discoveredById.values()).sort(
+    (left, right) =>
+      left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }) ||
+      left.filePath.localeCompare(right.filePath, undefined, { sensitivity: 'base' }),
+  );
 }
 
 function getManagedYtDlpDescriptor() {
@@ -1021,6 +1221,16 @@ app.whenReady().then(async () => {
 
     await ensureManagedYtDlpInstalled();
     return { enabled: true, installed: true, restartRequired: true };
+  });
+
+  registerIpcHandler('plugins:discover-default-paths', async () => {
+    const existingDirectories = await filterExistingDirectories(getDefaultPluginPathCandidates());
+    return existingDirectories;
+  });
+
+  registerIpcHandler('plugins:scan', async (_event, payload) => {
+    validateScanVstPluginsPayload(payload);
+    return scanVstPlugins(payload.paths);
   });
 
   registerIpcHandler('app:restart', async () => {

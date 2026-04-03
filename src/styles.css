@@ -1280,6 +1280,76 @@ textarea {
   line-height: 1.35;
 }
 
+.settings-plugin-section {
+  display: grid;
+  gap: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75rem;
+}
+
+.settings-plugin-heading {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.settings-plugin-heading strong {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.settings-plugin-heading span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.settings-plugin-add-row {
+  display: grid;
+  gap: 0.52rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.settings-plugin-path-list {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 164px;
+  overflow: auto;
+  padding-right: 0.1rem;
+}
+
+.settings-plugin-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.settings-plugin-path-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(6, 11, 16, 0.72);
+  padding: 0.42rem 0.48rem;
+}
+
+.settings-plugin-path-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.79rem;
+}
+
+.settings-plugin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .split-title-field {
   display: grid;
   gap: 0.34rem;
@@ -1523,6 +1593,106 @@ textarea {
   color: var(--muted);
   min-width: 2.5rem;
   text-align: right;
+}
+
+.vst-rack-panel {
+  margin: 0 1.25rem 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(9, 13, 17, 0.86), rgba(17, 24, 31, 0.88));
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.vst-rack-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.vst-rack-heading-row h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.vst-rack-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.vst-rack-add-row {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.vst-rack-add-row select {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(5, 11, 17, 0.7);
+  color: var(--text);
+  padding: 0.52rem 0.62rem;
+}
+
+.vst-rack-slots {
+  display: grid;
+  gap: 0.45rem;
+  max-height: 300px;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.vst-rack-slot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+  gap: 0.45rem;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.44rem;
+}
+
+.vst-rack-slot-index {
+  width: 2.1rem;
+  text-align: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Consolas', monospace;
+  font-size: 0.76rem;
+  padding: 0.35rem 0.25rem;
+}
+
+.vst-rack-slot-select {
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(6, 11, 16, 0.75);
+  color: var(--text);
+  padding: 0.42rem 0.55rem;
+  min-width: 0;
+}
+
+.vst-rack-slot-status {
+  font-size: 0.76rem;
+  color: var(--muted);
+  min-width: 4.3rem;
+  text-align: center;
+}
+
+.vst-rack-slot-format {
+  font-size: 0.72rem;
+  color: rgba(117, 201, 255, 0.95);
+  letter-spacing: 0.05em;
+  min-width: 2.7rem;
+  text-align: right;
+}
+
+.vst-rack-note {
+  margin: 0;
 }
 
 .wave-topline {
@@ -2455,5 +2625,19 @@ textarea {
   .daw-tool-button {
     width: var(--toolbar-button-size);
     height: var(--toolbar-button-size);
+  }
+
+  .settings-plugin-add-row,
+  .vst-rack-add-row {
+    grid-template-columns: 1fr;
+  }
+
+  .vst-rack-slot {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .vst-rack-slot-format,
+  .vst-rack-slot-status {
+    justify-self: start;
   }
 }

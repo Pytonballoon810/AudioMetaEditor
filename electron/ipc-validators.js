@@ -169,6 +169,14 @@ function validateConfigureWebDownloadToolsPayload(payload) {
   }
 }
 
+function validateScanVstPluginsPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('payload must be an object.');
+  }
+
+  assertArrayOfStrings(payload.paths, 'payload.paths');
+}
+
 function validateMoveTrackPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('payload must be an object.');
@@ -208,6 +216,7 @@ module.exports = {
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateConfigureWebDownloadToolsPayload,
+  validateScanVstPluginsPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,

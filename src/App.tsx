@@ -11,13 +11,22 @@ import { useDesktopBridgeSubscriptions } from './features/library/useDesktopBrid
 import { useMetadataActions } from './features/metadata/useMetadataActions';
 import { useTransportActions } from './features/player/useTransportActions';
 import { useLibraryDerivations } from './features/library/useLibraryDerivations';
+import type { VstPluginDescriptor } from './ipc/contracts';
 import { toUserErrorMessage } from './lib/errors';
 import { endPerfTimer, logMemorySnapshot, startPerfTimer } from './lib/performance';
 
 const LAYOUT_METADATA_WIDTH_KEY = 'audioMetaEditor:layout:metadataWidth';
 const LAYOUT_STATUS_HEIGHT_KEY = 'audioMetaEditor:layout:statusHeight';
 const SETTINGS_USE_WEB_DOWNLOADS_KEY = 'audioMetaEditor:settings:useWebDownloads';
+const SETTINGS_VST_PLUGIN_PATHS_KEY = 'audioMetaEditor:settings:vstPluginPaths';
 const LEGACY_SETTINGS_YTDLP_PATH_KEY = 'audioMetaEditor:settings:ytDlpPath';
+const MAX_VST_RACK_SLOTS = 10;
+
+type VstRackSlot = {
+  slot: number;
+  pluginId: string | null;
+  enabled: boolean;
+};
 
 function readStoredDimension(key: string, min: number, max: number, fallback: number) {
   if (typeof window === 'undefined') {
@@ -44,6 +53,58 @@ function readStoredString(key: string, fallback = '') {
 
   const raw = window.localStorage.getItem(key);
   return raw ?? fallback;
+}
+
+function readStoredStringArray(key: string) {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  const raw = window.localStorage.getItem(key);
+  if (!raw) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((entry): entry is string => typeof entry === 'string');
+  } catch {
+    return [];
+  }
+}
+
+function normalizeStoredPluginPaths(paths: string[]) {
+  const dedupe = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const candidatePath of paths) {
+    const trimmed = candidatePath.trim();
+    if (!trimmed || !isAbsolutePath(trimmed)) {
+      continue;
+    }
+
+    const key = trimmed.toLowerCase();
+    if (dedupe.has(key)) {
+      continue;
+    }
+
+    dedupe.add(key);
+    normalized.push(trimmed);
+  }
+
+  return normalized;
+}
+
+function createEmptyVstRackSlots() {
+  return Array.from({ length: MAX_VST_RACK_SLOTS }, (_unused, index) => ({
+    slot: index + 1,
+    pluginId: null,
+    enabled: true,
+  })) as VstRackSlot[];
 }
 
 function getDefaultWebDownloadEnabledSetting() {
@@ -94,6 +155,18 @@ export default function App() {
     () => getDefaultWebDownloadEnabledSetting(),
   );
   const [isApplyingWebDownloadSettings, setIsApplyingWebDownloadSettings] = useState(false);
+  const [vstPluginPaths, setVstPluginPaths] = useState(() =>
+    normalizeStoredPluginPaths(readStoredStringArray(SETTINGS_VST_PLUGIN_PATHS_KEY)),
+  );
+  const [vstPluginPathsDraft, setVstPluginPathsDraft] = useState(() =>
+    normalizeStoredPluginPaths(readStoredStringArray(SETTINGS_VST_PLUGIN_PATHS_KEY)),
+  );
+  const [vstPluginPathDraftInput, setVstPluginPathDraftInput] = useState('');
+  const [isDiscoveringDefaultVstPaths, setIsDiscoveringDefaultVstPaths] = useState(false);
+  const [isScanningVstPlugins, setIsScanningVstPlugins] = useState(false);
+  const [vstPlugins, setVstPlugins] = useState<VstPluginDescriptor[]>([]);
+  const [vstRackSlots, setVstRackSlots] = useState<VstRackSlot[]>(() => createEmptyVstRackSlots());
+  const [isApplyingVstRack, setIsApplyingVstRack] = useState(false);
   const [metadataWidth, setMetadataWidth] = useState(() =>
     readStoredDimension(LAYOUT_METADATA_WIDTH_KEY, MIN_METADATA_WIDTH, MAX_METADATA_WIDTH, 400),
   );
@@ -381,6 +454,37 @@ export default function App() {
   }, [hasWebDownloadsEnabled, isDownloadDialogOpen]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const scanPlugins = async () => {
+      const normalizedPaths = normalizeStoredPluginPaths(vstPluginPaths);
+      setIsScanningVstPlugins(true);
+
+      try {
+        const api = requireAudioMetaApi();
+        const scannedPlugins = await api.scanVstPlugins({ paths: normalizedPaths });
+        if (!cancelled) {
+          setVstPlugins(scannedPlugins);
+        }
+      } catch {
+        if (!cancelled) {
+          setVstPlugins([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsScanningVstPlugins(false);
+        }
+      }
+    };
+
+    void scanPlugins();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vstPluginPaths]);
+
+  useEffect(() => {
     if (splitDownloadIntoChapters || downloadTargetMode !== 'video-name-album') {
       return;
     }
@@ -457,7 +561,130 @@ export default function App() {
     setIsWebDownloadEnabledDraft(isWebDownloadEnabled);
     setHasAcceptedWebDownloadNoticeDraft(isWebDownloadEnabled);
     setIsWebDownloadNoticeOpen(false);
+    setVstPluginPathsDraft(vstPluginPaths);
+    setVstPluginPathDraftInput('');
     setIsSettingsDialogOpen(true);
+  }
+
+  async function scanVstPluginsForPaths(pathsToScan: string[], options?: { silent?: boolean }) {
+    const normalizedPaths = normalizeStoredPluginPaths(pathsToScan);
+    setIsScanningVstPlugins(true);
+
+    try {
+      const api = requireAudioMetaApi();
+      const scannedPlugins = await api.scanVstPlugins({ paths: normalizedPaths });
+      setVstPlugins(scannedPlugins);
+      if (!options?.silent) {
+        setStatus(
+          normalizedPaths.length === 0
+            ? 'Plugin scan skipped: add one or more plugin folders first.'
+            : `Found ${scannedPlugins.length} plugin${scannedPlugins.length === 1 ? '' : 's'}.`,
+        );
+      }
+    } catch (error) {
+      if (!options?.silent) {
+        setStatus(toUserErrorMessage(error, 'Unable to scan configured plugin folders.'));
+      }
+    } finally {
+      setIsScanningVstPlugins(false);
+    }
+  }
+
+  async function discoverDefaultVstPaths() {
+    setIsDiscoveringDefaultVstPaths(true);
+
+    try {
+      const api = requireAudioMetaApi();
+      const discoveredPaths = await api.discoverDefaultPluginPaths();
+      const mergedPaths = normalizeStoredPluginPaths([...vstPluginPathsDraft, ...discoveredPaths]);
+      setVstPluginPathsDraft(mergedPaths);
+      setStatus(`Found ${discoveredPaths.length} common plugin folder${discoveredPaths.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      setStatus(toUserErrorMessage(error, 'Unable to discover default plugin folders.'));
+    } finally {
+      setIsDiscoveringDefaultVstPaths(false);
+    }
+  }
+
+  function addDraftPluginPath() {
+    const candidatePath = vstPluginPathDraftInput.trim();
+    if (!candidatePath) {
+      return;
+    }
+
+    if (!isAbsolutePath(candidatePath)) {
+      setStatus('Plugin paths must be absolute paths.');
+      return;
+    }
+
+    setVstPluginPathsDraft((current) => normalizeStoredPluginPaths([...current, candidatePath]));
+    setVstPluginPathDraftInput('');
+  }
+
+  function removeDraftPluginPath(pathToRemove: string) {
+    const normalizedTargetPath = pathToRemove.toLowerCase();
+    setVstPluginPathsDraft((current) => current.filter((entry) => entry.toLowerCase() !== normalizedTargetPath));
+  }
+
+  function assignPluginToRackSlot(slotNumber: number, pluginId: string | null) {
+    setVstRackSlots((currentSlots) =>
+      currentSlots.map((slot) =>
+        slot.slot === slotNumber
+          ? {
+              ...slot,
+              pluginId,
+              enabled: pluginId ? (slot.pluginId === pluginId ? slot.enabled : true) : false,
+            }
+          : slot,
+      ),
+    );
+  }
+
+  function toggleRackSlot(slotNumber: number) {
+    setVstRackSlots((currentSlots) =>
+      currentSlots.map((slot) =>
+        slot.slot === slotNumber && slot.pluginId
+          ? {
+              ...slot,
+              enabled: !slot.enabled,
+            }
+          : slot,
+      ),
+    );
+  }
+
+  function addPluginToRack(pluginId: string) {
+    setVstRackSlots((currentSlots) => {
+      const nextSlots = [...currentSlots];
+      const firstAvailableSlotIndex = nextSlots.findIndex((slot) => !slot.pluginId);
+      if (firstAvailableSlotIndex < 0) {
+        return currentSlots;
+      }
+
+      const targetSlot = nextSlots[firstAvailableSlotIndex];
+      if (!targetSlot) {
+        return currentSlots;
+      }
+
+      nextSlots[firstAvailableSlotIndex] = {
+        ...targetSlot,
+        pluginId,
+        enabled: true,
+      };
+
+      return nextSlots;
+    });
+  }
+
+  async function applyVstRackToTrack() {
+    setIsApplyingVstRack(true);
+    try {
+      setStatus(
+        'VST rack save integration scaffolded. Real-time playback and destructive render require a native VST host engine and are not yet active.',
+      );
+    } finally {
+      setIsApplyingVstRack(false);
+    }
   }
 
   function openDownloadDialog() {
@@ -478,6 +705,7 @@ export default function App() {
   async function saveSettings() {
     const nextEnabled = isWebDownloadEnabledDraft;
     const enablingNow = nextEnabled && !isWebDownloadEnabled;
+    const nextPluginPaths = normalizeStoredPluginPaths(vstPluginPathsDraft);
 
     if (enablingNow && !hasAcceptedWebDownloadNoticeDraft) {
       setIsWebDownloadNoticeOpen(true);
@@ -494,8 +722,10 @@ export default function App() {
         acceptedWarning: !nextEnabled || hasAcceptedWebDownloadNoticeDraft,
       });
       window.localStorage.setItem(SETTINGS_USE_WEB_DOWNLOADS_KEY, String(nextEnabled));
+      window.localStorage.setItem(SETTINGS_VST_PLUGIN_PATHS_KEY, JSON.stringify(nextPluginPaths));
       window.localStorage.removeItem(LEGACY_SETTINGS_YTDLP_PATH_KEY);
       setIsWebDownloadEnabled(nextEnabled);
+      setVstPluginPaths(nextPluginPaths);
       setIsSettingsDialogOpen(false);
       setIsWebDownloadNoticeOpen(false);
       setHasAcceptedWebDownloadNoticeDraft(nextEnabled);
@@ -515,6 +745,13 @@ export default function App() {
       }
 
       setStatus(nextEnabled ? 'Web downloads are enabled.' : 'Web downloads are disabled.');
+
+      if (
+        nextPluginPaths.length !== vstPluginPaths.length ||
+        nextPluginPaths.some((entry, index) => entry !== vstPluginPaths[index])
+      ) {
+        await scanVstPluginsForPaths(nextPluginPaths, { silent: true });
+      }
     } catch (error) {
       setStatus(toUserErrorMessage(error, 'Unable to apply web download settings.'));
     } finally {
@@ -610,6 +847,14 @@ export default function App() {
             onSplitSelection={handleSplitSelectionToTrack}
             onExportClip={handleExportClip}
             onConvertAudio={handleConvertAudio}
+            vstPlugins={vstPlugins}
+            vstRackSlots={vstRackSlots}
+            onAddPluginToRack={addPluginToRack}
+            onAssignPluginToRackSlot={assignPluginToRackSlot}
+            onToggleRackSlot={toggleRackSlot}
+            onRemovePluginFromRackSlot={(slotNumber) => assignPluginToRackSlot(slotNumber, null)}
+            onApplyVstRack={applyVstRackToTrack}
+            isApplyingVstRack={isApplyingVstRack}
             isConverting={isConverting}
             isEditingSelection={isEditingSelection}
             isSplittingSelection={isSplittingSelection}
@@ -850,6 +1095,72 @@ export default function App() {
             <p className="settings-help">
               When enabled and saved, the app downloads yt-dlp as a managed dependency and restarts.
             </p>
+
+            <section className="settings-plugin-section">
+              <div className="settings-plugin-heading">
+                <strong>VST plugin folders</strong>
+                <span>Add one or more folders where your plugins are installed.</span>
+              </div>
+
+              <div className="settings-plugin-add-row">
+                <input
+                  onChange={(event) => setVstPluginPathDraftInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      addDraftPluginPath();
+                    }
+                  }}
+                  placeholder="C:\\Program Files\\Common Files\\VST3"
+                  value={vstPluginPathDraftInput}
+                />
+                <button className="secondary-button" onClick={addDraftPluginPath} type="button">
+                  Add path
+                </button>
+              </div>
+
+              <div className="settings-plugin-path-list" role="list" aria-label="Configured plugin folders">
+                {vstPluginPathsDraft.length === 0 ? (
+                  <p className="settings-plugin-empty">No plugin folders configured yet.</p>
+                ) : (
+                  vstPluginPathsDraft.map((pluginPath) => (
+                    <div className="settings-plugin-path-row" key={pluginPath} role="listitem">
+                      <span>{pluginPath}</span>
+                      <button
+                        className="secondary-button"
+                        onClick={() => removeDraftPluginPath(pluginPath)}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="settings-plugin-actions">
+                <button
+                  className="secondary-button"
+                  disabled={isDiscoveringDefaultVstPaths}
+                  onClick={() => void discoverDefaultVstPaths()}
+                  type="button"
+                >
+                  {isDiscoveringDefaultVstPaths ? 'Searching...' : 'Scan common locations'}
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={isScanningVstPlugins}
+                  onClick={() => void scanVstPluginsForPaths(vstPluginPathsDraft)}
+                  type="button"
+                >
+                  {isScanningVstPlugins ? 'Scanning plugins...' : 'Scan plugins now'}
+                </button>
+              </div>
+
+              <p className="settings-help">
+                Last scan found {vstPlugins.length} plugin{vstPlugins.length === 1 ? '' : 's'}.
+              </p>
+            </section>
 
             <div className="download-dialog-actions">
               <button

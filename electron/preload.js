@@ -162,6 +162,19 @@ function describeAction(callName, phase, args, result, error) {
     }
   }
 
+  if (callName === 'discoverDefaultPluginPaths') {
+    if (phase === 'start') return 'Searching common system folders for VST plugin locations.';
+    if (phase === 'done') {
+      return `Found ${Array.isArray(result) ? result.length : 0} plugin folder(s).`;
+    }
+  }
+
+  if (callName === 'scanVstPlugins') {
+    const pathCount = Array.isArray(args?.[0]?.paths) ? args[0].paths.length : 0;
+    if (phase === 'start') return `Scanning ${pathCount} folder(s) for VST plugins.`;
+    if (phase === 'done') return `Found ${Array.isArray(result) ? result.length : 0} plugin(s).`;
+  }
+
   if (callName === 'restartApplication') {
     if (phase === 'start') return 'Restarting application.';
     if (phase === 'done') {
@@ -202,6 +215,8 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   loadLibraryIncremental: (paths) => invokeLogged('loadLibraryIncremental', 'library:load-incremental', paths),
   configureWebDownloadTools: (payload) =>
     invokeLogged('configureWebDownloadTools', 'settings:configure-web-download-tools', payload),
+  discoverDefaultPluginPaths: () => invokeLogged('discoverDefaultPluginPaths', 'plugins:discover-default-paths'),
+  scanVstPlugins: (payload) => invokeLogged('scanVstPlugins', 'plugins:scan', payload),
   restartApplication: () => invokeLogged('restartApplication', 'app:restart'),
   downloadFromUrl: (payload) => invokeLogged('downloadFromUrl', 'audio:download-from-url', payload),
   saveMetadata: (payload) => invokeLogged('saveMetadata', 'metadata:save', payload),

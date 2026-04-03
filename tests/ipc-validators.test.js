@@ -11,6 +11,7 @@ const {
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
   validateConfigureWebDownloadToolsPayload,
+  validateScanVstPluginsPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,
@@ -165,6 +166,14 @@ describe('ipc validators', () => {
       /acceptedWarning/,
     );
     expect(() => validateConfigureWebDownloadToolsPayload(null)).toThrow(/payload/);
+  });
+
+  it('validates scan VST plugins payload', () => {
+    expect(() => validateScanVstPluginsPayload({ paths: [] })).not.toThrow();
+    expect(() => validateScanVstPluginsPayload({ paths: ['/tmp/vst', '/tmp/vst3'] })).not.toThrow();
+    expect(() => validateScanVstPluginsPayload({ paths: 'nope' })).toThrow(/payload.paths/);
+    expect(() => validateScanVstPluginsPayload({ paths: ['/tmp/vst', 42] })).toThrow(/payload.paths/);
+    expect(() => validateScanVstPluginsPayload(null)).toThrow(/payload/);
   });
 
   it('validates move track payload', () => {

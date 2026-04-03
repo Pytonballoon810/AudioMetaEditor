@@ -40,6 +40,15 @@ export type ConfigureWebDownloadToolsResult = {
   restartRequired: boolean;
 };
 
+export type VstPluginFormat = 'vst2' | 'vst3' | 'au' | 'clap' | 'unknown';
+export type VstPluginDescriptor = {
+  id: string;
+  name: string;
+  filePath: string;
+  format: VstPluginFormat;
+};
+export type ScanVstPluginsPayload = { paths: string[] };
+
 export type SaveMetadataPayload = { filePath: string; metadata: EditableMetadata };
 export type SaveMetadataResult = {
   sourcePath: string;
@@ -84,6 +93,8 @@ export interface AudioMetaApi {
   loadLibrary: (paths: string[]) => Promise<AudioLibraryItem[]>;
   loadLibraryIncremental: (paths: string[]) => Promise<AudioLibraryItem[]>;
   configureWebDownloadTools: (payload: ConfigureWebDownloadToolsPayload) => Promise<ConfigureWebDownloadToolsResult>;
+  discoverDefaultPluginPaths: () => Promise<string[]>;
+  scanVstPlugins: (payload: ScanVstPluginsPayload) => Promise<VstPluginDescriptor[]>;
   restartApplication: () => Promise<{ restarting: boolean }>;
   downloadFromUrl: (payload: DownloadFromUrlPayload) => Promise<DownloadFromUrlResult>;
   saveMetadata: (payload: SaveMetadataPayload) => Promise<SaveMetadataResult>;

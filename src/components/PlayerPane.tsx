@@ -12,6 +12,7 @@ import {
   UndoIcon,
 } from '@hugeicons/core-free-icons';
 import type { AudioLibraryItem } from '../types';
+import type { VstPluginDescriptor } from '../ipc/contracts';
 import { formatBitrate, formatDuration } from '../lib/format';
 import { useWaveSurfer } from '../hooks/useWaveSurfer';
 
@@ -25,6 +26,14 @@ type PlayerPaneProps = {
   onConvertAudio: (targetFormat: 'mp3' | 'flac') => Promise<void>;
   onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
   onSplitSelection: (startTime: number, endTime: number, splitMode: 'keep' | 'slice', splitTitle: string) => Promise<void>;
+  vstPlugins: VstPluginDescriptor[];
+  vstRackSlots: { slot: number; pluginId: string | null; enabled: boolean }[];
+  onAddPluginToRack: (pluginId: string) => void;
+  onAssignPluginToRackSlot: (slotNumber: number, pluginId: string | null) => void;
+  onToggleRackSlot: (slotNumber: number) => void;
+  onRemovePluginFromRackSlot: (slotNumber: number) => void;
+  onApplyVstRack: () => Promise<void>;
+  isApplyingVstRack: boolean;
   isExporting: boolean;
   isConverting: boolean;
   isEditingSelection: boolean;
@@ -159,6 +168,14 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     onConvertAudio,
     onEditSelection,
     onSplitSelection,
+    vstPlugins,
+    vstRackSlots,
+    onAddPluginToRack,
+    onAssignPluginToRackSlot,
+    onToggleRackSlot,
+    onRemovePluginFromRackSlot,
+    onApplyVstRack,
+    isApplyingVstRack,
     isExporting,
     isConverting,
     isEditingSelection,
@@ -173,6 +190,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [splitMode, setSplitMode] = useState<'keep' | 'slice'>('keep');
   const [splitTrackTitle, setSplitTrackTitle] = useState('');
+  const [selectedPluginIdToAdd, setSelectedPluginIdToAdd] = useState('');
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
   const audioUrl = item ? item.path : null;
@@ -374,10 +392,26 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   };
 
   const firstPendingEdit = pendingEdits.length > 0 ? pendingEdits[0] : null;
+  const loadedRackSlotCount = vstRackSlots.filter((slot) => slot.pluginId).length;
+  const enabledRackSlotCount = vstRackSlots.filter((slot) => slot.pluginId && slot.enabled).length;
+  const hasEnabledRackPlugin = enabledRackSlotCount > 0;
+  const canApplyVstRack = Boolean(item) && hasEnabledRackPlugin && !isApplyingVstRack;
 
   const removedRangeGuides = effectiveDuration
     ? pendingEdits.flatMap((edit) => buildRemovedRanges(edit, effectiveDuration))
     : [];
+
+  useEffect(() => {
+    if (vstPlugins.length === 0) {
+      setSelectedPluginIdToAdd('');
+      return;
+    }
+
+    const hasSelectedPlugin = vstPlugins.some((plugin) => plugin.id === selectedPluginIdToAdd);
+    if (!hasSelectedPlugin) {
+      setSelectedPluginIdToAdd(vstPlugins[0]?.id ?? '');
+    }
+  }, [selectedPluginIdToAdd, vstPlugins]);
 
   const confirmSplitSelection = () => {
     if (!item || !canSplitTrackType || !canSplitSelection || !splitTrackTitleTrimmed) {
@@ -520,11 +554,32 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
 
         <div className="daw-toolbar-group">
           <button
-            aria-label={isEditingSelection ? 'Saving next pending waveform edit' : 'Save next pending waveform edit'}
+            aria-label={
+              isEditingSelection
+                ? 'Saving next pending waveform edit'
+                : pendingEdits.length > 0
+                  ? 'Save next pending waveform edit'
+                  : 'Apply enabled VST rack using save'
+            }
             className="daw-tool-button daw-tool-button-save"
-            disabled={pendingEdits.length === 0 || isEditingSelection}
-            onClick={() => void savePendingEdit()}
-            title={firstPendingEdit ? `Save next pending edit: ${firstPendingEdit.label}` : 'No pending edit to save'}
+            disabled={(pendingEdits.length === 0 && !canApplyVstRack) || isEditingSelection || isApplyingVstRack}
+            onClick={() => {
+              if (pendingEdits.length > 0) {
+                void savePendingEdit();
+                return;
+              }
+
+              if (canApplyVstRack) {
+                void onApplyVstRack();
+              }
+            }}
+            title={
+              firstPendingEdit
+                ? `Save next pending edit: ${firstPendingEdit.label}`
+                : canApplyVstRack
+                  ? 'Apply enabled VST rack to the track'
+                  : 'No pending edit or enabled rack plugin to save'
+            }
             type="button"
           >
             <HugeiconsIcon icon={SaveIcon} size={18} strokeWidth={1.8} />
@@ -532,7 +587,9 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           <div className="daw-toolbar-pending-wrap" role="status" aria-live="polite">
             <span className="daw-toolbar-pending">
               {pendingEdits.length === 0
-                ? 'No pending edits'
+                ? hasEnabledRackPlugin
+                  ? `Rack ready: ${enabledRackSlotCount} enabled slot${enabledRackSlotCount === 1 ? '' : 's'}`
+                  : 'No pending edits'
                 : pendingEdits.length === 1 && firstPendingEdit
                   ? `Pending: ${firstPendingEdit.label}`
                   : `Pending edits: ${pendingEdits.length}`}
@@ -735,6 +792,91 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           <span>{Math.round(volume * 100)}%</span>
         </div>
       </div>
+
+      <section className="vst-rack-panel" aria-label="VST plugin rack">
+        <div className="vst-rack-heading-row">
+          <div>
+            <p className="eyebrow">Effects rack</p>
+            <h3>VST Plugin Stack</h3>
+          </div>
+          <span className="vst-rack-count">
+            {loadedRackSlotCount}/{vstRackSlots.length} slots loaded • {enabledRackSlotCount} enabled
+          </span>
+        </div>
+
+        <div className="vst-rack-add-row">
+          <select
+            disabled={vstPlugins.length === 0 || loadedRackSlotCount >= vstRackSlots.length}
+            onChange={(event) => setSelectedPluginIdToAdd(event.target.value)}
+            value={selectedPluginIdToAdd}
+          >
+            {vstPlugins.length === 0 ? <option value="">No scanned plugins found</option> : null}
+            {vstPlugins.map((plugin) => (
+              <option key={plugin.id} value={plugin.id}>
+                {plugin.name} ({plugin.format.toUpperCase()})
+              </option>
+            ))}
+          </select>
+          <button
+            className="secondary-button"
+            disabled={!selectedPluginIdToAdd || loadedRackSlotCount >= vstRackSlots.length}
+            onClick={() => onAddPluginToRack(selectedPluginIdToAdd)}
+            type="button"
+          >
+            Add plugin
+          </button>
+        </div>
+
+        <div className="vst-rack-slots" role="list" aria-label="Plugin rack slots">
+          {vstRackSlots.map((slot) => {
+            const selectedPlugin = slot.pluginId ? vstPlugins.find((plugin) => plugin.id === slot.pluginId) : null;
+
+            return (
+              <div className="vst-rack-slot" key={slot.slot} role="listitem">
+                <span className="vst-rack-slot-index">{String(slot.slot).padStart(2, '0')}</span>
+                <select
+                  className="vst-rack-slot-select"
+                  onChange={(event) => onAssignPluginToRackSlot(slot.slot, event.target.value || null)}
+                  value={slot.pluginId ?? ''}
+                >
+                  <option value="">Empty slot</option>
+                  {vstPlugins.map((plugin) => (
+                    <option key={plugin.id} value={plugin.id}>
+                      {plugin.name} ({plugin.format.toUpperCase()})
+                    </option>
+                  ))}
+                </select>
+                <label className="album-edit-switch" title={slot.enabled ? 'Plugin enabled' : 'Plugin bypassed'}>
+                  <input
+                    checked={Boolean(slot.pluginId) && slot.enabled}
+                    className="album-edit-switch-input"
+                    disabled={!slot.pluginId}
+                    onChange={() => onToggleRackSlot(slot.slot)}
+                    type="checkbox"
+                  />
+                  <span className="album-edit-switch-track" />
+                </label>
+                <span className="vst-rack-slot-status">
+                  {!slot.pluginId ? 'Empty' : slot.enabled ? 'On' : 'Bypassed'}
+                </span>
+                <button
+                  className="secondary-button"
+                  disabled={!slot.pluginId}
+                  onClick={() => onRemovePluginFromRackSlot(slot.slot)}
+                  type="button"
+                >
+                  Clear
+                </button>
+                <span className="vst-rack-slot-format">{selectedPlugin ? selectedPlugin.format.toUpperCase() : '--'}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="settings-help vst-rack-note">
+          Save button in the waveform toolbar applies the enabled rack when no edit operations are pending.
+        </p>
+      </section>
 
       {isSplitModalOpen ? (
         <div
