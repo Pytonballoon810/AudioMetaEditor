@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import { LibraryPane } from './components/LibraryPane';
 import { MetadataEditor } from './components/MetadataEditor';
 import { PlayerPane, type PlayerPaneHandle } from './components/PlayerPane';
@@ -447,6 +447,27 @@ export default function App() {
     isWebDownloadEnabled,
   });
 
+  const handleAdvanceToNextTrack = useCallback(() => {
+    if (!activeItem) {
+      return false;
+    }
+
+    const playableItems = library.filter((item) => item.isMetadataLoaded);
+    const currentIndex = playableItems.findIndex((item) => item.path === activeItem.path);
+    if (currentIndex < 0 || currentIndex >= playableItems.length - 1) {
+      return false;
+    }
+
+    const nextItem = playableItems[currentIndex + 1];
+    if (!nextItem) {
+      return false;
+    }
+
+    setActivePath(nextItem.path);
+    setStatus(`Now playing: ${nextItem.metadata.title || nextItem.name}`);
+    return true;
+  }, [activeItem, library, setActivePath]);
+
   useEffect(() => {
     if (!hasWebDownloadsEnabled && isDownloadDialogOpen) {
       setIsDownloadDialogOpen(false);
@@ -820,6 +841,7 @@ export default function App() {
           <PlayerPane
             ref={playerPaneRef}
             item={activeItem}
+            onAdvanceToNextTrack={handleAdvanceToNextTrack}
             onEditSelection={handleEditSelection}
             onSplitSelection={handleSplitSelectionToTrack}
             onExportClip={handleExportClip}

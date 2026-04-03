@@ -48,6 +48,7 @@ type UseWaveSurferOptions = {
   audioUrl: string | null;
   onReady?: (duration: number) => void;
   onTimeUpdate?: (currentTime: number) => void;
+  onFinish?: () => void;
 };
 
 const ZOOM_STEP_PX_PER_SEC = 20;
@@ -166,7 +167,7 @@ function applyPersistentScrollbarStyle(waveSurfer: WaveSurfer) {
   }
 }
 
-export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurferOptions) {
+export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: UseWaveSurferOptions) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const waveSurferRef = useRef<WaveSurfer | null>(null);
   const regionsPluginRef = useRef<ReturnType<typeof RegionsPlugin.create> | null>(null);
@@ -333,7 +334,10 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
 
     waveSurfer.on('play', () => setIsPlaying(true));
     waveSurfer.on('pause', () => setIsPlaying(false));
-    waveSurfer.on('finish', () => setIsPlaying(false));
+    waveSurfer.on('finish', () => {
+      setIsPlaying(false);
+      onFinish?.();
+    });
 
     const handleRegionChange = (region: Region) => {
       if (region.id !== 'selection') {
@@ -515,7 +519,7 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       waveSurferRef.current = null;
       regionsPluginRef.current = null;
     };
-  }, [onReady, onTimeUpdate]);
+  }, [onFinish, onReady, onTimeUpdate]);
 
   const reloadWaveformSource = useCallback((sourceUrl: string | null) => {
     const waveSurfer = waveSurferRef.current;
@@ -662,6 +666,26 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
       }
 
       waveSurfer.playPause();
+    },
+    play: () => {
+      const waveSurfer = waveSurferRef.current;
+      if (!waveSurfer || waveSurfer.isPlaying()) {
+        return;
+      }
+
+      const duration = durationRef.current;
+      const { start, end } = selectionRef.current;
+      const epsilon = 0.03;
+      const hasPartialSelection = duration > epsilon && start > epsilon && end < duration - epsilon;
+
+      if (hasPartialSelection) {
+        const currentTime = waveSurfer.getCurrentTime();
+        if (currentTime < start || currentTime > end) {
+          waveSurfer.seekTo(start / duration);
+        }
+      }
+
+      void waveSurfer.play();
     },
     seekTo: (time: number) => {
       const waveSurfer = waveSurferRef.current;

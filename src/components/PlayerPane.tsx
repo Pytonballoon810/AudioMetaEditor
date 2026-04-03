@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
   CropIcon,
@@ -22,6 +22,7 @@ export type PlayerPaneHandle = {
 
 type PlayerPaneProps = {
   item: AudioLibraryItem | null;
+  onAdvanceToNextTrack: () => boolean;
   onExportClip: (startTime: number, endTime: number) => Promise<void>;
   onConvertAudio: (targetFormat: 'mp3' | 'flac') => Promise<void>;
   onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
@@ -224,6 +225,7 @@ function fuzzyMatchScore(candidateRaw: string, queryRaw: string) {
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
   {
     item,
+    onAdvanceToNextTrack,
     onExportClip,
     onConvertAudio,
     onEditSelection,
@@ -254,11 +256,18 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [pluginPickerTargetSlot, setPluginPickerTargetSlot] = useState<number | null>(null);
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
+  const [autoPlayNextTrackRequestId, setAutoPlayNextTrackRequestId] = useState(0);
+  const autoPlayNextTrackOnReadyRef = useRef(false);
   const audioUrl = item ? item.path : null;
 
   const handleReady = useCallback((loadedDuration: number) => {
     setDuration(loadedDuration);
     setCurrentTime(0);
+
+    if (autoPlayNextTrackOnReadyRef.current) {
+      autoPlayNextTrackOnReadyRef.current = false;
+      setAutoPlayNextTrackRequestId((current) => current + 1);
+    }
   }, []);
 
   const {
@@ -273,11 +282,28 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     isAutoScrollEnabled,
     toggleAutoScroll,
     setVolume: setWaveSurferVolume,
+    play,
     visibleTimeframe,
   } = useWaveSurfer({
     audioUrl,
     onReady: handleReady,
     onTimeUpdate: setCurrentTime,
+    onFinish: () => {
+      const epsilon = 0.05;
+      const fullSelectionDuration = Math.max(0, normalizedSelectionEnd - normalizedSelectionStart);
+      const trackDuration = Math.max(0, effectiveDuration);
+      const selectionSpansWholeTrack =
+        trackDuration > epsilon &&
+        fullSelectionDuration > epsilon &&
+        normalizedSelectionStart <= epsilon &&
+        normalizedSelectionEnd >= trackDuration - epsilon;
+
+      if (!selectionSpansWholeTrack) {
+        return;
+      }
+
+      autoPlayNextTrackOnReadyRef.current = onAdvanceToNextTrack();
+    },
   });
 
   useImperativeHandle(
@@ -306,6 +332,14 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     setPendingEdits([]);
     setRedoPendingEdits([]);
   }, [item?.path]);
+
+  useEffect(() => {
+    if (autoPlayNextTrackRequestId <= 0) {
+      return;
+    }
+
+    play();
+  }, [autoPlayNextTrackRequestId, play]);
 
   const normalizedSelectionStart = Math.max(0, selection.start);
   const normalizedSelectionEnd = Math.max(normalizedSelectionStart, selection.end);
