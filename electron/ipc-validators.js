@@ -97,8 +97,49 @@ function validateDownloadFromUrlPayload(payload) {
 
   assertString(payload.url, 'payload.url');
 
-  if (payload.ytDlpPath !== undefined) {
-    assertString(payload.ytDlpPath, 'payload.ytDlpPath');
+  if (payload.targetAlbumDirectory !== undefined) {
+    assertString(payload.targetAlbumDirectory, 'payload.targetAlbumDirectory');
+  }
+
+  if (payload.newAlbumName !== undefined) {
+    assertString(payload.newAlbumName, 'payload.newAlbumName');
+  }
+
+  if (payload.newAlbumParentDirectory !== undefined) {
+    assertString(payload.newAlbumParentDirectory, 'payload.newAlbumParentDirectory');
+  }
+
+  if (payload.splitIntoChapters !== undefined && typeof payload.splitIntoChapters !== 'boolean') {
+    throw new Error('payload.splitIntoChapters must be a boolean when provided.');
+  }
+
+  const hasExistingTarget = typeof payload.targetAlbumDirectory === 'string';
+  const hasNewAlbumTarget = typeof payload.newAlbumName === 'string';
+
+  if (hasExistingTarget === hasNewAlbumTarget) {
+    throw new Error('payload must include exactly one destination target.');
+  }
+
+  if (hasNewAlbumTarget && typeof payload.newAlbumParentDirectory !== 'string') {
+    throw new Error('payload.newAlbumParentDirectory is required when payload.newAlbumName is provided.');
+  }
+}
+
+function validateConfigureWebDownloadToolsPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('payload must be an object.');
+  }
+
+  if (typeof payload.enabled !== 'boolean') {
+    throw new Error('payload.enabled must be a boolean.');
+  }
+
+  if (payload.acceptedWarning !== undefined && typeof payload.acceptedWarning !== 'boolean') {
+    throw new Error('payload.acceptedWarning must be a boolean when provided.');
+  }
+
+  if (payload.enabled && payload.acceptedWarning !== true) {
+    throw new Error('payload.acceptedWarning must be true when enabling web downloads.');
   }
 }
 
@@ -140,6 +181,7 @@ module.exports = {
   validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
+  validateConfigureWebDownloadToolsPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,

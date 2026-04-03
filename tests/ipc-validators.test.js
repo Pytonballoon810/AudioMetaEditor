@@ -10,6 +10,7 @@ const {
   validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
+  validateConfigureWebDownloadToolsPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,
@@ -68,13 +69,64 @@ describe('ipc validators', () => {
   });
 
   it('validates download payload', () => {
-    expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3' })).not.toThrow();
-    expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3', ytDlpPath: 'yt-dlp' })).not.toThrow();
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        targetAlbumDirectory: '/tmp/Album',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        targetAlbumDirectory: '/tmp/Album',
+        splitIntoChapters: true,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        newAlbumName: 'My Album',
+        newAlbumParentDirectory: '/tmp',
+      }),
+    ).not.toThrow();
     expect(() => validateDownloadFromUrlPayload({ url: '' })).toThrow(/payload.url/);
-    expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3', ytDlpPath: '' })).toThrow(
-      /payload.ytDlpPath/,
-    );
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        targetAlbumDirectory: '/tmp/Album',
+        splitIntoChapters: 'yes',
+      }),
+    ).toThrow(/splitIntoChapters/);
+    expect(() => validateDownloadFromUrlPayload({ url: 'https://example.com/a.mp3' })).toThrow(/destination target/);
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        targetAlbumDirectory: '/tmp/Album',
+        newAlbumName: 'My Album',
+        newAlbumParentDirectory: '/tmp',
+      }),
+    ).toThrow(/destination target/);
+    expect(() =>
+      validateDownloadFromUrlPayload({
+        url: 'https://example.com/a.mp3',
+        newAlbumName: 'My Album',
+      }),
+    ).toThrow(/newAlbumParentDirectory/);
     expect(() => validateDownloadFromUrlPayload(null)).toThrow(/payload/);
+  });
+
+  it('validates configure web download tools payload', () => {
+    expect(() => validateConfigureWebDownloadToolsPayload({ enabled: true, acceptedWarning: true })).not.toThrow();
+    expect(() => validateConfigureWebDownloadToolsPayload({ enabled: false })).not.toThrow();
+    expect(() => validateConfigureWebDownloadToolsPayload({ enabled: true })).toThrow(/acceptedWarning/);
+    expect(() => validateConfigureWebDownloadToolsPayload({ enabled: true, acceptedWarning: false })).toThrow(
+      /acceptedWarning/,
+    );
+    expect(() => validateConfigureWebDownloadToolsPayload({ enabled: 'true' })).toThrow(/payload.enabled/);
+    expect(() => validateConfigureWebDownloadToolsPayload({ enabled: false, acceptedWarning: 'true' })).toThrow(
+      /acceptedWarning/,
+    );
+    expect(() => validateConfigureWebDownloadToolsPayload(null)).toThrow(/payload/);
   });
 
   it('validates move track payload', () => {

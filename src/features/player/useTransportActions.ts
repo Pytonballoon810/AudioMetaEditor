@@ -20,7 +20,11 @@ type UseTransportActionsArgs = {
   downloadUrl: string;
   setDownloadUrl: (url: string) => void;
   setIsDownloadDialogOpen: (open: boolean) => void;
-  ytDlpPath: string;
+  downloadTargetMode: 'existing' | 'new';
+  downloadTargetExistingDirectory: string;
+  downloadTargetNewAlbumName: string;
+  splitDownloadIntoChapters: boolean;
+  isWebDownloadEnabled: boolean;
 };
 
 export function useTransportActions({
@@ -39,9 +43,21 @@ export function useTransportActions({
   downloadUrl,
   setDownloadUrl,
   setIsDownloadDialogOpen,
-  ytDlpPath,
+  downloadTargetMode,
+  downloadTargetExistingDirectory,
+  downloadTargetNewAlbumName,
+  splitDownloadIntoChapters,
+  isWebDownloadEnabled,
 }: UseTransportActionsArgs) {
   const normalizePathForComparison = (pathValue: string) => pathValue.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
+  const isSamePath = (leftPath: string, rightPath: string) =>
+    normalizePathForComparison(leftPath) === normalizePathForComparison(rightPath);
+
+  const fileNameFromPath = (pathValue: string) => {
+    const normalized = pathValue.replace(/\\/g, '/');
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || pathValue;
+  };
 
   const upsertLibraryItem = (items: AudioLibraryItem[], nextItem: AudioLibraryItem) => {
     const normalizedPath = normalizePathForComparison(nextItem.path);
@@ -61,6 +77,43 @@ export function useTransportActions({
     const normalizedPath = normalizePathForComparison(removedPath);
     return items.filter((item) => normalizePathForComparison(item.path) !== normalizedPath);
   };
+
+  const getDirectoryParent = (directoryPath: string) => directoryPath.replace(/[/\\][^/\\]+$/, '');
+
+  const buildPlaceholderItem = (
+    placeholderPath: string,
+    directoryPath: string,
+    name: string,
+    title: string,
+    openedDirectoryRoot: string | null,
+  ): AudioLibraryItem => ({
+    path: placeholderPath,
+    name,
+    directory: directoryPath,
+    extension: (name.split('.').pop() || 'download').toLowerCase(),
+    openedDirectoryRoot,
+    isInOpenedDirectoryRoot:
+      Boolean(openedDirectoryRoot) && normalizePathForComparison(directoryPath) === normalizePathForComparison(openedDirectoryRoot || ''),
+    isMetadataLoaded: false,
+    metadata: {
+      title,
+      album: '',
+      artist: '',
+      albumArtist: '',
+      composer: '',
+      producer: '',
+      genre: '',
+      year: '',
+      track: '',
+      disc: '',
+      comment: '',
+      coverArt: null,
+      duration: 0,
+      sampleRate: 0,
+      bitrate: 0,
+      codec: '',
+    },
+  });
 
   const pickNextActivePathAfterRemoval = (
     currentItems: AudioLibraryItem[],
@@ -418,28 +471,143 @@ export function useTransportActions({
       return;
     }
 
-    const ytDlpExecutable = ytDlpPath.trim();
-    if (!ytDlpExecutable) {
-      setStatus('Configure a yt-dlp path in Settings first.');
+    if (!isWebDownloadEnabled) {
+      setStatus('Enable web downloads in Settings first.');
       return;
     }
 
+    const existingDirectory = downloadTargetExistingDirectory.trim();
+    const newAlbumName = downloadTargetNewAlbumName.trim();
+    let destinationDirectory = '';
+    const payload: {
+      url: string;
+      targetAlbumDirectory?: string;
+      newAlbumName?: string;
+      newAlbumParentDirectory?: string;
+      splitIntoChapters?: boolean;
+    } = {
+      url,
+      splitIntoChapters: splitDownloadIntoChapters,
+    };
+
+    if (downloadTargetMode === 'existing') {
+      if (!existingDirectory) {
+        setStatus('Choose an album to download into.');
+        return;
+      }
+
+      payload.targetAlbumDirectory = existingDirectory;
+      destinationDirectory = existingDirectory;
+    } else {
+      if (!newAlbumName) {
+        setStatus('Enter a new album name.');
+        return;
+      }
+
+      const parentDirectoryCandidate =
+        activeItem?.openedDirectoryRoot?.trim() ||
+        (existingDirectory ? getDirectoryParent(existingDirectory) : '') ||
+        library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot?.trim() ||
+        (library[0]?.directory ? getDirectoryParent(library[0].directory) : '');
+
+      if (!parentDirectoryCandidate) {
+        setStatus('Open a directory first so the new album location can be resolved.');
+        return;
+      }
+
+      payload.newAlbumName = newAlbumName;
+      payload.newAlbumParentDirectory = parentDirectoryCandidate;
+      destinationDirectory = `${parentDirectoryCandidate.replace(/[/\\]+$/, '')}/${newAlbumName}`;
+    }
+
+    const startedAt = Date.now();
+    const pendingPlaceholderPath = `__pending_download__/${startedAt}-${Math.random().toString(36).slice(2)}.pending`;
+    let outputPlaceholderPaths: string[] = [];
+    const normalizedDestinationDirectory = destinationDirectory.replace(/\\/g, '/').replace(/\/+$/g, '') || destinationDirectory;
+    const openedDirectoryRoot =
+      activeItem?.openedDirectoryRoot ||
+      library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot ||
+      null;
+    const pendingPlaceholderItem = buildPlaceholderItem(
+      pendingPlaceholderPath,
+      normalizedDestinationDirectory || '(pending)',
+      'Download in progress...',
+      'Download started',
+      openedDirectoryRoot,
+    );
+
+    setLibrary((items) => {
+      const nextItems = upsertLibraryItem(items, pendingPlaceholderItem);
+      setLibraryWidth(estimateLibraryWidthForItems(nextItems));
+      return nextItems;
+    });
+
+    setIsDownloadDialogOpen(false);
+    setDownloadUrl('');
     setIsDownloadingFromUrl(true);
-    setStatus('Downloading audio from URL...');
+    setStatus('Download started');
 
     try {
       const api = requireAudioMetaApi();
-      const result = await api.downloadFromUrl({ url, ytDlpPath: ytDlpExecutable });
+      const result = await api.downloadFromUrl(payload);
       if (!result) {
+        setLibrary((items) => {
+          const nextItems = removeLibraryItem(items, pendingPlaceholderPath);
+          setLibraryWidth(estimateLibraryWidthForItems(nextItems));
+          return nextItems;
+        });
         setStatus('Download cancelled.');
         return;
       }
 
-      await loadPaths([result.outputPath], result.outputPath);
-      setIsDownloadDialogOpen(false);
-      setDownloadUrl('');
-      setStatus(`Downloaded audio to ${result.outputPath}.`);
+      const downloadedPaths =
+        Array.isArray(result.outputPaths) && result.outputPaths.length > 0 ? result.outputPaths : [result.outputPath];
+
+      const perFilePlaceholders = downloadedPaths.map((downloadedPath, index) =>
+        buildPlaceholderItem(
+          downloadedPath,
+          downloadedPath.replace(/[/\\][^/\\]+$/, ''),
+          fileNameFromPath(downloadedPath),
+          splitDownloadIntoChapters
+            ? `Chapter ${index + 1} processing...`
+            : 'Processing downloaded file...',
+          openedDirectoryRoot,
+        ),
+      );
+      outputPlaceholderPaths = perFilePlaceholders.map((item) => item.path);
+
+      setLibrary((items) => {
+        let nextItems = removeLibraryItem(items, pendingPlaceholderPath);
+        for (const placeholderItem of perFilePlaceholders) {
+          nextItems = upsertLibraryItem(nextItems, placeholderItem);
+        }
+
+        setLibraryWidth(estimateLibraryWidthForItems(nextItems));
+        return nextItems;
+      });
+
+      const nextSourcePaths =
+        loadedSourcePaths.length > 0
+          ? Array.from(
+              new Set([...loadedSourcePaths, ...downloadedPaths]),
+            )
+          : downloadedPaths;
+
+      await loadPaths(nextSourcePaths, result.outputPath);
+      setStatus(
+        splitDownloadIntoChapters
+          ? `Downloaded and split into ${downloadedPaths.length} chapter file${downloadedPaths.length === 1 ? '' : 's'}.`
+          : `Downloaded audio to ${result.outputPath}.`,
+      );
     } catch (error) {
+      setLibrary((items) => {
+        const withoutPending = removeLibraryItem(items, pendingPlaceholderPath);
+        const withoutOutputPlaceholders = withoutPending.filter(
+          (item) => !outputPlaceholderPaths.some((placeholderPath) => isSamePath(item.path, placeholderPath)),
+        );
+        setLibraryWidth(estimateLibraryWidthForItems(withoutOutputPlaceholders));
+        return withoutOutputPlaceholders;
+      });
       setStatus(toUserErrorMessage(error, 'Unable to download audio from URL.'));
     } finally {
       setIsDownloadingFromUrl(false);

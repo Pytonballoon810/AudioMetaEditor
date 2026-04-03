@@ -146,9 +146,27 @@ function describeAction(callName, phase, args, result, error) {
   }
 
   if (callName === 'downloadFromUrl') {
-    if (phase === 'start') return 'Starting URL download via yt-dlp.';
+    if (phase === 'start') return 'Download started';
     if (phase === 'done')
       return result ? `Download finished and saved to ${result.outputPath}.` : 'Download was cancelled by user.';
+  }
+
+  if (callName === 'configureWebDownloadTools') {
+    if (phase === 'start') return 'Applying web download settings.';
+    if (phase === 'done') {
+      if (result?.restartRequired) {
+        return 'Web download tools are installed. Restart is required.';
+      }
+
+      return 'Web download settings were saved.';
+    }
+  }
+
+  if (callName === 'restartApplication') {
+    if (phase === 'start') return 'Restarting application.';
+    if (phase === 'done') {
+      return result?.restarting ? 'Restart has been requested.' : 'Restart skipped (development mode).';
+    }
   }
 
   if (callName === 'loadAudioBlob') {
@@ -182,6 +200,9 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   openDirectory: () => invokeLogged('openDirectory', 'dialog:open-directory'),
   loadLibrary: (paths) => invokeLogged('loadLibrary', 'library:load', paths),
   loadLibraryIncremental: (paths) => invokeLogged('loadLibraryIncremental', 'library:load-incremental', paths),
+  configureWebDownloadTools: (payload) =>
+    invokeLogged('configureWebDownloadTools', 'settings:configure-web-download-tools', payload),
+  restartApplication: () => invokeLogged('restartApplication', 'app:restart'),
   downloadFromUrl: (payload) => invokeLogged('downloadFromUrl', 'audio:download-from-url', payload),
   saveMetadata: (payload) => invokeLogged('saveMetadata', 'metadata:save', payload),
   moveTrackToAlbum: (payload) => invokeLogged('moveTrackToAlbum', 'track:move-to-album', payload),

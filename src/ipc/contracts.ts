@@ -22,8 +22,21 @@ export type LibraryChangedPayload = {
   timestamp: number;
 };
 
-export type DownloadFromUrlPayload = { url: string; ytDlpPath?: string };
-export type DownloadFromUrlResult = { outputPath: string } | null;
+export type DownloadFromUrlPayload = {
+  url: string;
+  targetAlbumDirectory?: string;
+  newAlbumName?: string;
+  newAlbumParentDirectory?: string;
+  splitIntoChapters?: boolean;
+};
+export type DownloadFromUrlResult = { outputPath: string; outputPaths?: string[] } | null;
+
+export type ConfigureWebDownloadToolsPayload = { enabled: boolean; acceptedWarning?: boolean };
+export type ConfigureWebDownloadToolsResult = {
+  enabled: boolean;
+  installed: boolean;
+  restartRequired: boolean;
+};
 
 export type SaveMetadataPayload = { filePath: string; metadata: EditableMetadata };
 export type SaveMetadataResult = {
@@ -68,6 +81,8 @@ export interface AudioMetaApi {
   openDirectory: () => Promise<string[]>;
   loadLibrary: (paths: string[]) => Promise<AudioLibraryItem[]>;
   loadLibraryIncremental: (paths: string[]) => Promise<AudioLibraryItem[]>;
+  configureWebDownloadTools: (payload: ConfigureWebDownloadToolsPayload) => Promise<ConfigureWebDownloadToolsResult>;
+  restartApplication: () => Promise<{ restarting: boolean }>;
   downloadFromUrl: (payload: DownloadFromUrlPayload) => Promise<DownloadFromUrlResult>;
   saveMetadata: (payload: SaveMetadataPayload) => Promise<SaveMetadataResult>;
   moveTrackToAlbum: (payload: MoveTrackToAlbumPayload) => Promise<MoveTrackToAlbumResult>;

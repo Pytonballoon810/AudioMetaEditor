@@ -29,6 +29,7 @@ const {
   validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
+  validateConfigureWebDownloadToolsPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,
@@ -77,6 +78,13 @@ const MIN_WINDOW_WIDTH = 1120;
 const MIN_WINDOW_HEIGHT = 720;
 const WINDOW_STATE_FILE_PATH = path.join(app.getPath('userData'), 'window-state.json');
 const LIBRARY_WATCHER_SUPPRESS_MS = 2200;
+const YT_DLP_FALLBACK_DIR_PATH = path.join(app.getPath('userData'), 'dependencies', 'yt-dlp');
+
+const YT_DLP_ASSET_BY_PLATFORM = {
+  win32: { asset: 'yt-dlp.exe', fileName: 'yt-dlp.exe' },
+  linux: { asset: 'yt-dlp', fileName: 'yt-dlp' },
+  darwin: { asset: 'yt-dlp_macos', fileName: 'yt-dlp_macos' },
+};
 
 function isAudioFilePath(candidatePath) {
   const extension = path.extname(String(candidatePath || '')).toLowerCase();
@@ -242,6 +250,101 @@ function runCommandCapture(command, args) {
       reject(new Error(stderr || `${command} exited with code ${code}`));
     });
   });
+}
+
+function sanitizeFileSystemSegment(value) {
+  const noReserved = String(value || '').replace(/[<>:"/\\|?*]+/g, ' ');
+  let cleaned = '';
+  for (const char of noReserved) {
+    const code = char.charCodeAt(0);
+    if (code < 32) {
+      continue;
+    }
+
+    cleaned += char;
+  }
+
+  return cleaned.replace(/\s+/g, ' ').trim();
+}
+
+function getManagedYtDlpDescriptor() {
+  const descriptor = YT_DLP_ASSET_BY_PLATFORM[process.platform];
+  if (!descriptor) {
+    throw new Error(`yt-dlp is not supported on platform ${process.platform}.`);
+  }
+
+  return descriptor;
+}
+
+function getManagedYtDlpInstallDirectoryCandidates() {
+  const candidates = [];
+  if (process.resourcesPath) {
+    candidates.push(path.join(process.resourcesPath, 'audio-meta-editor-dependencies', 'yt-dlp'));
+  }
+
+  candidates.push(YT_DLP_FALLBACK_DIR_PATH);
+  return Array.from(new Set(candidates));
+}
+
+function getExistingManagedYtDlpBinaryPath() {
+  const descriptor = getManagedYtDlpDescriptor();
+  for (const directoryPath of getManagedYtDlpInstallDirectoryCandidates()) {
+    const candidatePath = path.join(directoryPath, descriptor.fileName);
+    if (fsSync.existsSync(candidatePath)) {
+      return candidatePath;
+    }
+  }
+
+  return null;
+}
+
+async function resolveWritableManagedYtDlpInstallDirectory() {
+  for (const directoryPath of getManagedYtDlpInstallDirectoryCandidates()) {
+    try {
+      await fs.mkdir(directoryPath, { recursive: true });
+      const probePath = path.join(directoryPath, '.write-probe');
+      await fs.writeFile(probePath, 'ok');
+      await fs.rm(probePath, { force: true });
+      return directoryPath;
+    } catch {
+      // Try next location.
+    }
+  }
+
+  throw new Error('No writable directory is available for yt-dlp installation.');
+}
+
+async function ensureManagedYtDlpInstalled() {
+  const descriptor = getManagedYtDlpDescriptor();
+  const existingPath = getExistingManagedYtDlpBinaryPath();
+
+  if (existingPath) {
+    return existingPath;
+  }
+
+  const installDirectory = await resolveWritableManagedYtDlpInstallDirectory();
+  const binaryPath = path.join(installDirectory, descriptor.fileName);
+
+  const downloadUrl = `https://github.com/yt-dlp/yt-dlp/releases/latest/download/${descriptor.asset}`;
+  const response = await net.fetch(downloadUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download yt-dlp (${response.status} ${response.statusText || ''}).`.trim());
+  }
+
+  const binaryBytes = Buffer.from(await response.arrayBuffer());
+  if (binaryBytes.byteLength === 0) {
+    throw new Error('Downloaded yt-dlp binary is empty.');
+  }
+
+  const tempPath = `${binaryPath}.tmp`;
+  await fs.writeFile(tempPath, binaryBytes);
+  await fs.rename(tempPath, binaryPath);
+
+  if (process.platform !== 'win32') {
+    await fs.chmod(binaryPath, 0o755);
+  }
+
+  return binaryPath;
 }
 
 function delay(milliseconds) {
@@ -903,6 +1006,40 @@ app.whenReady().then(async () => {
     }
   });
 
+  registerIpcHandler('settings:configure-web-download-tools', async (_event, payload) => {
+    validateConfigureWebDownloadToolsPayload(payload);
+
+    if (!payload.enabled) {
+      return { enabled: false, installed: false, restartRequired: false };
+    }
+
+    const existingPath = getExistingManagedYtDlpBinaryPath();
+    if (existingPath) {
+      return { enabled: true, installed: false, restartRequired: false };
+    }
+
+    await ensureManagedYtDlpInstalled();
+    return { enabled: true, installed: true, restartRequired: true };
+  });
+
+  registerIpcHandler('app:restart', async () => {
+    if (!app.isPackaged) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        await loadRenderer(mainWindow);
+        mainWindow.focus();
+      }
+
+      return { restarting: false };
+    }
+
+    setTimeout(() => {
+      app.relaunch();
+      app.quit();
+    }, 60);
+
+    return { restarting: true };
+  });
+
   registerIpcHandler('audio:download-from-url', async (_event, payload) => {
     validateDownloadFromUrlPayload(payload);
     console.log('[backend-action] audio:download-from-url:start', payload?.url);
@@ -910,9 +1047,9 @@ app.whenReady().then(async () => {
       throw new Error('A valid URL is required.');
     }
 
-    const ytDlpPath = typeof payload.ytDlpPath === 'string' ? payload.ytDlpPath.trim() : '';
+    const ytDlpPath = getExistingManagedYtDlpBinaryPath();
     if (!ytDlpPath) {
-      throw new Error('A yt-dlp command path or alias is required.');
+      throw new Error('Enable web downloads in Settings and save changes to install yt-dlp first.');
     }
 
     let parsedUrl;
@@ -934,52 +1071,107 @@ app.whenReady().then(async () => {
       .replace(/[<>:"/\\|?*]+/g, '-')
       .replace(/\s+/g, ' ')
       .trim();
-    const defaultPath = path.join(app.getPath('downloads'), safeBaseName || 'audio-download');
-    const saveResult = await dialog.showSaveDialog({
-      title: 'Download audio via yt-dlp',
-      defaultPath,
-      filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'flac', 'm4a', 'opus', 'aac', 'ogg'] }],
-    });
+    const safeStem = (path.parse(safeBaseName || 'audio-download').name || 'audio-download').trim() || 'audio-download';
 
-    if (saveResult.canceled || !saveResult.filePath) {
-      console.log('[backend-action] audio:download-from-url:cancelled');
-      return null;
+    let targetAlbumDirectory = '';
+    if (typeof payload.targetAlbumDirectory === 'string' && payload.targetAlbumDirectory.trim()) {
+      targetAlbumDirectory = path.resolve(payload.targetAlbumDirectory.trim());
+    } else {
+      const newAlbumNameRaw = typeof payload.newAlbumName === 'string' ? payload.newAlbumName.trim() : '';
+      const newAlbumParentDirectory =
+        typeof payload.newAlbumParentDirectory === 'string' ? payload.newAlbumParentDirectory.trim() : '';
+      if (!newAlbumNameRaw || !newAlbumParentDirectory) {
+        throw new Error('A valid album destination is required.');
+      }
+
+      const sanitizedAlbumFolderName = sanitizeFileSystemSegment(newAlbumNameRaw);
+
+      if (!sanitizedAlbumFolderName) {
+        throw new Error('New album name is invalid after sanitization.');
+      }
+
+      targetAlbumDirectory = path.resolve(newAlbumParentDirectory, sanitizedAlbumFolderName);
     }
 
-    const targetOutputPath = path.resolve(saveResult.filePath);
-    await fs.mkdir(path.dirname(targetOutputPath), { recursive: true });
+    await fs.mkdir(targetAlbumDirectory, { recursive: true });
+
+    const outputTemplatePath = path.join(targetAlbumDirectory, `${safeStem}.%(ext)s`);
+    const splitIntoChapters = payload.splitIntoChapters === true;
 
     try {
-      const { stdout } = await runCommandCapture(ytDlpPath, [
+      const commandArgs = [
         '--no-playlist',
         '--no-progress',
         '--no-warnings',
         '--print',
         'after_move:filepath',
+      ];
+
+      if (splitIntoChapters) {
+        commandArgs.push('--split-chapters');
+      }
+
+      commandArgs.push(
         '--output',
-        targetOutputPath,
+        outputTemplatePath,
         parsedUrl.toString(),
-      ]);
+      );
+
+      const { stdout } = await runCommandCapture(ytDlpPath, commandArgs);
 
       const printedLines = stdout
         .split(/\r?\n/g)
         .map((line) => line.trim())
         .filter(Boolean);
-      const existingPrintedPath = printedLines
+      const existingPrintedPaths = printedLines
         .slice()
         .reverse()
-        .find((line) => fsSync.existsSync(line));
-      const outputPath = existingPrintedPath || targetOutputPath;
+        .filter((line) => fsSync.existsSync(line));
+      const discoveredPaths = [];
+
+      for (const candidatePath of existingPrintedPaths) {
+        if (!discoveredPaths.includes(candidatePath)) {
+          discoveredPaths.push(candidatePath);
+        }
+      }
+
+      if (discoveredPaths.length === 0) {
+        const directoryEntries = await fs.readdir(targetAlbumDirectory);
+        const candidatePaths = directoryEntries
+          .filter((entry) => path.parse(entry).name.toLowerCase().startsWith(safeStem.toLowerCase()))
+          .map((entry) => path.join(targetAlbumDirectory, entry));
+
+        const candidateStats = await Promise.all(
+          candidatePaths.map(async (candidatePath) => ({
+            candidatePath,
+            stats: await fs.stat(candidatePath),
+          })),
+        );
+
+        const fileCandidates = candidateStats.filter((candidate) => candidate.stats.isFile());
+
+        fileCandidates.sort((left, right) => right.stats.mtimeMs - left.stats.mtimeMs);
+        for (const candidate of fileCandidates) {
+          if (!discoveredPaths.includes(candidate.candidatePath)) {
+            discoveredPaths.push(candidate.candidatePath);
+          }
+        }
+      }
+
+      const outputPath = discoveredPaths[0] || '';
 
       if (!fsSync.existsSync(outputPath)) {
         throw new Error('yt-dlp finished but no output file was found at the expected location.');
       }
 
-      console.log('[backend-action] audio:download-from-url:done', outputPath);
-      return { outputPath };
+      console.log('[backend-action] audio:download-from-url:done', outputPath, discoveredPaths.length);
+      return {
+        outputPath,
+        outputPaths: discoveredPaths,
+      };
     } catch (error) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-        throw new Error(`Unable to run yt-dlp command "${ytDlpPath}". Check your Settings path or alias.`);
+        throw new Error('yt-dlp executable is missing. Re-enable web downloads in Settings to reinstall it.');
       }
 
       throw error;
