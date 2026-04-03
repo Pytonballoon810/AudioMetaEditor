@@ -1623,18 +1623,35 @@ textarea {
   font-size: 0.8rem;
 }
 
-.vst-rack-add-row {
-  display: grid;
-  gap: 0.55rem;
-  grid-template-columns: minmax(0, 1fr) auto;
+.vst-rack-plus-button {
+  width: 100%;
+  min-height: 3.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(117, 201, 255, 0.55);
+  background: linear-gradient(180deg, rgba(117, 201, 255, 0.08), rgba(255, 94, 168, 0.08));
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.92rem;
 }
 
-.vst-rack-add-row select {
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(5, 11, 17, 0.7);
-  color: var(--text);
-  padding: 0.52rem 0.62rem;
+.vst-rack-plus-button:hover:not(:disabled) {
+  border-color: rgba(255, 176, 214, 0.78);
+  background: linear-gradient(180deg, rgba(117, 201, 255, 0.16), rgba(255, 94, 168, 0.16));
+}
+
+.vst-rack-plus-button:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.vst-rack-plus-symbol {
+  font-size: 1.65rem;
+  line-height: 1;
+  color: rgba(255, 196, 217, 0.95);
 }
 
 .vst-rack-slots {
@@ -1643,6 +1660,12 @@ textarea {
   max-height: 300px;
   overflow: auto;
   padding-right: 0.15rem;
+}
+
+.vst-rack-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .vst-rack-slot {
@@ -1667,13 +1690,77 @@ textarea {
   padding: 0.35rem 0.25rem;
 }
 
-.vst-rack-slot-select {
+.vst-rack-slot-plugin {
   border-radius: 9px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(6, 11, 16, 0.75);
   color: var(--text);
   padding: 0.42rem 0.55rem;
   min-width: 0;
+  text-align: left;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.vst-rack-slot-plugin:hover,
+.vst-rack-slot-plugin:focus-visible {
+  border-color: rgba(117, 201, 255, 0.74);
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(117, 201, 255, 0.26);
+}
+
+.vst-rack-slot-plugin span,
+.plugin-picker-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vst-rack-slot-plugin small,
+.plugin-picker-item small {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plugin-picker-dialog {
+  width: min(760px, 100%);
+}
+
+.plugin-picker-list {
+  display: grid;
+  gap: 0.35rem;
+  max-height: min(58vh, 520px);
+  overflow: auto;
+  padding-right: 0.1rem;
+}
+
+.plugin-picker-item {
+  width: 100%;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(6, 11, 16, 0.75);
+  color: var(--text);
+  padding: 0.55rem 0.65rem;
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+}
+
+.plugin-picker-item:hover,
+.plugin-picker-item:focus-visible {
+  border-color: rgba(117, 201, 255, 0.74);
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(117, 201, 255, 0.26);
+}
+
+.plugin-picker-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .vst-rack-slot-status {
@@ -2627,8 +2714,7 @@ textarea {
     height: var(--toolbar-button-size);
   }
 
-  .settings-plugin-add-row,
-  .vst-rack-add-row {
+  .settings-plugin-add-row {
     grid-template-columns: 1fr;
   }
 
