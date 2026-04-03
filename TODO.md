@@ -2,7 +2,7 @@
 
 ## Features
 
-- [ ] Add file change listener to automatically update the app when files are added/removed/changed in the directory. Currently, the app only updates when the directory is reloaded.
+- [x] Add file change listener to automatically update the app when files are added/removed/changed in the directory. Currently, the app only updates when the directory is reloaded.
 - [ ] Add app as option in the "Open with" context menu for audio files and directories in the file manager.
 - [x] Add filling outline as border for track items in the track list when they are loaded. This indicates which tracks have been loaded/cached and which are still loading. This is especially useful when loading large directories, as it can take some time for all tracks to be loaded and cached.
 - [x] Also add that unloaded tracks are displayed greyed out but are still index instantly but make them only clickable when they are loaded.

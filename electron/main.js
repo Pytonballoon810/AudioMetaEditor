@@ -2,6 +2,7 @@ const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const chokidar = require('chokidar');
 const { app, BrowserWindow, dialog, ipcMain, net, protocol, Menu, screen, shell } = require('electron');
 
 const {
@@ -58,6 +59,9 @@ if (!singleInstanceLock) {
 
 let mainWindow = null;
 let pendingPaths = [];
+let libraryWatcher = null;
+let libraryWatcherDebounceTimer = null;
+let pendingLibraryChangedPath = null;
 const MAX_AUDIO_BLOB_BYTES = 80 * 1024 * 1024;
 const DEFAULT_WINDOW_WIDTH = 1520;
 const DEFAULT_WINDOW_HEIGHT = 940;
@@ -276,6 +280,105 @@ function registerIpcHandler(channel, handler) {
   });
 }
 
+async function disposeLibraryWatcher() {
+  if (libraryWatcherDebounceTimer) {
+    clearTimeout(libraryWatcherDebounceTimer);
+    libraryWatcherDebounceTimer = null;
+  }
+
+  pendingLibraryChangedPath = null;
+
+  if (!libraryWatcher) {
+    return;
+  }
+
+  const watcher = libraryWatcher;
+  libraryWatcher = null;
+
+  try {
+    await watcher.close();
+  } catch (error) {
+    console.warn('[library-watcher] Failed to close watcher cleanly:', error);
+  }
+}
+
+function scheduleLibraryChangedRefresh(changedPath) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  pendingLibraryChangedPath = changedPath || pendingLibraryChangedPath || '(unknown path)';
+
+  if (libraryWatcherDebounceTimer) {
+    clearTimeout(libraryWatcherDebounceTimer);
+  }
+
+  libraryWatcherDebounceTimer = setTimeout(() => {
+    libraryWatcherDebounceTimer = null;
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      pendingLibraryChangedPath = null;
+      return;
+    }
+
+    mainWindow.webContents.send('library:changed', {
+      changedPath: pendingLibraryChangedPath || '(unknown path)',
+      timestamp: Date.now(),
+    });
+    pendingLibraryChangedPath = null;
+  }, 420);
+}
+
+async function resolveWatchTargets(pathsToScan) {
+  const uniqueTargets = new Set();
+
+  for (const sourcePath of pathsToScan) {
+    try {
+      const resolved = path.resolve(sourcePath);
+      const stats = await fs.stat(resolved);
+      if (stats.isFile() || stats.isDirectory()) {
+        uniqueTargets.add(resolved);
+      }
+    } catch {
+      // Ignore paths that no longer exist.
+    }
+  }
+
+  return Array.from(uniqueTargets);
+}
+
+async function configureLibraryWatcher(pathsToScan) {
+  await disposeLibraryWatcher();
+  const watchTargets = await resolveWatchTargets(pathsToScan);
+  if (watchTargets.length === 0) {
+    return;
+  }
+
+  const watcher = chokidar.watch(watchTargets, {
+    ignoreInitial: true,
+    awaitWriteFinish: {
+      stabilityThreshold: 260,
+      pollInterval: 80,
+    },
+  });
+
+  const onFsChanged = (changedPath) => {
+    const normalizedPath = typeof changedPath === 'string' ? path.resolve(changedPath) : '(unknown path)';
+    scheduleLibraryChangedRefresh(normalizedPath);
+  };
+
+  watcher.on('add', onFsChanged);
+  watcher.on('change', onFsChanged);
+  watcher.on('unlink', onFsChanged);
+  watcher.on('addDir', onFsChanged);
+  watcher.on('unlinkDir', onFsChanged);
+  watcher.on('error', (error) => {
+    console.warn('[library-watcher] Watcher error:', error);
+  });
+
+  libraryWatcher = watcher;
+}
+
 async function createWindow() {
   const runtimeIconPath = resolveRuntimeIconPath();
   const restoredWindowState = getRestoredWindowState();
@@ -437,6 +540,7 @@ app.whenReady().then(async () => {
         console.warn('[backend-action] library:load:progress-send-failed', error);
       }
     });
+    await configureLibraryWatcher(pathsToScan);
     console.log('[backend-action] library:load:done', result.length);
     return result;
   });
@@ -721,4 +825,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  void disposeLibraryWatcher();
 });

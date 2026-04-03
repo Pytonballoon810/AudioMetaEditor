@@ -1,11 +1,14 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
-import type { ApiLogPayload, AudioMetaApi, LibraryProgressPayload } from '../../ipc/contracts';
+import type { ApiLogPayload, AudioMetaApi, LibraryChangedPayload, LibraryProgressPayload } from '../../ipc/contracts';
 import type { AudioLibraryItem } from '../../types';
 import { DESKTOP_BRIDGE_UNAVAILABLE_MESSAGE } from '../../services/audioMetaApi';
 
 type UseDesktopBridgeSubscriptionsArgs = {
   audioMetaApi: AudioMetaApi | undefined;
   loadPaths: (paths: string[], preferredActivePath?: string | null) => Promise<void>;
+  loadedSourcePaths: string[];
+  activePath: string | null;
+  isLoadingLibrary: boolean;
   setLibrary: Dispatch<SetStateAction<AudioLibraryItem[]>>;
   setActivePath: Dispatch<SetStateAction<string | null>>;
   setLibraryWidth: (width: number) => void;
@@ -18,6 +21,9 @@ type UseDesktopBridgeSubscriptionsArgs = {
 export function useDesktopBridgeSubscriptions({
   audioMetaApi,
   loadPaths,
+  loadedSourcePaths,
+  activePath,
+  isLoadingLibrary,
   setLibrary,
   setActivePath,
   setLibraryWidth,
@@ -89,4 +95,21 @@ export function useDesktopBridgeSubscriptions({
     setLibraryWidth,
     setStatus,
   ]);
+
+  useEffect(() => {
+    if (!audioMetaApi?.onLibraryChanged) {
+      return;
+    }
+
+    const dispose = audioMetaApi.onLibraryChanged((payload: LibraryChangedPayload) => {
+      if (loadedSourcePaths.length === 0 || isLoadingLibrary) {
+        return;
+      }
+
+      setStatus(`Detected library file changes at ${payload.changedPath}. Refreshing...`);
+      void loadPaths(loadedSourcePaths, activePath);
+    });
+
+    return dispose;
+  }, [activePath, audioMetaApi, isLoadingLibrary, loadPaths, loadedSourcePaths, setStatus]);
 }

@@ -14,6 +14,11 @@ export type LibraryProgressPayload = {
   items: AudioLibraryItem[];
 };
 
+export type LibraryChangedPayload = {
+  changedPath: string;
+  timestamp: number;
+};
+
 export type DownloadFromUrlPayload = { url: string };
 export type DownloadFromUrlResult = { outputPath: string } | null;
 
@@ -56,5 +61,6 @@ export interface AudioMetaApi {
   onOpenPaths: (callback: (paths: string[]) => void) => () => void;
   onApiLog: (callback: (payload: ApiLogPayload) => void) => () => void;
   onLibraryProgress: (callback: (payload: LibraryProgressPayload) => void) => () => void;
+  onLibraryChanged: (callback: (payload: LibraryChangedPayload) => void) => () => void;
   toMediaUrl: (filePath: string) => string;
 }
