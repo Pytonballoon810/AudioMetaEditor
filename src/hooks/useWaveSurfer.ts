@@ -346,25 +346,57 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate }: UseWaveSurfer
     waveSurfer.on('zoom', updateVisibleTimeframe);
     waveSurfer.on('scroll', updateVisibleTimeframe);
 
-    const scrollWaveformHorizontally = (event: WheelEvent & { wheelDeltaX?: number }) => {
-      const hasHorizontalDelta = Math.abs(event.deltaX) > 0.01;
-      const legacyHorizontalDelta =
-        typeof event.wheelDeltaX === 'number' && Math.abs(event.wheelDeltaX) > 0.01
-          ? (-event.wheelDeltaX / 120) * 40
+    const scrollWaveformHorizontally = (
+      event: WheelEvent & {
+        wheelDeltaX?: number;
+        wheelDeltaY?: number;
+        wheelDelta?: number;
+        axis?: number;
+        HORIZONTAL_AXIS?: number;
+        detail?: number;
+      },
+    ) => {
+      const pageSize = scrollElement?.clientWidth || containerElement.clientWidth || 1;
+      const hasHorizontalDelta = Number.isFinite(event.deltaX) && Math.abs(event.deltaX) > 0.01;
+      const fromDeltaX = hasHorizontalDelta ? wheelDeltaToPixels(event, event.deltaX, pageSize) : 0;
+
+      const legacyDeltaX =
+        typeof event.wheelDeltaX === 'number' && Math.abs(event.wheelDeltaX) > 0.01 ? (-event.wheelDeltaX / 120) * 40 : 0;
+
+      const hasLegacyHorizontalAxis =
+        typeof event.axis === 'number' && typeof event.HORIZONTAL_AXIS === 'number' && event.axis === event.HORIZONTAL_AXIS;
+      const fromLegacyAxis =
+        hasLegacyHorizontalAxis && typeof event.detail === 'number' && Math.abs(event.detail) > 0.01 ? event.detail * 16 : 0;
+
+      const fromShiftFallback =
+        Math.abs(fromDeltaX) <= 0.01 && Math.abs(legacyDeltaX) <= 0.01 && Math.abs(fromLegacyAxis) <= 0.01 && event.shiftKey
+          ? wheelDeltaToPixels(event, event.deltaY, pageSize)
           : 0;
-      const hasLegacyHorizontalDelta = Math.abs(legacyHorizontalDelta) > 0.01;
-      const useShiftAsHorizontal = !hasHorizontalDelta && !hasLegacyHorizontalDelta && event.shiftKey && Math.abs(event.deltaY) > 0.01;
-      if (!hasHorizontalDelta && !hasLegacyHorizontalDelta && !useShiftAsHorizontal) {
+
+      const fromLegacyWheelDelta =
+        Math.abs(fromDeltaX) <= 0.01 && Math.abs(legacyDeltaX) <= 0.01 && Math.abs(fromLegacyAxis) <= 0.01
+          ? (() => {
+              const wheelDelta = typeof event.wheelDelta === 'number' ? event.wheelDelta : 0;
+              const wheelDeltaY = typeof event.wheelDeltaY === 'number' ? event.wheelDeltaY : 0;
+              if (Math.abs(wheelDelta) <= 0.01) {
+                return 0;
+              }
+
+              if (Math.abs(wheelDeltaY) > 0.01) {
+                return 0;
+              }
+
+              return (-wheelDelta / 120) * 40;
+            })()
+          : 0;
+
+      const horizontalDelta = fromDeltaX || legacyDeltaX || fromLegacyAxis || fromShiftFallback || fromLegacyWheelDelta;
+
+      if (Math.abs(horizontalDelta) <= 0.01) {
         return false;
       }
 
-      const pageSize = scrollElement?.clientWidth || containerElement.clientWidth || 1;
-      const rawDelta = hasHorizontalDelta
-        ? wheelDeltaToPixels(event, event.deltaX, pageSize)
-        : hasLegacyHorizontalDelta
-          ? legacyHorizontalDelta
-          : wheelDeltaToPixels(event, event.deltaY, pageSize);
-      const delta = rawDelta * HORIZONTAL_SCROLL_SENSITIVITY;
+      const delta = horizontalDelta * HORIZONTAL_SCROLL_SENSITIVITY;
       const scrollableWaveSurfer = waveSurfer as WaveSurfer & {
         getScroll?: () => number;
         setScroll?: (value: number) => void;
