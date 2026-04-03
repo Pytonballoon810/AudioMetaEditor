@@ -7,8 +7,10 @@ export type ApiLogPayload = {
 };
 
 export type LibraryProgressPayload = {
+  phase?: 'indexing' | 'metadata';
   loaded: number;
   total: number;
+  indexed?: number;
   items: AudioLibraryItem[];
 };
 

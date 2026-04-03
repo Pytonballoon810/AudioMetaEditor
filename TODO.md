@@ -18,7 +18,7 @@
 ## Bugs
 
 - [x] Spacebar isnt handled as input when editing track metadata, like entering the track title. This is because spacebar is used to play/pause the track, but it should be possible to use spacebar as input when text fields are focused.
-- [ ] Loading progress is not updated when indexing a directory.
+- [x] Loading progress is not updated when indexing a directory.
 
 ## CD/CI
 
