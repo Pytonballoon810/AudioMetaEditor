@@ -88,15 +88,38 @@ function removeLibraryPaths(items: AudioLibraryItem[], removedPaths: string[]) {
   return items.filter((item) => !removedPaths.some((removedPath) => isSameOrChildPath(item.path, removedPath)));
 }
 
+function findInsertIndexByPath(items: AudioLibraryItem[], itemPath: string) {
+  let low = 0;
+  let high = items.length;
+
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    const midItem = items[mid];
+    if (!midItem || midItem.path.localeCompare(itemPath) <= 0) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+
+  return low;
+}
+
 function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLibraryItem[], loadedSourcePaths: string[]) {
   if (incomingItems.length === 0) {
     return items;
   }
 
-  const merged = new Map<string, AudioLibraryItem>();
+  const merged = [...items];
+  const indexByPath = new Map<string, number>();
 
-  for (const item of items) {
-    merged.set(normalizePathForComparison(item.path), item);
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (!item) {
+      continue;
+    }
+
+    indexByPath.set(normalizePathForComparison(item.path), index);
   }
 
   for (const incomingItem of incomingItems) {
@@ -109,10 +132,18 @@ function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLi
         }
       : incomingItem;
 
-    merged.set(normalizePathForComparison(nextItem.path), nextItem);
+    const normalizedPath = normalizePathForComparison(nextItem.path);
+    const existingIndex = indexByPath.get(normalizedPath);
+    if (existingIndex !== undefined) {
+      merged[existingIndex] = nextItem;
+      continue;
+    }
+
+    const insertIndex = findInsertIndexByPath(merged, nextItem.path);
+    merged.splice(insertIndex, 0, nextItem);
   }
 
-  return Array.from(merged.values()).sort((left, right) => left.path.localeCompare(right.path));
+  return merged;
 }
 
 function findLoadedItemPath(items: AudioLibraryItem[], pathValue: string) {
@@ -319,7 +350,9 @@ export function useDesktopBridgeSubscriptions({
 
             libraryRef.current = nextLibrary;
             setLibrary(nextLibrary);
-            setLibraryWidth(estimateLibraryWidthForItems(nextLibrary));
+            if (addedPaths.length > 0 || removedPaths.length > 0) {
+              setLibraryWidth(estimateLibraryWidthForItems(nextLibrary));
+            }
             setActivePath(nextActivePath);
             activePathRef.current = nextActivePath;
 
