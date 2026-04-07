@@ -137,10 +137,23 @@ jobs:
       - build-windows
 
     steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-artifacts
+
+      - name: Build release notes from changelog
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/build-release-body-from-changelog.sh CHANGELOG.md "${GITHUB_REF_NAME}" release-body.md
+          echo "body_path=release-body.md" >> "$GITHUB_OUTPUT"
 
       - name: Publish release assets
         uses: softprops/action-gh-release@v2
@@ -150,6 +163,7 @@ jobs:
             release-artifacts/**/*.deb
             release-artifacts/**/*.rpm
             release-artifacts/**/*.exe
+          body_path: ${{ steps.changelog.outputs.body_path }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
-          generate_release_notes: true
+          generate_release_notes: false
