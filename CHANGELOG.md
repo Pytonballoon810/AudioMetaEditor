@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Added repository operations guide in `AGENTS.md` for context loading and agent workflows.
+- Added visual system specification in `DESIGN.md` (palette, typography, layout, motion, and maintenance rules).
+
+## [v1] - 2026-04-03
+
+### Changed
+
+- CI release-tag workflow updated to include `GH_TOKEN` for tag publishing reliability.
+
+## [v1.0.0] - 2026-03-27
+
+### Added
+
+- Stable release line for AudioMetaEditor v1.0.0.
+- Audio conversion dropdown and FLAC support in player/import flows.
+
+### Changed
+
+- Cover editing workflow/toolbars unified and refined across library/metadata/player contexts.
+
+### Fixed
+
+- Reliability and UX fixes including cover persistence behavior, waveform loading robustness, and metadata-related polish.
+
 ## [0.2.0-rc.2] - 2026-03-24
 
 ### Fixed
@@ -59,3 +87,9 @@ All notable changes to this project are documented in this file.
   - `npm run lint`
   - `npm run typecheck`
   - `npm run tests`
+
+[Unreleased]: https://github.com/Pytonballoon810/AudioMetaEditor/compare/v1...main
+[v1]: https://github.com/Pytonballoon810/AudioMetaEditor/releases/tag/v1
+[v1.0.0]: https://github.com/Pytonballoon810/AudioMetaEditor/releases/tag/v1.0.0
+[0.2.0-rc.2]: https://github.com/Pytonballoon810/AudioMetaEditor/blob/main/docs/releases/0.2.0-rc.2.md
+[0.2.0-rc.1]: https://github.com/Pytonballoon810/AudioMetaEditor/blob/main/docs/releases/0.2.0-rc.1.md
