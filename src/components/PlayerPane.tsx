@@ -161,67 +161,6 @@ function buildRemovedRanges(edit: PendingWaveEdit, trackDuration: number): Remov
   return removedRanges;
 }
 
-function isWordBoundary(candidate: string, index: number) {
-  if (index <= 0) {
-    return true;
-  }
-
-  const previousChar = candidate[index - 1];
-  return previousChar === ' ' || previousChar === '_' || previousChar === '-' || previousChar === '/' || previousChar === '\\' || previousChar === '.';
-}
-
-function fuzzyMatchScore(candidateRaw: string, queryRaw: string) {
-  const candidate = candidateRaw.trim().toLowerCase();
-  const query = queryRaw.trim().toLowerCase();
-  if (!candidate || !query) {
-    return null;
-  }
-
-  const queryTokens = query.split(/\s+/g).filter(Boolean);
-  let totalScore = 0;
-
-  for (const token of queryTokens) {
-    let searchCursor = 0;
-    let previousIndex = -1;
-    let tokenScore = 0;
-
-    for (const tokenChar of token) {
-      const matchedIndex = candidate.indexOf(tokenChar, searchCursor);
-      if (matchedIndex < 0) {
-        return null;
-      }
-
-      tokenScore += 10;
-
-      if (matchedIndex === previousIndex + 1) {
-        tokenScore += 8;
-      } else if (previousIndex >= 0) {
-        tokenScore -= Math.min(5, matchedIndex - previousIndex - 1);
-      }
-
-      if (isWordBoundary(candidate, matchedIndex)) {
-        tokenScore += 5;
-      }
-
-      if (matchedIndex === 0) {
-        tokenScore += 7;
-      }
-
-      previousIndex = matchedIndex;
-      searchCursor = matchedIndex + 1;
-    }
-
-    if (candidate.includes(token)) {
-      tokenScore += 20;
-    }
-
-    totalScore += tokenScore;
-  }
-
-  totalScore -= candidate.length * 0.02;
-  return totalScore;
-}
-
 export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function PlayerPane(
   {
     item,
@@ -500,35 +439,10 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
       return vstPlugins;
     }
 
-    return vstPlugins
-      .map((plugin) => {
-        const nameScore = fuzzyMatchScore(plugin.name, query);
-        const formatScore = fuzzyMatchScore(plugin.format, query);
-        const pathScore = fuzzyMatchScore(plugin.filePath, query);
-
-        const weightedScore = Math.max(
-          nameScore === null ? Number.NEGATIVE_INFINITY : nameScore + 120,
-          formatScore === null ? Number.NEGATIVE_INFINITY : formatScore + 50,
-          pathScore === null ? Number.NEGATIVE_INFINITY : pathScore + 25,
-        );
-
-        if (!Number.isFinite(weightedScore)) {
-          return null;
-        }
-
-        return {
-          plugin,
-          weightedScore,
-        };
-      })
-      .filter((entry): entry is { plugin: VstPluginDescriptor; weightedScore: number } => Boolean(entry))
-      .sort(
-        (left, right) =>
-          right.weightedScore - left.weightedScore ||
-          left.plugin.name.localeCompare(right.plugin.name, undefined, { sensitivity: 'base' }) ||
-          left.plugin.filePath.localeCompare(right.plugin.filePath, undefined, { sensitivity: 'base' }),
-      )
-      .map((entry) => entry.plugin);
+    return vstPlugins.filter((plugin) => {
+      const haystack = `${plugin.name} ${plugin.format} ${plugin.filePath}`.toLowerCase();
+      return haystack.includes(query);
+    });
   }, [pluginPickerSearch, vstPlugins]);
 
   const removedRangeGuides = effectiveDuration
