@@ -29,6 +29,7 @@ type PlayerPaneProps = {
   onSplitSelection: (startTime: number, endTime: number, splitMode: 'keep' | 'slice', splitTitle: string) => Promise<void>;
   vstPlugins: VstPluginDescriptor[];
   vstRackSlots: { slot: number; pluginId: string | null; enabled: boolean }[];
+  onAddPluginToRack: (pluginId: string) => void;
   onAssignPluginToRackSlot: (slotNumber: number, pluginId: string | null) => void;
   onToggleRackSlot: (slotNumber: number) => void;
   onRemovePluginFromRackSlot: (slotNumber: number) => void;
@@ -171,6 +172,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
     onSplitSelection,
     vstPlugins,
     vstRackSlots,
+    onAddPluginToRack,
     onAssignPluginToRackSlot,
     onToggleRackSlot,
     onRemovePluginFromRackSlot,
@@ -190,9 +192,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [splitMode, setSplitMode] = useState<'keep' | 'slice'>('keep');
   const [splitTrackTitle, setSplitTrackTitle] = useState('');
-  const [isPluginPickerOpen, setIsPluginPickerOpen] = useState(false);
-  const [pluginPickerSearch, setPluginPickerSearch] = useState('');
-  const [pluginPickerTargetSlot, setPluginPickerTargetSlot] = useState<number | null>(null);
+  const [selectedPluginIdToAdd, setSelectedPluginIdToAdd] = useState('');
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [autoPlayNextTrackRequestId, setAutoPlayNextTrackRequestId] = useState(0);
@@ -426,57 +426,26 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   };
 
   const firstPendingEdit = pendingEdits.length > 0 ? pendingEdits[0] : null;
-  const loadedRackSlots = vstRackSlots.filter((slot) => slot.pluginId);
-  const firstEmptyRackSlot = vstRackSlots.find((slot) => !slot.pluginId) ?? null;
   const loadedRackSlotCount = vstRackSlots.filter((slot) => slot.pluginId).length;
   const enabledRackSlotCount = vstRackSlots.filter((slot) => slot.pluginId && slot.enabled).length;
   const hasEnabledRackPlugin = enabledRackSlotCount > 0;
   const canApplyVstRack = Boolean(item) && hasEnabledRackPlugin && !isApplyingVstRack;
 
-  const filteredPlugins = useMemo(() => {
-    const query = pluginPickerSearch.trim().toLowerCase();
-    if (!query) {
-      return vstPlugins;
-    }
-
-    return vstPlugins.filter((plugin) => {
-      const haystack = `${plugin.name} ${plugin.format} ${plugin.filePath}`.toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [pluginPickerSearch, vstPlugins]);
-
   const removedRangeGuides = effectiveDuration
     ? pendingEdits.flatMap((edit) => buildRemovedRanges(edit, effectiveDuration))
     : [];
 
-  const openPluginPickerForSlot = (slotNumber: number) => {
+  useEffect(() => {
     if (vstPlugins.length === 0) {
+      setSelectedPluginIdToAdd('');
       return;
     }
 
-    setPluginPickerTargetSlot(slotNumber);
-    setPluginPickerSearch('');
-    setIsPluginPickerOpen(true);
-  };
-
-  const openPluginPickerForNextSlot = () => {
-    if (!firstEmptyRackSlot || vstPlugins.length === 0) {
-      return;
+    const hasSelectedPlugin = vstPlugins.some((plugin) => plugin.id === selectedPluginIdToAdd);
+    if (!hasSelectedPlugin) {
+      setSelectedPluginIdToAdd(vstPlugins[0]?.id ?? '');
     }
-
-    openPluginPickerForSlot(firstEmptyRackSlot.slot);
-  };
-
-  const selectPluginFromPicker = (pluginId: string) => {
-    if (!pluginPickerTargetSlot) {
-      return;
-    }
-
-    onAssignPluginToRackSlot(pluginPickerTargetSlot, pluginId);
-    setIsPluginPickerOpen(false);
-    setPluginPickerTargetSlot(null);
-    setPluginPickerSearch('');
-  };
+  }, [selectedPluginIdToAdd, vstPlugins]);
 
   const confirmSplitSelection = () => {
     if (!item || !canSplitTrackType || !canSplitSelection || !splitTrackTitleTrimmed) {
@@ -869,36 +838,48 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           </span>
         </div>
 
-        <button
-          className="vst-rack-plus-button"
-          disabled={!firstEmptyRackSlot || vstPlugins.length === 0}
-          onClick={openPluginPickerForNextSlot}
-          type="button"
-        >
-          <span aria-hidden="true" className="vst-rack-plus-symbol">
-            +
-          </span>
-          <span>
-            {!firstEmptyRackSlot
-              ? 'Rack full'
-              : vstPlugins.length === 0
-                ? 'No plugins scanned'
-                : `Add slot ${String(firstEmptyRackSlot.slot).padStart(2, '0')}`}
-          </span>
-        </button>
+        <div className="vst-rack-add-row">
+          <select
+            disabled={vstPlugins.length === 0 || loadedRackSlotCount >= vstRackSlots.length}
+            onChange={(event) => setSelectedPluginIdToAdd(event.target.value)}
+            value={selectedPluginIdToAdd}
+          >
+            {vstPlugins.length === 0 ? <option value="">No scanned plugins found</option> : null}
+            {vstPlugins.map((plugin) => (
+              <option key={plugin.id} value={plugin.id}>
+                {plugin.name} ({plugin.format.toUpperCase()})
+              </option>
+            ))}
+          </select>
+          <button
+            className="secondary-button"
+            disabled={!selectedPluginIdToAdd || loadedRackSlotCount >= vstRackSlots.length}
+            onClick={() => onAddPluginToRack(selectedPluginIdToAdd)}
+            type="button"
+          >
+            Add plugin
+          </button>
+        </div>
 
         <div className="vst-rack-slots" role="list" aria-label="Plugin rack slots">
-          {loadedRackSlots.length === 0 ? <p className="vst-rack-empty">No plugins in rack. Use + to add one.</p> : null}
-          {loadedRackSlots.map((slot) => {
+          {vstRackSlots.map((slot) => {
             const selectedPlugin = slot.pluginId ? vstPlugins.find((plugin) => plugin.id === slot.pluginId) : null;
 
             return (
               <div className="vst-rack-slot" key={slot.slot} role="listitem">
                 <span className="vst-rack-slot-index">{String(slot.slot).padStart(2, '0')}</span>
-                <button className="vst-rack-slot-plugin" onClick={() => openPluginPickerForSlot(slot.slot)} type="button">
-                  <span>{selectedPlugin?.name || 'Missing plugin'}</span>
-                  <small>{selectedPlugin ? selectedPlugin.filePath : 'Plugin no longer in scan list'}</small>
-                </button>
+                <select
+                  className="vst-rack-slot-select"
+                  onChange={(event) => onAssignPluginToRackSlot(slot.slot, event.target.value || null)}
+                  value={slot.pluginId ?? ''}
+                >
+                  <option value="">Empty slot</option>
+                  {vstPlugins.map((plugin) => (
+                    <option key={plugin.id} value={plugin.id}>
+                      {plugin.name} ({plugin.format.toUpperCase()})
+                    </option>
+                  ))}
+                </select>
                 <label className="album-edit-switch" title={slot.enabled ? 'Plugin enabled' : 'Plugin bypassed'}>
                   <input
                     checked={Boolean(slot.pluginId) && slot.enabled}
@@ -930,73 +911,6 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
           Save button in the waveform toolbar applies the enabled rack when no edit operations are pending.
         </p>
       </section>
-
-      {isPluginPickerOpen ? (
-        <div
-          className="download-dialog-backdrop"
-          onClick={() => {
-            setIsPluginPickerOpen(false);
-            setPluginPickerTargetSlot(null);
-          }}
-          role="presentation"
-        >
-          <div
-            className="download-dialog plugin-picker-dialog"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Select VST plugin"
-          >
-            <div className="download-dialog-heading">
-              <h2>Select plugin for slot {pluginPickerTargetSlot ? String(pluginPickerTargetSlot).padStart(2, '0') : '--'}</h2>
-              <p>Search and pick one of the scanned plugins.</p>
-            </div>
-
-            <label className="settings-field">
-              Search plugins
-              <input
-                autoFocus
-                onChange={(event) => setPluginPickerSearch(event.target.value)}
-                placeholder="Type plugin name, format, or path"
-                value={pluginPickerSearch}
-              />
-            </label>
-
-            <div className="plugin-picker-list" role="list" aria-label="Available plugins">
-              {filteredPlugins.length === 0 ? (
-                <p className="plugin-picker-empty">No plugins match your search.</p>
-              ) : (
-                filteredPlugins.map((plugin) => (
-                  <button
-                    className="plugin-picker-item"
-                    key={plugin.id}
-                    onClick={() => selectPluginFromPicker(plugin.id)}
-                    role="listitem"
-                    type="button"
-                  >
-                    <span>{plugin.name}</span>
-                    <small>{plugin.format.toUpperCase()}</small>
-                    <small>{plugin.filePath}</small>
-                  </button>
-                ))
-              )}
-            </div>
-
-            <div className="download-dialog-actions">
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setIsPluginPickerOpen(false);
-                  setPluginPickerTargetSlot(null);
-                }}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {isSplitModalOpen ? (
         <div

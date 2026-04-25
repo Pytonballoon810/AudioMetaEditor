@@ -689,6 +689,29 @@ export default function App() {
     );
   }
 
+  function addPluginToRack(pluginId: string) {
+    setVstRackSlots((currentSlots) => {
+      const nextSlots = [...currentSlots];
+      const firstAvailableSlotIndex = nextSlots.findIndex((slot) => !slot.pluginId);
+      if (firstAvailableSlotIndex < 0) {
+        return currentSlots;
+      }
+
+      const targetSlot = nextSlots[firstAvailableSlotIndex];
+      if (!targetSlot) {
+        return currentSlots;
+      }
+
+      nextSlots[firstAvailableSlotIndex] = {
+        ...targetSlot,
+        pluginId,
+        enabled: true,
+      };
+
+      return nextSlots;
+    });
+  }
+
   async function applyVstRackToTrack() {
     setIsApplyingVstRack(true);
     try {
@@ -922,6 +945,7 @@ export default function App() {
             onConvertAudio={handleConvertAudio}
             vstPlugins={vstPlugins}
             vstRackSlots={vstRackSlots}
+            onAddPluginToRack={addPluginToRack}
             onAssignPluginToRackSlot={assignPluginToRackSlot}
             onToggleRackSlot={toggleRackSlot}
             onRemovePluginFromRackSlot={(slotNumber) => assignPluginToRackSlot(slotNumber, null)}
