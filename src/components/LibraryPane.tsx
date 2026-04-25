@@ -30,6 +30,7 @@ type LibraryPaneProps = {
   currentPath: string | null;
   isLoading: boolean;
   loadingProgress: { loaded: number; total: number } | null;
+  isTrackEditingLocked: boolean;
   onPlaybackOrderChange?: (groups: LibraryPanePlaybackOrderGroup[]) => void;
   onSelect: (item: AudioLibraryItem) => void;
   onApplyAlbumFields: (folderPath: string, metadata: AlbumBulkEditFields) => Promise<void>;
@@ -351,6 +352,7 @@ export function LibraryPane({
   currentPath,
   isLoading,
   loadingProgress,
+  isTrackEditingLocked,
   onPlaybackOrderChange,
   onSelect,
   onApplyAlbumFields,
@@ -385,6 +387,18 @@ export function LibraryPane({
   const albumCoverCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isAlbumWandDraggingRef = useRef(false);
   const hasAlbumWandEditsRef = useRef(false);
+
+  useEffect(() => {
+    if (!isTrackEditingLocked) {
+      return;
+    }
+
+    setTrackContextMenu(null);
+    setEditingAlbum(null);
+    setIsAlbumModalCoverPickerOpen(false);
+    setAlbumCoverImportError(null);
+    setIsAlbumWandActive(false);
+  }, [isTrackEditingLocked]);
 
   useEffect(() => {
     if (!editingAlbum) {
@@ -959,6 +973,10 @@ export function LibraryPane({
   }
 
   function openAlbumEditor(folderPath: string, folderName: string, albumItems: AudioLibraryItem[]) {
+    if (isTrackEditingLocked) {
+      return;
+    }
+
     setIsAlbumModalCoverPickerOpen(false);
     setAlbumCoverImportError(null);
     setIsAlbumWandActive(false);
@@ -1079,6 +1097,10 @@ export function LibraryPane({
   }
 
   function openTrackContextMenu(event: ReactMouseEvent, item: AudioLibraryItem) {
+    if (isTrackEditingLocked) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 
@@ -1104,7 +1126,7 @@ export function LibraryPane({
   }
 
   async function moveTrackToDirectory(targetDirectory: string) {
-    if (!trackContextMenu || isMovingTrack) {
+    if (!trackContextMenu || isMovingTrack || isTrackEditingLocked) {
       return;
     }
 
@@ -1119,7 +1141,7 @@ export function LibraryPane({
   }
 
   async function duplicateTrackFromContextMenu() {
-    if (!trackContextMenu || isMovingTrack || isTrackActionPending) {
+    if (!trackContextMenu || isMovingTrack || isTrackActionPending || isTrackEditingLocked) {
       return;
     }
 
@@ -1134,7 +1156,7 @@ export function LibraryPane({
   }
 
   async function deleteTrackFromContextMenu() {
-    if (!trackContextMenu || isMovingTrack || isTrackActionPending) {
+    if (!trackContextMenu || isMovingTrack || isTrackActionPending || isTrackEditingLocked) {
       return;
     }
 
@@ -1149,7 +1171,7 @@ export function LibraryPane({
   }
 
   async function moveTrackToPickedDirectory() {
-    if (!trackContextMenu || isMovingTrack) {
+    if (!trackContextMenu || isMovingTrack || isTrackEditingLocked) {
       return;
     }
 
@@ -1165,7 +1187,7 @@ export function LibraryPane({
   }
 
   async function moveTrackToNewAlbumInRoot() {
-    if (!trackContextMenu || isMovingTrack) {
+    if (!trackContextMenu || isMovingTrack || isTrackEditingLocked) {
       return;
     }
 
@@ -1184,7 +1206,7 @@ export function LibraryPane({
   }
 
   async function saveAlbumEditorChanges() {
-    if (!editingAlbum) {
+    if (!editingAlbum || isTrackEditingLocked) {
       return;
     }
 
@@ -1235,7 +1257,7 @@ export function LibraryPane({
   }
 
   async function onDownloadAlbumCover() {
-    if (!editingAlbum?.draft.coverArt) {
+    if (!editingAlbum?.draft.coverArt || isTrackEditingLocked) {
       return;
     }
 
@@ -1357,6 +1379,7 @@ export function LibraryPane({
                   )}
                   <button
                     className="library-album-name-button"
+                    disabled={isTrackEditingLocked}
                     onClick={(event) => {
                       event.stopPropagation();
                       openAlbumEditor(group.folderPath, group.folderName, group.items);
@@ -1400,16 +1423,16 @@ export function LibraryPane({
                       <button
                         key={item.path}
                         className={`library-item${isActive ? ' active' : ''}${isLoaded ? ' loaded' : ' loading'}`}
-                        disabled={!isLoaded}
+                        disabled={!isLoaded || isTrackEditingLocked}
                         onContextMenu={(event) => {
-                          if (!isLoaded) {
+                          if (!isLoaded || isTrackEditingLocked) {
                             return;
                           }
 
                           openTrackContextMenu(event, item);
                         }}
                         onClick={() => {
-                          if (!isLoaded) {
+                          if (!isLoaded || isTrackEditingLocked) {
                             return;
                           }
 
@@ -1544,7 +1567,7 @@ export function LibraryPane({
               <>
                 <button
                   className="library-context-menu-option"
-                  disabled={isMovingTrack || isTrackActionPending}
+                  disabled={isMovingTrack || isTrackActionPending || isTrackEditingLocked}
                   onMouseDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1557,7 +1580,7 @@ export function LibraryPane({
 
                 <button
                   className="library-context-menu-option"
-                  disabled={isMovingTrack || isTrackActionPending}
+                  disabled={isMovingTrack || isTrackActionPending || isTrackEditingLocked}
                   onMouseDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1570,7 +1593,7 @@ export function LibraryPane({
 
                 <button
                   className="library-context-menu-option"
-                  disabled={isMovingTrack || isTrackActionPending}
+                  disabled={isMovingTrack || isTrackActionPending || isTrackEditingLocked}
                   onMouseDown={(event) => {
                     event.preventDefault();
                     event.stopPropagation();
@@ -1591,7 +1614,7 @@ export function LibraryPane({
                     <button
                       key={`move-target-${group.folderPath}`}
                       className="library-context-menu-option track-context-target"
-                      disabled={isCurrentFolder || isMovingTrack}
+                      disabled={isCurrentFolder || isMovingTrack || isTrackEditingLocked}
                       onClick={() => void moveTrackToDirectory(group.folderPath)}
                       type="button"
                     >
@@ -1604,7 +1627,7 @@ export function LibraryPane({
                 <div className="track-context-submenu-actions">
                   <button
                     className="library-context-menu-option track-context-target"
-                    disabled={isMovingTrack}
+                    disabled={isMovingTrack || isTrackEditingLocked}
                     onClick={() => void moveTrackToPickedDirectory()}
                     type="button"
                   >
@@ -1613,7 +1636,7 @@ export function LibraryPane({
 
                   <button
                     className="library-context-menu-option track-context-target"
-                    disabled={isMovingTrack}
+                    disabled={isMovingTrack || isTrackEditingLocked}
                     onMouseDown={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -1665,7 +1688,7 @@ export function LibraryPane({
                     />
                     <button
                       className="library-context-menu-option track-context-create-action"
-                      disabled={isMovingTrack || !trackContextMenu.newAlbumName.trim()}
+                      disabled={isMovingTrack || isTrackEditingLocked || !trackContextMenu.newAlbumName.trim()}
                       onMouseDown={(event) => {
                         event.preventDefault();
                         event.stopPropagation();

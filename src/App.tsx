@@ -453,6 +453,8 @@ export default function App() {
     isWebDownloadEnabled,
   });
 
+  const isTrackMetadataEditingLocked = isDownloadingFromUrl;
+
   const handleAdvanceToNextTrack = useCallback(() => {
     if (!activeItem) {
       return false;
@@ -865,6 +867,7 @@ export default function App() {
           currentPath={activeItem?.path ?? null}
           isLoading={isLoadingLibrary}
           loadingProgress={libraryLoadingProgress}
+          isTrackEditingLocked={isTrackMetadataEditingLocked}
           onPlaybackOrderChange={handlePlaybackOrderChange}
           onApplyAlbumFields={handleApplyAlbumFields}
           onMoveTrackToAlbum={handleMoveTrackToAlbum}
@@ -949,6 +952,7 @@ export default function App() {
           onSaveAlbum={handleSaveAlbumMetadata}
           isSaving={isSaving}
           isSavingAlbum={isSavingAlbum}
+          isEditingLocked={isTrackMetadataEditingLocked}
           albumTrackCount={activeAlbumTrackCount}
           albumCoverOptions={activeAlbumCoverOptions}
           otherTrackCoverOptions={activeOtherTrackCoverOptions}

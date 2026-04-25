@@ -2248,6 +2248,13 @@ textarea {
   padding: 0 1.25rem 1.25rem;
 }
 
+.metadata-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
 .metadata-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

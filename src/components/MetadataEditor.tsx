@@ -51,6 +51,7 @@ type MetadataEditorProps = {
   onSaveAlbum: (metadata: EditableMetadata) => Promise<void>;
   isSaving: boolean;
   isSavingAlbum: boolean;
+  isEditingLocked: boolean;
   albumTrackCount: number;
   albumCoverOptions: string[];
   otherTrackCoverOptions: TrackCoverOption[];
@@ -139,6 +140,7 @@ export function MetadataEditor({
   onSaveAlbum,
   isSaving,
   isSavingAlbum,
+  isEditingLocked,
   albumTrackCount,
   albumCoverOptions,
   otherTrackCoverOptions,
@@ -160,6 +162,19 @@ export function MetadataEditor({
   const isWandDraggingRef = useRef(false);
   const hasWandEditsRef = useRef(false);
   const willConvertToFlacOnSave = item?.extension?.toLowerCase() === 'wav' && Boolean(draft.coverArt);
+  const isInteractionLocked = isSaving || isSavingAlbum || isEditingLocked;
+
+  useEffect(() => {
+    if (!isEditingLocked) {
+      return;
+    }
+
+    setIsAlbumCoverPickerOpen(false);
+    setIsTrackCoverPickerOpen(false);
+    setCoverContextMenu(null);
+    setIsWandActive(false);
+    isWandDraggingRef.current = false;
+  }, [isEditingLocked]);
 
   function applyCoverArt(nextCoverArt: string | null, trackHistory = true) {
     const currentCoverArt = currentCoverArtRef.current;
@@ -304,6 +319,11 @@ export function MetadataEditor({
   }, [draft.coverArt]);
 
   async function onCoverChange(event: ChangeEvent<HTMLInputElement>) {
+    if (isInteractionLocked) {
+      event.target.value = '';
+      return;
+    }
+
     const file = event.target.files?.[0];
     if (!file) {
       return;
@@ -506,6 +526,10 @@ export function MetadataEditor({
   }
 
   function openCoverContextMenu(event: ReactMouseEvent) {
+    if (isInteractionLocked) {
+      return;
+    }
+
     event.preventDefault();
 
     const menuWidth = 220;
@@ -560,9 +584,13 @@ export function MetadataEditor({
         className="metadata-form"
         onSubmit={(event) => {
           event.preventDefault();
+          if (isInteractionLocked) {
+            return;
+          }
           void onSave(draft);
         }}
       >
+        <fieldset className="metadata-fieldset" disabled={isInteractionLocked}>
         <div className="cover-card">
           <div className={`cover-image-editor${isWandActive ? ' wand-active' : ''}`}>
             <canvas
@@ -789,12 +817,12 @@ export function MetadataEditor({
         </div>
 
         <div className="metadata-actions">
-          <button className="primary-button" disabled={isSaving || isSavingAlbum} type="submit">
+          <button className="primary-button" disabled={isInteractionLocked} type="submit">
             {isSaving ? 'Saving track...' : 'Save track metadata'}
           </button>
           <button
             className="secondary-button"
-            disabled={albumTrackCount < 2 || isSaving || isSavingAlbum}
+            disabled={albumTrackCount < 2 || isInteractionLocked}
             onClick={() => void onSaveAlbum(draft)}
             title="Apply album-level fields only: album, album artist, composer, producer, genre, year, and cover art"
             type="button"
@@ -802,6 +830,7 @@ export function MetadataEditor({
             {isSavingAlbum ? 'Saving album...' : `Apply to album (${albumTrackCount} tracks)`}
           </button>
         </div>
+        </fieldset>
       </form>
 
       {coverContextMenu ? (
@@ -821,7 +850,7 @@ export function MetadataEditor({
           >
             <button
               className="library-context-menu-option"
-              disabled={!draft.coverArt}
+              disabled={!draft.coverArt || isInteractionLocked}
               onClick={() => {
                 void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover');
                 setCoverContextMenu(null);
