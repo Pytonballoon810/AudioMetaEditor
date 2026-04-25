@@ -94,6 +94,28 @@ This starts:
 - Vite renderer at `http://127.0.0.1:5173`.
 - Electron shell after renderer is reachable.
 
+### Windows Start Menu Shortcut (Dev)
+
+For a simple interactive menu (install/uninstall):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\dev-install\main.ps1
+```
+
+To create a Start Menu shortcut that launches development mode with the app icon:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\dev-install\install.ps1
+```
+
+To remove that Start Menu shortcut again:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\dev-install\uninstall.ps1
+```
+
+Scripts are kept in the `dev-install` folder. See `docs/windows-start-menu-dev-shortcut.md` for details.
+
 ### Run Tests
 
 ```bash
@@ -191,6 +213,7 @@ src/
 - `docs/releases/0.2.0-rc.2.md`
 - `docs/security-hardening-checklist.md`
 - `docs/validation.md`
+- `docs/windows-start-menu-dev-shortcut.md`
 
 ## Troubleshooting
 
