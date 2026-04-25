@@ -33,7 +33,6 @@ const {
   validateResolveVideoTitlePayload,
   validateConfigureWebDownloadToolsPayload,
   validateScanVstPluginsPayload,
-  validateApplyVstRackPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,
@@ -548,109 +547,6 @@ async function ensureManagedYtDlpInstalled() {
   }
 
   return binaryPath;
-}
-
-function shellQuoteCommandArgument(argument) {
-  const value = String(argument);
-  if (!/[\s"]/g.test(value)) {
-    return value;
-  }
-
-  return `"${value.replace(/"/g, '\\"')}"`;
-}
-
-async function canExecuteCommand(command, args) {
-  try {
-    await runCommandCapture(command, args);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function resolveVstHostExecutable(preferredExecutablePath) {
-  const envOverride = String(process.env.AUDIO_META_VST_HOST_PATH || '').trim();
-  const explicit = String(preferredExecutablePath || '').trim();
-  const candidates = [];
-
-  if (explicit) {
-    candidates.push(explicit);
-  }
-
-  if (envOverride) {
-    candidates.push(envOverride);
-  }
-
-  candidates.push('mrswatson64', 'mrswatson');
-
-  for (const candidate of candidates) {
-    if (await canExecuteCommand(candidate, ['--help'])) {
-      return candidate;
-    }
-  }
-
-  throw new Error(
-    'No VST host executable was found. Install MrsWatson (mrswatson64/mrswatson) and add it to PATH, set AUDIO_META_VST_HOST_PATH, or configure a host path in Settings.',
-  );
-}
-
-async function applyVstRackWithExternalHost(sourcePath, pluginPaths, hostExecutablePath) {
-  const resolvedSourcePath = path.resolve(sourcePath);
-  const sourceStats = await fs.stat(resolvedSourcePath);
-  if (!sourceStats.isFile()) {
-    throw new Error('VST apply source must be a file.');
-  }
-
-  const resolvedPlugins = Array.from(
-    new Set(pluginPaths.map((pluginPath) => path.resolve(String(pluginPath || '').trim())).filter(Boolean)),
-  );
-  if (resolvedPlugins.length === 0) {
-    throw new Error('At least one enabled plugin is required.');
-  }
-
-  for (const pluginPath of resolvedPlugins) {
-    if (!fsSync.existsSync(pluginPath)) {
-      throw new Error(`Plugin was not found on disk: ${pluginPath}`);
-    }
-  }
-
-  const hostExecutable = await resolveVstHostExecutable(hostExecutablePath);
-  const outputExtension = path.extname(resolvedSourcePath).toLowerCase() || '.wav';
-  const outputCandidate = path.join(
-    path.dirname(resolvedSourcePath),
-    `${path.basename(resolvedSourcePath, outputExtension)}-vst${outputExtension}`,
-  );
-  const outputPath = await ensureUniquePath(outputCandidate);
-
-  const tempDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'ame-vst-apply-'));
-  const renderedWavPath = path.join(tempDirectory, 'rendered.wav');
-  const pluginListArgument = resolvedPlugins.join(';');
-  const args = ['--quiet', '--input', resolvedSourcePath, '--output', renderedWavPath, '--plugin', pluginListArgument];
-
-  try {
-    await runCommandCapture(hostExecutable, args);
-    if (!fsSync.existsSync(renderedWavPath)) {
-      throw new Error('VST host completed without producing output audio.');
-    }
-
-    if (outputExtension === '.mp3' || outputExtension === '.flac') {
-      await convertAudioFormat(renderedWavPath, outputExtension.slice(1), outputPath);
-    } else if (outputExtension === '.wav') {
-      await fs.copyFile(renderedWavPath, outputPath);
-    } else {
-      throw new Error(
-        `Unsupported target format ${outputExtension} for VST render output. Use WAV, MP3, or FLAC source files.`,
-      );
-    }
-
-    return {
-      outputPath,
-      hostExecutable,
-      pluginList: resolvedPlugins.map((pluginPath) => shellQuoteCommandArgument(pluginPath)).join(';'),
-    };
-  } finally {
-    await fs.rm(tempDirectory, { recursive: true, force: true });
-  }
 }
 
 function delay(milliseconds) {
@@ -1336,25 +1232,6 @@ app.whenReady().then(async () => {
   registerIpcHandler('plugins:scan', async (_event, payload) => {
     validateScanVstPluginsPayload(payload);
     return scanVstPlugins(payload.paths);
-  });
-
-  registerIpcHandler('audio:apply-vst-rack', async (_event, payload) => {
-    validateApplyVstRackPayload(payload);
-    console.log('[backend-action] audio:apply-vst-rack:start', payload?.filePath, payload?.pluginPaths?.length || 0);
-
-    const result = await applyVstRackWithExternalHost(
-      payload.filePath,
-      payload.pluginPaths,
-      payload.hostExecutablePath,
-    );
-
-    console.log(
-      '[backend-action] audio:apply-vst-rack:done',
-      result.outputPath,
-      result.hostExecutable,
-      result.pluginList,
-    );
-    return { outputPath: result.outputPath };
   });
 
   registerIpcHandler('app:restart', async () => {

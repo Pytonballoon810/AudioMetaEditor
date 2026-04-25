@@ -185,23 +185,6 @@ function validateScanVstPluginsPayload(payload) {
   assertArrayOfStrings(payload.paths, 'payload.paths');
 }
 
-function validateApplyVstRackPayload(payload) {
-  if (!payload || typeof payload !== 'object') {
-    throw new Error('payload must be an object.');
-  }
-
-  assertString(payload.filePath, 'payload.filePath');
-  assertArrayOfStrings(payload.pluginPaths, 'payload.pluginPaths');
-
-  if (payload.pluginPaths.length === 0) {
-    throw new Error('payload.pluginPaths must include at least one plugin path.');
-  }
-
-  if (payload.hostExecutablePath !== undefined) {
-    assertString(payload.hostExecutablePath, 'payload.hostExecutablePath');
-  }
-}
-
 function validateMoveTrackPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('payload must be an object.');
@@ -243,7 +226,6 @@ module.exports = {
   validateResolveVideoTitlePayload,
   validateConfigureWebDownloadToolsPayload,
   validateScanVstPluginsPayload,
-  validateApplyVstRackPayload,
   validateMoveTrackPayload,
   validateOpenFileLocationPayload,
   validateSaveCoverImagePayload,
