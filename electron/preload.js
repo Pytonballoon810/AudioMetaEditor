@@ -151,6 +151,11 @@ function describeAction(callName, phase, args, result, error) {
       return result ? `Download finished and saved to ${result.outputPath}.` : 'Download was cancelled by user.';
   }
 
+  if (callName === 'resolveVideoTitleForAlbumName') {
+    if (phase === 'start') return 'Resolving video title for album preview.';
+    if (phase === 'done') return result ? `Resolved video title: ${result.albumName}.` : 'Unable to resolve video title.';
+  }
+
   if (callName === 'configureWebDownloadTools') {
     if (phase === 'start') return 'Applying web download settings.';
     if (phase === 'done') {
@@ -225,6 +230,7 @@ contextBridge.exposeInMainWorld('audioMetaApi', {
   scanVstPlugins: (payload) => invokeLogged('scanVstPlugins', 'plugins:scan', payload),
   applyVstRack: (payload) => invokeLogged('applyVstRack', 'audio:apply-vst-rack', payload),
   restartApplication: () => invokeLogged('restartApplication', 'app:restart'),
+  resolveVideoTitleForAlbumName: (payload) => ipcRenderer.invoke('audio:resolve-video-title', payload),
   downloadFromUrl: (payload) => invokeLogged('downloadFromUrl', 'audio:download-from-url', payload),
   saveMetadata: (payload) => invokeLogged('saveMetadata', 'metadata:save', payload),
   moveTrackToAlbum: (payload) => invokeLogged('moveTrackToAlbum', 'track:move-to-album', payload),

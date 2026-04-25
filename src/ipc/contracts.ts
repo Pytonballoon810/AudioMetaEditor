@@ -33,6 +33,9 @@ export type DownloadFromUrlPayload = {
 };
 export type DownloadFromUrlResult = { outputPath: string; outputPaths?: string[] } | null;
 
+export type ResolveVideoTitlePayload = { url: string };
+export type ResolveVideoTitleResult = { title: string; albumName: string };
+
 export type ConfigureWebDownloadToolsPayload = { enabled: boolean; acceptedWarning?: boolean };
 export type ConfigureWebDownloadToolsResult = {
   enabled: boolean;
@@ -103,6 +106,7 @@ export interface AudioMetaApi {
   scanVstPlugins: (payload: ScanVstPluginsPayload) => Promise<VstPluginDescriptor[]>;
   applyVstRack: (payload: ApplyVstRackPayload) => Promise<ApplyVstRackResult>;
   restartApplication: () => Promise<{ restarting: boolean }>;
+  resolveVideoTitleForAlbumName: (payload: ResolveVideoTitlePayload) => Promise<ResolveVideoTitleResult>;
   downloadFromUrl: (payload: DownloadFromUrlPayload) => Promise<DownloadFromUrlResult>;
   saveMetadata: (payload: SaveMetadataPayload) => Promise<SaveMetadataResult>;
   moveTrackToAlbum: (payload: MoveTrackToAlbumPayload) => Promise<MoveTrackToAlbumResult>;

@@ -30,6 +30,7 @@ const {
   validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
+  validateResolveVideoTitlePayload,
   validateConfigureWebDownloadToolsPayload,
   validateScanVstPluginsPayload,
   validateApplyVstRackPayload,
@@ -1372,6 +1373,62 @@ app.whenReady().then(async () => {
     }, 60);
 
     return { restarting: true };
+  });
+
+  registerIpcHandler('audio:resolve-video-title', async (_event, payload) => {
+    validateResolveVideoTitlePayload(payload);
+
+    const rawUrl = payload.url.trim();
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      throw new Error('Invalid URL format.');
+    }
+
+    const allowPrivateHosts = process.env.AUDIO_META_ALLOW_PRIVATE_DOWNLOADS === 'true';
+    if (!isAllowedDownloadUrl(parsedUrl, { allowPrivateHosts })) {
+      throw new Error(
+        'URL is blocked by security policy. Only public HTTP(S) hosts are allowed by default. Set AUDIO_META_ALLOW_PRIVATE_DOWNLOADS=true to override for trusted networks.',
+      );
+    }
+
+    const ytDlpPath = getExistingManagedYtDlpBinaryPath();
+    if (!ytDlpPath) {
+      throw new Error('Enable web downloads in Settings and save changes to install yt-dlp first.');
+    }
+
+    const metadataArgs = ['--no-playlist', '--dump-single-json', '--skip-download', '--no-warnings', parsedUrl.toString()];
+    const { stdout } = await runCommandCapture(ytDlpPath, metadataArgs);
+    const metadataLines = stdout
+      .split(/\r?\n/g)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    let metadataPayload = null;
+    for (let index = metadataLines.length - 1; index >= 0; index -= 1) {
+      try {
+        metadataPayload = JSON.parse(metadataLines[index]);
+        break;
+      } catch {
+        // Continue scanning lines until a valid JSON payload is found.
+      }
+    }
+
+    const resolvedTitle = typeof metadataPayload?.title === 'string' ? metadataPayload.title.trim() : '';
+    if (!resolvedTitle) {
+      throw new Error('Unable to resolve video title from this URL.');
+    }
+
+    const albumName = sanitizeFileSystemSegment(resolvedTitle);
+    if (!albumName) {
+      throw new Error('Resolved video title is invalid after sanitization.');
+    }
+
+    return {
+      title: resolvedTitle,
+      albumName,
+    };
   });
 
   registerIpcHandler('audio:download-from-url', async (_event, payload) => {

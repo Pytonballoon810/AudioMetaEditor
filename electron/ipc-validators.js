@@ -151,6 +151,14 @@ function validateDownloadFromUrlPayload(payload) {
   }
 }
 
+function validateResolveVideoTitlePayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('payload must be an object.');
+  }
+
+  assertString(payload.url, 'payload.url');
+}
+
 function validateConfigureWebDownloadToolsPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     throw new Error('payload must be an object.');
@@ -232,6 +240,7 @@ module.exports = {
   validateConvertAudioPayload,
   validateLoadBlobPayload,
   validateDownloadFromUrlPayload,
+  validateResolveVideoTitlePayload,
   validateConfigureWebDownloadToolsPayload,
   validateScanVstPluginsPayload,
   validateApplyVstRackPayload,

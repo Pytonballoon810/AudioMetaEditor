@@ -27,9 +27,12 @@ export function useMetadataActions({
 }: UseMetadataActionsArgs) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingAlbum, setIsSavingAlbum] = useState(false);
+  const isAbsolutePath = (pathValue: string) => /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(pathValue);
+  const isSavableLibraryItem = (item: AudioLibraryItem) => item.isMetadataLoaded && isAbsolutePath(item.path);
 
   async function handleSaveMetadata(metadata: EditableMetadata) {
-    if (!activeItem) {
+    if (!activeItem || !isSavableLibraryItem(activeItem)) {
+      setStatus('Selected track is still processing and cannot be saved yet.');
       return;
     }
 
@@ -90,8 +93,11 @@ export function useMetadataActions({
       return;
     }
 
-    const albumItems = library.filter((item) => item.directory === activeItem.directory);
+    const albumItems = library.filter(
+      (item) => item.directory === activeItem.directory && isSavableLibraryItem(item),
+    );
     if (albumItems.length === 0) {
+      setStatus('No completed tracks are ready for album metadata save yet.');
       return;
     }
 
@@ -149,8 +155,9 @@ export function useMetadataActions({
   }
 
   async function handleApplyAlbumFields(folderPath: string, metadata: AlbumBulkApplyFields) {
-    const albumItems = library.filter((item) => item.directory === folderPath);
+    const albumItems = library.filter((item) => item.directory === folderPath && isSavableLibraryItem(item));
     if (albumItems.length === 0) {
+      setStatus('No completed tracks are ready for album edits yet.');
       return;
     }
 

@@ -145,6 +145,9 @@ export default function App() {
   const [downloadTargetMode, setDownloadTargetMode] = useState<'existing' | 'new' | 'video-name-album'>('existing');
   const [downloadTargetExistingDirectory, setDownloadTargetExistingDirectory] = useState('');
   const [downloadTargetNewAlbumName, setDownloadTargetNewAlbumName] = useState('');
+  const [videoAlbumNamePreview, setVideoAlbumNamePreview] = useState('');
+  const [videoAlbumNamePreviewError, setVideoAlbumNamePreviewError] = useState<string | null>(null);
+  const [isResolvingVideoAlbumNamePreview, setIsResolvingVideoAlbumNamePreview] = useState(false);
   const [downloadFormat, setDownloadFormat] = useState<'flac' | 'mp3' | 'wav' | 'm4a'>('flac');
   const [splitDownloadIntoChapters, setSplitDownloadIntoChapters] = useState(false);
   const [isWebDownloadEnabled, setIsWebDownloadEnabled] = useState(() => getDefaultWebDownloadEnabledSetting());
@@ -745,8 +748,65 @@ export default function App() {
     }
 
     setDownloadTargetNewAlbumName('');
+    setVideoAlbumNamePreview('');
+    setVideoAlbumNamePreviewError(null);
+    setIsResolvingVideoAlbumNamePreview(false);
     setIsDownloadDialogOpen(true);
   }
+
+  useEffect(() => {
+    const shouldResolveVideoAlbumName =
+      isDownloadDialogOpen && downloadTargetMode === 'video-name-album' && splitDownloadIntoChapters;
+
+    if (!shouldResolveVideoAlbumName) {
+      setIsResolvingVideoAlbumNamePreview(false);
+      setVideoAlbumNamePreviewError(null);
+      return;
+    }
+
+    const trimmedUrl = downloadUrl.trim();
+    if (!trimmedUrl) {
+      setIsResolvingVideoAlbumNamePreview(false);
+      setVideoAlbumNamePreview('');
+      setVideoAlbumNamePreviewError(null);
+      return;
+    }
+
+    let isCancelled = false;
+    const debounceHandle = window.setTimeout(() => {
+      void (async () => {
+        setIsResolvingVideoAlbumNamePreview(true);
+        setVideoAlbumNamePreviewError(null);
+
+        try {
+          const api = requireAudioMetaApi();
+          const result = await api.resolveVideoTitleForAlbumName({ url: trimmedUrl });
+          if (isCancelled) {
+            return;
+          }
+
+          setVideoAlbumNamePreview(result.albumName);
+          setVideoAlbumNamePreviewError(null);
+        } catch (error) {
+          if (isCancelled) {
+            return;
+          }
+
+          setVideoAlbumNamePreview('');
+          setVideoAlbumNamePreviewError(toUserErrorMessage(error, 'Unable to resolve video title preview.'));
+        } finally {
+          if (!isCancelled) {
+            setIsResolvingVideoAlbumNamePreview(false);
+          }
+        }
+      })();
+    }, 320);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(debounceHandle);
+    };
+  }, [downloadTargetMode, downloadUrl, isDownloadDialogOpen, splitDownloadIntoChapters]);
 
   async function saveSettings() {
     const nextEnabled = isWebDownloadEnabledDraft;
@@ -1060,6 +1120,20 @@ export default function App() {
               </label>
             ) : null}
 
+            {downloadTargetMode === 'video-name-album' ? (
+              <div className="settings-field">
+                <strong>Album name preview</strong>
+                <p className="settings-help">
+                  {isResolvingVideoAlbumNamePreview
+                    ? 'Resolving video title...'
+                    : videoAlbumNamePreview
+                      ? videoAlbumNamePreview
+                      : 'Enter a URL to preview the album name.'}
+                </p>
+                {videoAlbumNamePreviewError ? <p className="settings-help">{videoAlbumNamePreviewError}</p> : null}
+              </div>
+            ) : null}
+
             <div className="download-chapters-toggle-wrap">
               <div className="download-chapters-toggle-copy">
                 <strong>Split download into specified chapters</strong>
@@ -1091,9 +1165,11 @@ export default function App() {
                 className="primary-button"
                 disabled={
                   isDownloadingFromUrl ||
+                  isResolvingVideoAlbumNamePreview ||
                   !downloadUrl.trim() ||
                   (downloadTargetMode === 'existing' && !downloadTargetExistingDirectory.trim()) ||
-                  (downloadTargetMode === 'new' && !downloadTargetNewAlbumName.trim())
+                  (downloadTargetMode === 'new' && !downloadTargetNewAlbumName.trim()) ||
+                  (downloadTargetMode === 'video-name-album' && !videoAlbumNamePreview.trim())
                 }
                 onClick={() => void handleDownloadFromUrl()}
                 type="button"
