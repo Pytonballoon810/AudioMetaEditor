@@ -2,9 +2,33 @@ import { useMemo } from 'react';
 import type { AudioLibraryItem, MetadataSuggestions } from '../../types';
 
 const ALBUM_MISMATCH_FIELDS = ['artist', 'album', 'producer', 'composer', 'genre', 'year'] as const;
+const ALBUM_MISMATCH_FIELD_LABELS: Record<(typeof ALBUM_MISMATCH_FIELDS)[number], string> = {
+  artist: 'Artist',
+  album: 'Album',
+  producer: 'Producer',
+  composer: 'Composer',
+  genre: 'Genre',
+  year: 'Year',
+};
 
 type AlbumMismatchField = (typeof ALBUM_MISMATCH_FIELDS)[number];
 export type AlbumMismatchMap = Record<AlbumMismatchField, boolean>;
+export type MismatchResolutionFieldOption = {
+  value: string;
+  count: number;
+};
+export type MismatchResolutionField = {
+  field: AlbumMismatchField;
+  label: string;
+  currentValue: string;
+  recommendedValue: string | null;
+  options: MismatchResolutionFieldOption[];
+  isRecommendationAmbiguous: boolean;
+};
+export type ActiveMismatchResolution = {
+  fields: MismatchResolutionField[];
+  hasSingleResolution: boolean;
+};
 
 function normalizeMetadataValue(value: string) {
   return value.trim();
@@ -175,11 +199,60 @@ export function useLibraryDerivations({ library, activeItem }: UseLibraryDerivat
     return next;
   }, [activeItem, library]);
 
+  const activeMismatchResolution = useMemo<ActiveMismatchResolution | null>(() => {
+    if (!activeItem || activeItem.isInOpenedDirectoryRoot) {
+      return null;
+    }
+
+    const albumItems = library.filter((item) => item.directory === activeItem.directory);
+    if (albumItems.length < 2) {
+      return null;
+    }
+
+    const mismatchFields = ALBUM_MISMATCH_FIELDS.filter((field) => activeAlbumMismatchFields[field]);
+    if (mismatchFields.length === 0) {
+      return null;
+    }
+
+    const fields: MismatchResolutionField[] = mismatchFields.map((field) => {
+      const valueCounts = new Map<string, number>();
+      for (const item of albumItems) {
+        const normalizedValue = normalizeMetadataValue(item.metadata[field]);
+        valueCounts.set(normalizedValue, (valueCounts.get(normalizedValue) ?? 0) + 1);
+      }
+
+      const sortedCounts = Array.from(valueCounts.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((left, right) => right.count - left.count || left.value.localeCompare(right.value));
+
+      const nonEmptyCounts = sortedCounts.filter((entry) => entry.value.length > 0);
+      const candidateCounts = nonEmptyCounts.length > 0 ? nonEmptyCounts : sortedCounts;
+      const topCount = candidateCounts[0]?.count ?? 0;
+      const topCandidates = candidateCounts.filter((entry) => entry.count === topCount);
+      const recommendedValue = topCandidates.length === 1 ? (topCandidates[0]?.value ?? null) : null;
+
+      return {
+        field,
+        label: ALBUM_MISMATCH_FIELD_LABELS[field],
+        currentValue: normalizeMetadataValue(activeItem.metadata[field]),
+        recommendedValue,
+        options: candidateCounts,
+        isRecommendationAmbiguous: topCandidates.length > 1,
+      };
+    });
+
+    return {
+      fields,
+      hasSingleResolution: fields.every((field) => field.recommendedValue !== null),
+    };
+  }, [activeAlbumMismatchFields, activeItem, library]);
+
   return {
     metadataSuggestions,
     activeAlbumTrackCount,
     activeAlbumCoverOptions,
     activeOtherTrackCoverOptions,
     activeAlbumMismatchFields,
+    activeMismatchResolution,
   };
 }

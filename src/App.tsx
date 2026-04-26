@@ -324,6 +324,7 @@ export default function App() {
     activeAlbumCoverOptions,
     activeOtherTrackCoverOptions,
     activeAlbumMismatchFields,
+    activeMismatchResolution,
   } = useLibraryDerivations({
     library,
     activeItem,
@@ -757,6 +758,7 @@ export default function App() {
           albumCoverOptions={activeAlbumCoverOptions}
           otherTrackCoverOptions={activeOtherTrackCoverOptions}
           albumMismatchFields={activeAlbumMismatchFields}
+          mismatchResolution={activeMismatchResolution}
           suggestions={metadataSuggestions}
           onSaveCoverImage={handleSaveCoverImage}
         />

@@ -18,6 +18,7 @@ import {
   useState,
 } from 'react';
 import type { AudioLibraryItem, EditableMetadata, MetadataSuggestions } from '../types';
+import type { ActiveMismatchResolution } from '../features/library/useLibraryDerivations';
 import defaultCover from '../assets/defaultCover.png';
 import { CoverEditToolbar, CoverToolbarButton, CoverToolbarDivider, CoverToolbarGroup } from './CoverEditToolbar';
 
@@ -56,6 +57,7 @@ type MetadataEditorProps = {
   albumCoverOptions: string[];
   otherTrackCoverOptions: TrackCoverOption[];
   albumMismatchFields: AlbumMismatchFields;
+  mismatchResolution: ActiveMismatchResolution | null;
   suggestions: MetadataSuggestions;
   onSaveCoverImage: (coverDataUrl: string | null, suggestedName: string) => Promise<void>;
 };
@@ -145,6 +147,7 @@ export function MetadataEditor({
   albumCoverOptions,
   otherTrackCoverOptions,
   albumMismatchFields,
+  mismatchResolution,
   suggestions,
   onSaveCoverImage,
 }: MetadataEditorProps) {
@@ -154,6 +157,8 @@ export function MetadataEditor({
   const [isTrackCoverPickerOpen, setIsTrackCoverPickerOpen] = useState(false);
   const [coverContextMenu, setCoverContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isWandActive, setIsWandActive] = useState(false);
+  const [isMismatchDialogOpen, setIsMismatchDialogOpen] = useState(false);
+  const [mismatchSelections, setMismatchSelections] = useState<Record<string, string>>({});
   const [coverUndoStack, setCoverUndoStack] = useState<Array<string | null>>([]);
   const [coverRedoStack, setCoverRedoStack] = useState<Array<string | null>>([]);
   const coverCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -163,6 +168,8 @@ export function MetadataEditor({
   const hasWandEditsRef = useRef(false);
   const willConvertToFlacOnSave = item?.extension?.toLowerCase() === 'wav' && Boolean(draft.coverArt);
   const isInteractionLocked = isSaving || isSavingAlbum || isEditingLocked;
+  const mismatchFields = mismatchResolution?.fields ?? [];
+  const hasMismatchIssue = mismatchFields.length > 0;
 
   useEffect(() => {
     if (!isEditingLocked) {
@@ -172,9 +179,23 @@ export function MetadataEditor({
     setIsAlbumCoverPickerOpen(false);
     setIsTrackCoverPickerOpen(false);
     setCoverContextMenu(null);
+    setIsMismatchDialogOpen(false);
     setIsWandActive(false);
     isWandDraggingRef.current = false;
   }, [isEditingLocked]);
+
+  useEffect(() => {
+    if (!isMismatchDialogOpen || !mismatchResolution) {
+      return;
+    }
+
+    const nextSelections: Record<string, string> = {};
+    for (const fieldPlan of mismatchResolution.fields) {
+      nextSelections[fieldPlan.field] = fieldPlan.recommendedValue ?? fieldPlan.currentValue;
+    }
+
+    setMismatchSelections(nextSelections);
+  }, [isMismatchDialogOpen, mismatchResolution]);
 
   function applyCoverArt(nextCoverArt: string | null, trackHistory = true) {
     const currentCoverArt = currentCoverArtRef.current;
@@ -557,6 +578,28 @@ export function MetadataEditor({
     );
   }
 
+  function formatMismatchOptionValue(value: string) {
+    return value.trim() ? value : '(empty)';
+  }
+
+  async function confirmMismatchResolution() {
+    if (!mismatchResolution || isInteractionLocked) {
+      return;
+    }
+
+    const nextDraft: EditableMetadata = { ...draft };
+    for (const fieldPlan of mismatchResolution.fields) {
+      const selectedValue = mismatchResolution.hasSingleResolution
+        ? (fieldPlan.recommendedValue ?? mismatchSelections[fieldPlan.field] ?? fieldPlan.currentValue)
+        : (mismatchSelections[fieldPlan.field] ?? fieldPlan.currentValue);
+      nextDraft[fieldPlan.field] = selectedValue;
+    }
+
+    setDraft(nextDraft);
+    setIsMismatchDialogOpen(false);
+    await onSave(nextDraft);
+  }
+
   if (!item) {
     return (
       <section className="panel metadata-panel">
@@ -829,9 +872,115 @@ export function MetadataEditor({
           >
             {isSavingAlbum ? 'Saving album...' : `Apply to album (${albumTrackCount} tracks)`}
           </button>
+          {hasMismatchIssue ? (
+            <button
+              className="secondary-button"
+              disabled={isInteractionLocked}
+              onClick={() => setIsMismatchDialogOpen(true)}
+              title="Resolve mismatched album metadata fields for this track"
+              type="button"
+            >
+              Resolve mismatches
+            </button>
+          ) : null}
         </div>
         </fieldset>
       </form>
+
+      {isMismatchDialogOpen && mismatchResolution ? (
+        <div
+          className="download-dialog-backdrop"
+          onClick={() => {
+            if (isInteractionLocked) {
+              return;
+            }
+
+            setIsMismatchDialogOpen(false);
+          }}
+          role="presentation"
+        >
+          <section className="download-dialog mismatch-resolve-dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="download-dialog-heading">
+              <p className="eyebrow">Metadata mismatch</p>
+              <h2>Resolve track mismatch</h2>
+              <p>
+                {mismatchResolution.hasSingleResolution
+                  ? 'One clear album consensus was found. This action will apply and save the values below.'
+                  : 'Multiple possible values were found. Choose how each field should be resolved before saving.'}
+              </p>
+            </div>
+
+            {mismatchResolution.hasSingleResolution ? (
+              <div className="mismatch-resolution-list" role="list">
+                {mismatchResolution.fields.map((fieldPlan) => (
+                  <div className="mismatch-resolution-row" key={`single-${fieldPlan.field}`} role="listitem">
+                    <strong>{fieldPlan.label}</strong>
+                    <span>
+                      {formatMismatchOptionValue(fieldPlan.currentValue)} {'->'}{' '}
+                      {formatMismatchOptionValue(fieldPlan.recommendedValue ?? fieldPlan.currentValue)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mismatch-resolution-grid">
+                {mismatchResolution.fields.map((fieldPlan) => {
+                  const selectedValue = mismatchSelections[fieldPlan.field] ?? fieldPlan.currentValue;
+                  return (
+                    <label className="settings-field" key={`choice-${fieldPlan.field}`}>
+                      {fieldPlan.label}
+                      <select
+                        onChange={(event) =>
+                          setMismatchSelections((current) => ({
+                            ...current,
+                            [fieldPlan.field]: event.target.value,
+                          }))
+                        }
+                        value={selectedValue}
+                      >
+                        {fieldPlan.options.map((option) => {
+                          const isCurrent = option.value === fieldPlan.currentValue;
+                          const isRecommended = fieldPlan.recommendedValue !== null && option.value === fieldPlan.recommendedValue;
+                          const optionSuffix = [
+                            `${option.count} track${option.count === 1 ? '' : 's'}`,
+                            isCurrent ? 'current' : '',
+                            isRecommended ? 'recommended' : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' • ');
+
+                          return (
+                            <option key={`${fieldPlan.field}-${option.value || '__empty__'}`} value={option.value}>
+                              {formatMismatchOptionValue(option.value)} ({optionSuffix})
+                            </option>
+                          );
+                        })}
+                      </select>
+                      {fieldPlan.isRecommendationAmbiguous ? (
+                        <span className="settings-help">No single recommended value for this field.</span>
+                      ) : null}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="download-dialog-actions">
+              <button
+                className="secondary-button"
+                disabled={isInteractionLocked}
+                onClick={() => setIsMismatchDialogOpen(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button className="primary-button" disabled={isInteractionLocked} onClick={() => void confirmMismatchResolution()} type="button">
+                Apply and save
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {coverContextMenu ? (
         <div

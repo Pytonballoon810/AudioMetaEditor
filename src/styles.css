@@ -1232,6 +1232,39 @@ textarea {
   color: var(--text);
 }
 
+.mismatch-resolve-dialog {
+  width: min(620px, 100%);
+}
+
+.mismatch-resolution-grid {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.mismatch-resolution-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.mismatch-resolution-row {
+  display: grid;
+  gap: 0.14rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.58rem 0.64rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.mismatch-resolution-row strong {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.mismatch-resolution-row span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
 .download-chapters-toggle-wrap {
   display: flex;
   align-items: center;
