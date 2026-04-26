@@ -26,10 +26,11 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier . --check",
     "format:write": "prettier . --write",
+    "check:version:latest-tag": "node ./scripts/check-version-vs-latest-tag.mjs",
     "ci:quality": "npm run lint && npm run format && npm run typecheck && npm run tests",
     "ci:build:windows:local": "npm run build:windows -- --publish never --config.win.signAndEditExecutable=false",
     "ci:local": "npm run ci:quality && npm run ci:build:windows:local",
-    "ci:verify:publish": "npm run ci:local",
+    "ci:verify:publish": "npm run ci:local && npm run check:version:latest-tag",
     "hooks:install": "git config core.hooksPath .githooks",
     "hooks:status": "git config --get core.hooksPath"
   },

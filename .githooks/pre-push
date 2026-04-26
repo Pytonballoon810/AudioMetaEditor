@@ -2,4 +2,4 @@
 set -e
 
 echo "[local-ci] Running local pipeline parity checks (quality + windows build)..."
-npm run ci:verify:publish
+npm run ci:local

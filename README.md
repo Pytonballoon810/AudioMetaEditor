@@ -151,6 +151,8 @@ Use this explicit pre-publish verification command any time before pushing a rel
 npm run ci:verify:publish
 ```
 
+`ci:verify:publish` additionally checks that `package.json` version matches the latest git tag (accepts optional `v` prefix on the tag).
+
 Manual run (without pushing):
 
 ```bash
