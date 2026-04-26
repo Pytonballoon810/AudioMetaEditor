@@ -4,7 +4,7 @@ import { MetadataEditor } from './components/MetadataEditor';
 import { PlayerPane, type PlayerPaneHandle } from './components/PlayerPane';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Copy01Icon, Settings01Icon } from '@hugeicons/core-free-icons';
-import { requireAudioMetaApi } from './services/audioMetaApi';
+import { preloadAudioBlob, requireAudioMetaApi } from './services/audioMetaApi';
 import { useLibraryState } from './features/library/useLibraryState';
 import { useSessionRestore } from './features/library/useSessionRestore';
 import { useDesktopBridgeSubscriptions } from './features/library/useDesktopBridgeSubscriptions';
@@ -381,6 +381,31 @@ export default function App() {
 
   const isTrackMetadataEditingLocked = isDownloadingFromUrl;
 
+  const prefetchNextTrackBlob = useCallback(() => {
+    if (!activeItem) {
+      return;
+    }
+
+    const activeGroup = playbackOrderGroupsRef.current.find((group) => group.trackPaths.includes(activeItem.path));
+    if (!activeGroup || activeGroup.trackPaths.length < 2) {
+      return;
+    }
+
+    const currentIndex = activeGroup.trackPaths.findIndex((trackPath) => trackPath === activeItem.path);
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const nextPath = activeGroup.trackPaths[(currentIndex + 1) % activeGroup.trackPaths.length];
+    if (!nextPath || nextPath === activeItem.path) {
+      return;
+    }
+
+    void preloadAudioBlob(nextPath).catch(() => {
+      // Preload is best-effort optimization for smoother transitions.
+    });
+  }, [activeItem]);
+
   const handleAdvanceToNextTrack = useCallback(() => {
     if (!activeItem) {
       return false;
@@ -409,7 +434,12 @@ export default function App() {
 
   const handlePlaybackOrderChange = useCallback((groups: LibraryPanePlaybackOrderGroup[]) => {
     playbackOrderGroupsRef.current = groups;
-  }, []);
+    prefetchNextTrackBlob();
+  }, [prefetchNextTrackBlob]);
+
+  useEffect(() => {
+    prefetchNextTrackBlob();
+  }, [prefetchNextTrackBlob]);
 
   useEffect(() => {
     if (!hasWebDownloadsEnabled && isDownloadDialogOpen) {

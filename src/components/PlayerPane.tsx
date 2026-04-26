@@ -177,8 +177,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const [splitTrackTitle, setSplitTrackTitle] = useState('');
   const [pendingEdits, setPendingEdits] = useState<PendingWaveEdit[]>([]);
   const [redoPendingEdits, setRedoPendingEdits] = useState<PendingWaveEdit[]>([]);
-  const [autoPlayNextTrackRequestId, setAutoPlayNextTrackRequestId] = useState(0);
   const autoPlayNextTrackOnReadyRef = useRef(false);
+  const playOnReadyRef = useRef<(() => void) | null>(null);
   const audioUrl = item ? item.path : null;
 
   const handleReady = useCallback((loadedDuration: number) => {
@@ -187,7 +187,7 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
 
     if (autoPlayNextTrackOnReadyRef.current) {
       autoPlayNextTrackOnReadyRef.current = false;
-      setAutoPlayNextTrackRequestId((current) => current + 1);
+      playOnReadyRef.current?.();
     }
   }, []);
 
@@ -255,12 +255,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   }, [item?.path]);
 
   useEffect(() => {
-    if (autoPlayNextTrackRequestId <= 0) {
-      return;
-    }
-
-    play();
-  }, [autoPlayNextTrackRequestId, play]);
+    playOnReadyRef.current = play;
+  }, [play]);
 
   const normalizedSelectionStart = Math.max(0, selection.start);
   const normalizedSelectionEnd = Math.max(normalizedSelectionStart, selection.end);
