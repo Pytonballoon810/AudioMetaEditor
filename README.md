@@ -122,6 +122,41 @@ Scripts are kept in the `dev-install` folder. See `docs/windows-start-menu-dev-s
 npm run tests
 ```
 
+### Local Pipeline Hook (Pre-Push)
+
+You can run your GitHub pipeline checks locally before every push.
+
+1. Install hooks for this clone:
+
+```bash
+npm run hooks:install
+```
+
+2. Verify hook path:
+
+```bash
+npm run hooks:status
+```
+
+Expected output: `.githooks`
+
+After setup, every `git push` runs:
+
+- `npm run ci:quality` (`lint`, `format`, `typecheck`, `tests`)
+- `npm run ci:build:windows:local` (`build:windows -- --publish never`)
+
+Use this explicit pre-publish verification command any time before pushing a release/tag:
+
+```bash
+npm run ci:verify:publish
+```
+
+Manual run (without pushing):
+
+```bash
+npm run ci:local
+```
+
 ### Type Check and Production Build
 
 ```bash

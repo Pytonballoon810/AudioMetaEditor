@@ -25,7 +25,13 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --check",
-    "format:write": "prettier . --write"
+    "format:write": "prettier . --write",
+    "ci:quality": "npm run lint && npm run format && npm run typecheck && npm run tests",
+    "ci:build:windows:local": "npm run build:windows -- --publish never",
+    "ci:local": "npm run ci:quality && npm run ci:build:windows:local",
+    "ci:verify:publish": "npm run ci:local",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "hooks:status": "git config --get core.hooksPath"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.0.0",
