@@ -143,7 +143,7 @@ Expected output: `.githooks`
 After setup, every `git push` runs:
 
 - `npm run ci:quality` (`lint`, `format`, `typecheck`, `tests`)
-- `npm run ci:build:windows:local` (`build:windows -- --publish never`)
+- `npm run ci:build:windows:local` (`build:windows -- --publish never --config.win.signAndEditExecutable=false`)
 
 Use this explicit pre-publish verification command any time before pushing a release/tag:
 
