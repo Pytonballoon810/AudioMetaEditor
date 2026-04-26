@@ -9,7 +9,7 @@
 - [x] When updating metadata of a track, update the track item in the track list immediately to reflect the changes. Move the process to another thread to avoid blocking the UI and make it more responsive.
 - [x] Split selected Segment from wav into a new track and save it as a new file in the same Album directory. This is useful for splitting long recordings into multiple tracks. This should prompt teh user to enter the title manually but copy the other metadata from the original track. This should also update the track list and the album metadata accordingly.
 - [ ] Add option to add up to 10 VST plugins to apply to the track. Should be implemented as the todo below would be implemented, but instead of applying the EQ settings, it would apply the VST plugin settings. This would allow users to apply effects to their tracks without having to use a separate DAW. The VST plugins should be applied temporarily until they are applied like the other edits.
-(- Add simple EQ tool for waveform editor. This will apply the EQ settings to the track when it is played. This EQ should be temporarily applied until it is applied like the other edits.)
+      (- Add simple EQ tool for waveform editor. This will apply the EQ settings to the track when it is played. This EQ should be temporarily applied until it is applied like the other edits.)
 
 ## Style
 

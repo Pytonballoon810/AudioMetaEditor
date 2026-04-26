@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { LibraryPane, type LibraryPanePlaybackOrderGroup } from './components/LibraryPane';
 import { MetadataEditor } from './components/MetadataEditor';
 import { PlayerPane, type PlayerPaneHandle } from './components/PlayerPane';
@@ -93,8 +101,8 @@ export default function App() {
     getDefaultWebDownloadEnabledSetting(),
   );
   const [isWebDownloadNoticeOpen, setIsWebDownloadNoticeOpen] = useState(false);
-  const [hasAcceptedWebDownloadNoticeDraft, setHasAcceptedWebDownloadNoticeDraft] = useState(
-    () => getDefaultWebDownloadEnabledSetting(),
+  const [hasAcceptedWebDownloadNoticeDraft, setHasAcceptedWebDownloadNoticeDraft] = useState(() =>
+    getDefaultWebDownloadEnabledSetting(),
   );
   const [isApplyingWebDownloadSettings, setIsApplyingWebDownloadSettings] = useState(false);
   const [metadataWidth, setMetadataWidth] = useState(() =>
@@ -432,10 +440,13 @@ export default function App() {
     return true;
   }, [activeItem, library, setActivePath]);
 
-  const handlePlaybackOrderChange = useCallback((groups: LibraryPanePlaybackOrderGroup[]) => {
-    playbackOrderGroupsRef.current = groups;
-    prefetchNextTrackBlob();
-  }, [prefetchNextTrackBlob]);
+  const handlePlaybackOrderChange = useCallback(
+    (groups: LibraryPanePlaybackOrderGroup[]) => {
+      playbackOrderGroupsRef.current = groups;
+      prefetchNextTrackBlob();
+    },
+    [prefetchNextTrackBlob],
+  );
 
   useEffect(() => {
     prefetchNextTrackBlob();
@@ -454,7 +465,9 @@ export default function App() {
 
     if (downloadAlbumOptions.length > 0) {
       const hasExisting = downloadAlbumOptions.some((option) => option.directory === downloadTargetExistingDirectory);
-      setDownloadTargetExistingDirectory(hasExisting ? downloadTargetExistingDirectory : downloadAlbumOptions[0]?.directory ?? '');
+      setDownloadTargetExistingDirectory(
+        hasExisting ? downloadTargetExistingDirectory : (downloadAlbumOptions[0]?.directory ?? ''),
+      );
       setDownloadTargetMode('existing');
       return;
     }
@@ -826,9 +839,7 @@ export default function App() {
             <label className="settings-field">
               File type
               <select
-                onChange={(event) =>
-                  setDownloadFormat(event.target.value as 'flac' | 'mp3' | 'wav' | 'm4a')
-                }
+                onChange={(event) => setDownloadFormat(event.target.value as 'flac' | 'mp3' | 'wav' | 'm4a')}
                 value={downloadFormat}
               >
                 <option value="flac">FLAC</option>
@@ -954,11 +965,7 @@ export default function App() {
       ) : null}
 
       {isSettingsDialogOpen ? (
-        <div
-          className="download-dialog-backdrop"
-          onClick={() => setIsSettingsDialogOpen(false)}
-          role="presentation"
-        >
+        <div className="download-dialog-backdrop" onClick={() => setIsSettingsDialogOpen(false)} role="presentation">
           <section className="download-dialog settings-dialog" onClick={(event) => event.stopPropagation()}>
             <div className="download-dialog-heading">
               <p className="eyebrow">Settings</p>
@@ -1027,9 +1034,7 @@ export default function App() {
             <div className="download-dialog-heading">
               <p className="eyebrow">Notice</p>
               <h2>yt-dlp will be installed</h2>
-              <p>
-                If you save these settings, the app will download yt-dlp as a dependency and restart automatically.
-              </p>
+              <p>If you save these settings, the app will download yt-dlp as a dependency and restart automatically.</p>
             </div>
             <div className="download-dialog-actions">
               <button

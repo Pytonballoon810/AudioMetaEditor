@@ -634,256 +634,256 @@ export function MetadataEditor({
         }}
       >
         <fieldset className="metadata-fieldset" disabled={isInteractionLocked}>
-        <div className="cover-card">
-          <div className={`cover-image-editor${isWandActive ? ' wand-active' : ''}`}>
-            <canvas
-              aria-label="Album cover editor"
-              className="cover-image-canvas"
-              onContextMenu={openCoverContextMenu}
-              onPointerDown={handleCoverPointerDown}
-              onPointerMove={handleCoverPointerMove}
-              onPointerUp={handleCoverPointerUp}
-              onPointerCancel={handleCoverPointerUp}
-              ref={coverCanvasRef}
-            />
-          </div>
-          <CoverEditToolbar ariaLabel="Cover editing toolbar">
-            <CoverToolbarGroup>
-              <CoverToolbarButton
-                ariaLabel="Undo cover edit"
-                disabled={coverUndoStack.length === 0}
-                onClick={undoCoverArtEdit}
-                title={coverUndoStack.length > 0 ? 'Undo last cover edit' : 'No cover edit to undo'}
-              >
-                <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
-              </CoverToolbarButton>
-              <CoverToolbarButton
-                ariaLabel="Redo cover edit"
-                disabled={coverRedoStack.length === 0}
-                onClick={redoCoverArtEdit}
-                title={coverRedoStack.length > 0 ? 'Redo last undone cover edit' : 'No cover edit to redo'}
-              >
-                <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
-              </CoverToolbarButton>
-            </CoverToolbarGroup>
+          <div className="cover-card">
+            <div className={`cover-image-editor${isWandActive ? ' wand-active' : ''}`}>
+              <canvas
+                aria-label="Album cover editor"
+                className="cover-image-canvas"
+                onContextMenu={openCoverContextMenu}
+                onPointerDown={handleCoverPointerDown}
+                onPointerMove={handleCoverPointerMove}
+                onPointerUp={handleCoverPointerUp}
+                onPointerCancel={handleCoverPointerUp}
+                ref={coverCanvasRef}
+              />
+            </div>
+            <CoverEditToolbar ariaLabel="Cover editing toolbar">
+              <CoverToolbarGroup>
+                <CoverToolbarButton
+                  ariaLabel="Undo cover edit"
+                  disabled={coverUndoStack.length === 0}
+                  onClick={undoCoverArtEdit}
+                  title={coverUndoStack.length > 0 ? 'Undo last cover edit' : 'No cover edit to undo'}
+                >
+                  <HugeiconsIcon icon={UndoIcon} size={18} strokeWidth={1.8} />
+                </CoverToolbarButton>
+                <CoverToolbarButton
+                  ariaLabel="Redo cover edit"
+                  disabled={coverRedoStack.length === 0}
+                  onClick={redoCoverArtEdit}
+                  title={coverRedoStack.length > 0 ? 'Redo last undone cover edit' : 'No cover edit to redo'}
+                >
+                  <HugeiconsIcon icon={RedoIcon} size={18} strokeWidth={1.8} />
+                </CoverToolbarButton>
+              </CoverToolbarGroup>
 
-            <CoverToolbarDivider />
+              <CoverToolbarDivider />
 
-            <CoverToolbarGroup>
-              <CoverToolbarButton
-                ariaLabel="Upload replacement artwork"
-                onClick={() => coverInputRef.current?.click()}
-                title="Upload replacement artwork image"
-              >
-                <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
-              </CoverToolbarButton>
-              <input accept="image/*" hidden onChange={onCoverChange} ref={coverInputRef} type="file" />
-            </CoverToolbarGroup>
+              <CoverToolbarGroup>
+                <CoverToolbarButton
+                  ariaLabel="Upload replacement artwork"
+                  onClick={() => coverInputRef.current?.click()}
+                  title="Upload replacement artwork image"
+                >
+                  <HugeiconsIcon icon={Upload01Icon} size={18} strokeWidth={1.8} />
+                </CoverToolbarButton>
+                <input accept="image/*" hidden onChange={onCoverChange} ref={coverInputRef} type="file" />
+              </CoverToolbarGroup>
 
-            <CoverToolbarDivider />
+              <CoverToolbarDivider />
 
-            <CoverToolbarGroup>
-              <CoverToolbarButton
-                ariaLabel="Download cover image"
-                disabled={!draft.coverArt}
-                onClick={() =>
-                  void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover')
-                }
-                title={draft.coverArt ? 'Download cover image to file' : 'No cover image to download'}
-              >
-                <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
-              </CoverToolbarButton>
-              <CoverToolbarButton
-                ariaLabel={
-                  isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'
-                }
-                className={`daw-tool-button daw-tool-button-accent${isWandActive ? ' cover-tool-active' : ''}`}
-                disabled={!draft.coverArt}
-                onClick={() => {
-                  if (isWandActive) {
-                    commitWandEditsToDraft();
+              <CoverToolbarGroup>
+                <CoverToolbarButton
+                  ariaLabel="Download cover image"
+                  disabled={!draft.coverArt}
+                  onClick={() =>
+                    void onSaveCoverImage(draft.coverArt, draft.album || draft.title || item.name || 'cover')
                   }
-                  setIsWandActive((current) => !current);
-                }}
-                title={
-                  draft.coverArt
-                    ? 'Magic wand: click and drag on similar colors to make them transparent'
-                    : 'Load artwork first to use the magic wand'
-                }
-              >
-                <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
-              </CoverToolbarButton>
-            </CoverToolbarGroup>
-
-            <CoverToolbarDivider />
-
-            <CoverToolbarGroup>
-              <CoverToolbarButton
-                ariaLabel="Carry over cover from derived album cover"
-                disabled={albumCoverOptions.length === 0}
-                onClick={onCarryOverAlbumCover}
-                title="Carry over cover from derived album cover"
-              >
-                <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
-              </CoverToolbarButton>
-              <CoverToolbarButton
-                ariaLabel="Copy cover from other track"
-                disabled={otherTrackCoverOptions.length === 0}
-                onClick={onCopyCoverFromOtherTrack}
-                title="Copy cover from other track"
-              >
-                <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
-              </CoverToolbarButton>
-            </CoverToolbarGroup>
-
-            {willConvertToFlacOnSave ? (
-              <span className="cover-convert-warning-wrap" role="note" tabIndex={0}>
-                <span aria-hidden="true" className="cover-convert-warning-icon">
-                  ⚠
-                </span>
-                <span className="cover-convert-warning-tooltip">
-                  WAV + cover save will auto-convert this file to FLAC to persist artwork.
-                </span>
-              </span>
-            ) : null}
-          </CoverEditToolbar>
-
-          {coverImportError ? <p className="cover-load-error">{coverImportError}</p> : null}
-
-          {isAlbumCoverPickerOpen && albumCoverOptions.length > 1 ? (
-            <div className="album-cover-picker" role="listbox">
-              {albumCoverOptions.map((cover, index) => (
-                <button
-                  key={`album-cover-option-${index}`}
-                  className="album-cover-option"
-                  onClick={() => {
-                    applyCoverArt(cover);
-                    setIsAlbumCoverPickerOpen(false);
-                  }}
-                  type="button"
+                  title={draft.coverArt ? 'Download cover image to file' : 'No cover image to download'}
                 >
-                  <img src={cover} alt={`Album cover option ${index + 1}`} />
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          {isTrackCoverPickerOpen && otherTrackCoverOptions.length > 1 ? (
-            <div className="track-cover-picker" role="listbox">
-              {otherTrackCoverOptions.map((option) => (
-                <button
-                  key={`track-cover-option-${option.coverArt}`}
-                  className="track-cover-option"
+                  <HugeiconsIcon icon={Download01Icon} size={18} strokeWidth={1.8} />
+                </CoverToolbarButton>
+                <CoverToolbarButton
+                  ariaLabel={
+                    isWandActive ? 'Disable magic wand background remover' : 'Enable magic wand background remover'
+                  }
+                  className={`daw-tool-button daw-tool-button-accent${isWandActive ? ' cover-tool-active' : ''}`}
+                  disabled={!draft.coverArt}
                   onClick={() => {
-                    applyCoverArt(option.coverArt);
-                    setIsTrackCoverPickerOpen(false);
+                    if (isWandActive) {
+                      commitWandEditsToDraft();
+                    }
+                    setIsWandActive((current) => !current);
                   }}
-                  type="button"
+                  title={
+                    draft.coverArt
+                      ? 'Magic wand: click and drag on similar colors to make them transparent'
+                      : 'Load artwork first to use the magic wand'
+                  }
                 >
-                  <img src={option.coverArt} alt={`Cover from album ${option.albumName}`} />
-                  <span className="track-cover-option-meta">
-                    <strong>{option.albumName}</strong>
+                  <HugeiconsIcon icon={MagicWand01Icon} size={18} strokeWidth={1.8} />
+                </CoverToolbarButton>
+              </CoverToolbarGroup>
+
+              <CoverToolbarDivider />
+
+              <CoverToolbarGroup>
+                <CoverToolbarButton
+                  ariaLabel="Carry over cover from derived album cover"
+                  disabled={albumCoverOptions.length === 0}
+                  onClick={onCarryOverAlbumCover}
+                  title="Carry over cover from derived album cover"
+                >
+                  <HugeiconsIcon icon={Album01Icon} size={18} strokeWidth={1.8} />
+                </CoverToolbarButton>
+                <CoverToolbarButton
+                  ariaLabel="Copy cover from other track"
+                  disabled={otherTrackCoverOptions.length === 0}
+                  onClick={onCopyCoverFromOtherTrack}
+                  title="Copy cover from other track"
+                >
+                  <HugeiconsIcon icon={Copy01Icon} size={18} strokeWidth={1.8} />
+                </CoverToolbarButton>
+              </CoverToolbarGroup>
+
+              {willConvertToFlacOnSave ? (
+                <span className="cover-convert-warning-wrap" role="note" tabIndex={0}>
+                  <span aria-hidden="true" className="cover-convert-warning-icon">
+                    ⚠
                   </span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+                  <span className="cover-convert-warning-tooltip">
+                    WAV + cover save will auto-convert this file to FLAC to persist artwork.
+                  </span>
+                </span>
+              ) : null}
+            </CoverEditToolbar>
 
-        <div className="metadata-grid">
-          <label>
-            Title
-            <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
-          </label>
-          <SuggestionInput
-            id="artist"
-            label={renderFieldLabel('Artist', albumMismatchFields.artist)}
-            value={draft.artist}
-            suggestions={suggestions.artists}
-            onChange={(value) => setDraft({ ...draft, artist: value })}
-          />
-          <SuggestionInput
-            id="album"
-            label={renderFieldLabel('Album', albumMismatchFields.album)}
-            value={draft.album}
-            suggestions={suggestions.albums}
-            onChange={(value) => setDraft({ ...draft, album: value })}
-          />
-          <SuggestionInput
-            id="albumArtist"
-            label="Album artist"
-            value={draft.albumArtist}
-            suggestions={suggestions.albumArtists}
-            onChange={(value) => setDraft({ ...draft, albumArtist: value })}
-          />
-          <SuggestionInput
-            id="composer"
-            label={renderFieldLabel('Composer', albumMismatchFields.composer)}
-            value={draft.composer}
-            suggestions={suggestions.composers}
-            onChange={(value) => setDraft({ ...draft, composer: value })}
-          />
-          <SuggestionInput
-            id="producer"
-            label={renderFieldLabel('Producer', albumMismatchFields.producer)}
-            value={draft.producer}
-            suggestions={suggestions.producers}
-            onChange={(value) => setDraft({ ...draft, producer: value })}
-          />
-          <SuggestionInput
-            id="genre"
-            label={renderFieldLabel('Genre', albumMismatchFields.genre)}
-            value={draft.genre}
-            suggestions={suggestions.genres}
-            onChange={(value) => setDraft({ ...draft, genre: value })}
-          />
-          <label>
-            {renderFieldLabel('Year', albumMismatchFields.year)}
-            <input value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} />
-          </label>
-          <label>
-            Track
-            <input value={draft.track} onChange={(event) => setDraft({ ...draft, track: event.target.value })} />
-          </label>
-          <label>
-            Disc
-            <input value={draft.disc} onChange={(event) => setDraft({ ...draft, disc: event.target.value })} />
-          </label>
-          <label className="full-width">
-            Comment
-            <textarea
-              rows={4}
-              value={draft.comment}
-              onChange={(event) => setDraft({ ...draft, comment: event.target.value })}
+            {coverImportError ? <p className="cover-load-error">{coverImportError}</p> : null}
+
+            {isAlbumCoverPickerOpen && albumCoverOptions.length > 1 ? (
+              <div className="album-cover-picker" role="listbox">
+                {albumCoverOptions.map((cover, index) => (
+                  <button
+                    key={`album-cover-option-${index}`}
+                    className="album-cover-option"
+                    onClick={() => {
+                      applyCoverArt(cover);
+                      setIsAlbumCoverPickerOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <img src={cover} alt={`Album cover option ${index + 1}`} />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {isTrackCoverPickerOpen && otherTrackCoverOptions.length > 1 ? (
+              <div className="track-cover-picker" role="listbox">
+                {otherTrackCoverOptions.map((option) => (
+                  <button
+                    key={`track-cover-option-${option.coverArt}`}
+                    className="track-cover-option"
+                    onClick={() => {
+                      applyCoverArt(option.coverArt);
+                      setIsTrackCoverPickerOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <img src={option.coverArt} alt={`Cover from album ${option.albumName}`} />
+                    <span className="track-cover-option-meta">
+                      <strong>{option.albumName}</strong>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="metadata-grid">
+            <label>
+              Title
+              <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
+            </label>
+            <SuggestionInput
+              id="artist"
+              label={renderFieldLabel('Artist', albumMismatchFields.artist)}
+              value={draft.artist}
+              suggestions={suggestions.artists}
+              onChange={(value) => setDraft({ ...draft, artist: value })}
             />
-          </label>
-        </div>
+            <SuggestionInput
+              id="album"
+              label={renderFieldLabel('Album', albumMismatchFields.album)}
+              value={draft.album}
+              suggestions={suggestions.albums}
+              onChange={(value) => setDraft({ ...draft, album: value })}
+            />
+            <SuggestionInput
+              id="albumArtist"
+              label="Album artist"
+              value={draft.albumArtist}
+              suggestions={suggestions.albumArtists}
+              onChange={(value) => setDraft({ ...draft, albumArtist: value })}
+            />
+            <SuggestionInput
+              id="composer"
+              label={renderFieldLabel('Composer', albumMismatchFields.composer)}
+              value={draft.composer}
+              suggestions={suggestions.composers}
+              onChange={(value) => setDraft({ ...draft, composer: value })}
+            />
+            <SuggestionInput
+              id="producer"
+              label={renderFieldLabel('Producer', albumMismatchFields.producer)}
+              value={draft.producer}
+              suggestions={suggestions.producers}
+              onChange={(value) => setDraft({ ...draft, producer: value })}
+            />
+            <SuggestionInput
+              id="genre"
+              label={renderFieldLabel('Genre', albumMismatchFields.genre)}
+              value={draft.genre}
+              suggestions={suggestions.genres}
+              onChange={(value) => setDraft({ ...draft, genre: value })}
+            />
+            <label>
+              {renderFieldLabel('Year', albumMismatchFields.year)}
+              <input value={draft.year} onChange={(event) => setDraft({ ...draft, year: event.target.value })} />
+            </label>
+            <label>
+              Track
+              <input value={draft.track} onChange={(event) => setDraft({ ...draft, track: event.target.value })} />
+            </label>
+            <label>
+              Disc
+              <input value={draft.disc} onChange={(event) => setDraft({ ...draft, disc: event.target.value })} />
+            </label>
+            <label className="full-width">
+              Comment
+              <textarea
+                rows={4}
+                value={draft.comment}
+                onChange={(event) => setDraft({ ...draft, comment: event.target.value })}
+              />
+            </label>
+          </div>
 
-        <div className="metadata-actions">
-          <button className="primary-button" disabled={isInteractionLocked} type="submit">
-            {isSaving ? 'Saving track...' : 'Save track metadata'}
-          </button>
-          <button
-            className="secondary-button"
-            disabled={albumTrackCount < 2 || isInteractionLocked}
-            onClick={() => void onSaveAlbum(draft)}
-            title="Apply album-level fields only: album, album artist, composer, producer, genre, year, and cover art"
-            type="button"
-          >
-            {isSavingAlbum ? 'Saving album...' : `Apply to album (${albumTrackCount} tracks)`}
-          </button>
-          {hasMismatchIssue ? (
+          <div className="metadata-actions">
+            <button className="primary-button" disabled={isInteractionLocked} type="submit">
+              {isSaving ? 'Saving track...' : 'Save track metadata'}
+            </button>
             <button
               className="secondary-button"
-              disabled={isInteractionLocked}
-              onClick={() => setIsMismatchDialogOpen(true)}
-              title="Resolve mismatched album metadata fields for this track"
+              disabled={albumTrackCount < 2 || isInteractionLocked}
+              onClick={() => void onSaveAlbum(draft)}
+              title="Apply album-level fields only: album, album artist, composer, producer, genre, year, and cover art"
               type="button"
             >
-              Resolve mismatches
+              {isSavingAlbum ? 'Saving album...' : `Apply to album (${albumTrackCount} tracks)`}
             </button>
-          ) : null}
-        </div>
+            {hasMismatchIssue ? (
+              <button
+                className="secondary-button"
+                disabled={isInteractionLocked}
+                onClick={() => setIsMismatchDialogOpen(true)}
+                title="Resolve mismatched album metadata fields for this track"
+                type="button"
+              >
+                Resolve mismatches
+              </button>
+            ) : null}
+          </div>
         </fieldset>
       </form>
 
@@ -940,7 +940,8 @@ export function MetadataEditor({
                       >
                         {fieldPlan.options.map((option) => {
                           const isCurrent = option.value === fieldPlan.currentValue;
-                          const isRecommended = fieldPlan.recommendedValue !== null && option.value === fieldPlan.recommendedValue;
+                          const isRecommended =
+                            fieldPlan.recommendedValue !== null && option.value === fieldPlan.recommendedValue;
                           const optionSuffix = [
                             `${option.count} track${option.count === 1 ? '' : 's'}`,
                             isCurrent ? 'current' : '',
@@ -974,7 +975,12 @@ export function MetadataEditor({
               >
                 Cancel
               </button>
-              <button className="primary-button" disabled={isInteractionLocked} onClick={() => void confirmMismatchResolution()} type="button">
+              <button
+                className="primary-button"
+                disabled={isInteractionLocked}
+                onClick={() => void confirmMismatchResolution()}
+                type="button"
+              >
                 Apply and save
               </button>
             </div>

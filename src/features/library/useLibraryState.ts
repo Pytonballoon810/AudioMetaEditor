@@ -91,9 +91,11 @@ export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
   const isLoadingLibraryRef = useRef(false);
   const activeLoadSignatureRef = useRef<string | null>(null);
   const inFlightLoadPromiseRef = useRef<Promise<void> | null>(null);
-  const queuedLoadRequestRef = useRef<{ paths: string[]; preferredActivePath: string | null; signature: string } | null>(
-    null,
-  );
+  const queuedLoadRequestRef = useRef<{
+    paths: string[];
+    preferredActivePath: string | null;
+    signature: string;
+  } | null>(null);
   const audioMetaApi = getAudioMetaApi();
 
   useEffect(() => {
@@ -115,7 +117,9 @@ export function useLibraryState({ setStatus }: UseLibraryStateArgs) {
       try {
         const items = await audioMetaApi.loadLibrary(paths);
         const preferredExists = preferredActivePath && items.some((item) => item.path === preferredActivePath);
-        const nextActivePath = preferredExists ? preferredActivePath : (items.find((item) => item.isMetadataLoaded)?.path ?? null);
+        const nextActivePath = preferredExists
+          ? preferredActivePath
+          : (items.find((item) => item.isMetadataLoaded)?.path ?? null);
 
         setLibrary(items);
         setLoadedSourcePaths(paths);

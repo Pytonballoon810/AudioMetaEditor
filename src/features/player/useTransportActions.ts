@@ -51,7 +51,8 @@ export function useTransportActions({
   splitDownloadIntoChapters,
   isWebDownloadEnabled,
 }: UseTransportActionsArgs) {
-  const normalizePathForComparison = (pathValue: string) => pathValue.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
+  const normalizePathForComparison = (pathValue: string) =>
+    pathValue.replace(/\\/g, '/').replace(/\/+$/g, '').toLowerCase();
   const isSamePath = (leftPath: string, rightPath: string) =>
     normalizePathForComparison(leftPath) === normalizePathForComparison(rightPath);
   const isAbsolutePath = (pathValue: string) => /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/.test(pathValue);
@@ -114,7 +115,8 @@ export function useTransportActions({
     extension: (name.split('.').pop() || 'download').toLowerCase(),
     openedDirectoryRoot,
     isInOpenedDirectoryRoot:
-      Boolean(openedDirectoryRoot) && normalizePathForComparison(directoryPath) === normalizePathForComparison(openedDirectoryRoot || ''),
+      Boolean(openedDirectoryRoot) &&
+      normalizePathForComparison(directoryPath) === normalizePathForComparison(openedDirectoryRoot || ''),
     isMetadataLoaded: false,
     metadata: {
       title,
@@ -155,14 +157,20 @@ export function useTransportActions({
     const removedIndex = currentItems.findIndex((item) => normalizePathForComparison(item.path) === normalizedRemoved);
     if (removedIndex > 0) {
       const abovePath = currentItems[removedIndex - 1]?.path;
-      if (abovePath && nextItems.some((item) => normalizePathForComparison(item.path) === normalizePathForComparison(abovePath))) {
+      if (
+        abovePath &&
+        nextItems.some((item) => normalizePathForComparison(item.path) === normalizePathForComparison(abovePath))
+      ) {
         return abovePath;
       }
     }
 
     if (removedIndex >= 0) {
       const belowPath = currentItems[removedIndex + 1]?.path;
-      if (belowPath && nextItems.some((item) => normalizePathForComparison(item.path) === normalizePathForComparison(belowPath))) {
+      if (
+        belowPath &&
+        nextItems.some((item) => normalizePathForComparison(item.path) === normalizePathForComparison(belowPath))
+      ) {
         return belowPath;
       }
     }
@@ -423,7 +431,9 @@ export function useTransportActions({
       const nextSourcePaths = loadedSourcePaths.length > 0 ? [...loadedSourcePaths] : [item.path];
       if (
         !nextSourcePaths.includes(result.destinationPath) &&
-        nextSourcePaths.every((sourcePath) => normalizePathForComparison(sourcePath) === normalizePathForComparison(item.path))
+        nextSourcePaths.every(
+          (sourcePath) => normalizePathForComparison(sourcePath) === normalizePathForComparison(item.path),
+        )
       ) {
         nextSourcePaths.push(result.destinationPath);
       }
@@ -565,9 +575,7 @@ export function useTransportActions({
     let outputPlaceholderPaths: string[] = [];
     const normalizedDestinationDirectory = destinationDirectory.replace(/[/\\]+$/g, '') || destinationDirectory;
     const openedDirectoryRoot =
-      activeItem?.openedDirectoryRoot ||
-      library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot ||
-      null;
+      activeItem?.openedDirectoryRoot || library.find((item) => item.openedDirectoryRoot)?.openedDirectoryRoot || null;
     const pendingPlaceholderItem = buildPlaceholderItem(
       pendingPlaceholderPath,
       normalizedDestinationDirectory || '(pending)',
@@ -608,9 +616,7 @@ export function useTransportActions({
           downloadedPath,
           downloadedPath.replace(/[/\\][^/\\]+$/, ''),
           fileNameFromPath(downloadedPath),
-          splitDownloadIntoChapters
-            ? `Chapter ${index + 1} processing...`
-            : 'Processing downloaded file...',
+          splitDownloadIntoChapters ? `Chapter ${index + 1} processing...` : 'Processing downloaded file...',
           openedDirectoryRoot,
         ),
       );
@@ -628,9 +634,7 @@ export function useTransportActions({
 
       const nextSourcePaths =
         loadedSourcePaths.length > 0
-          ? Array.from(
-              new Set([...loadedSourcePaths, ...downloadedPaths]),
-            )
+          ? Array.from(new Set([...loadedSourcePaths, ...downloadedPaths]))
           : downloadedPaths;
 
       if (api.loadLibraryIncremental) {
@@ -657,7 +661,11 @@ export function useTransportActions({
               const canonicalCover = canonicalCoverByAlbum.get(albumKey);
               let nextRefreshedItem = refreshedItem;
 
-              if (canonicalCover && refreshedItem.metadata.coverArt && refreshedItem.metadata.coverArt !== canonicalCover) {
+              if (
+                canonicalCover &&
+                refreshedItem.metadata.coverArt &&
+                refreshedItem.metadata.coverArt !== canonicalCover
+              ) {
                 nextRefreshedItem = {
                   ...refreshedItem,
                   metadata: {

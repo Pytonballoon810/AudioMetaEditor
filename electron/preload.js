@@ -53,7 +53,8 @@ function describeAction(callName, phase, args, result, error) {
   if (callName === 'loadLibraryIncremental') {
     const pathCount = Array.isArray(args?.[0]) ? args[0].length : 0;
     if (phase === 'start') return `Refreshing ${pathCount} changed path(s) in the current library.`;
-    if (phase === 'done') return `Incremental library refresh finished. Loaded ${Array.isArray(result) ? result.length : 0} track(s).`;
+    if (phase === 'done')
+      return `Incremental library refresh finished. Loaded ${Array.isArray(result) ? result.length : 0} track(s).`;
   }
 
   if (callName === 'saveMetadata') {
@@ -153,7 +154,8 @@ function describeAction(callName, phase, args, result, error) {
 
   if (callName === 'resolveVideoTitleForAlbumName') {
     if (phase === 'start') return 'Resolving video title for album preview.';
-    if (phase === 'done') return result ? `Resolved video title: ${result.albumName}.` : 'Unable to resolve video title.';
+    if (phase === 'done')
+      return result ? `Resolved video title: ${result.albumName}.` : 'Unable to resolve video title.';
   }
 
   if (callName === 'configureWebDownloadTools') {

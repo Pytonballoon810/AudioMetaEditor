@@ -93,9 +93,7 @@ export function useMetadataActions({
       return;
     }
 
-    const albumItems = library.filter(
-      (item) => item.directory === activeItem.directory && isSavableLibraryItem(item),
-    );
+    const albumItems = library.filter((item) => item.directory === activeItem.directory && isSavableLibraryItem(item));
     if (albumItems.length === 0) {
       setStatus('No completed tracks are ready for album metadata save yet.');
       return;

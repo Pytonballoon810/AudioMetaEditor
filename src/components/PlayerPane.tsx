@@ -25,7 +25,12 @@ type PlayerPaneProps = {
   onExportClip: (startTime: number, endTime: number) => Promise<void>;
   onConvertAudio: (targetFormat: 'mp3' | 'flac') => Promise<void>;
   onEditSelection: (mode: 'trim' | 'cut', startTime: number, endTime: number) => Promise<void>;
-  onSplitSelection: (startTime: number, endTime: number, splitMode: 'keep' | 'slice', splitTitle: string) => Promise<void>;
+  onSplitSelection: (
+    startTime: number,
+    endTime: number,
+    splitMode: 'keep' | 'slice',
+    splitTitle: string,
+  ) => Promise<void>;
   isExporting: boolean;
   isConverting: boolean;
   isEditingSelection: boolean;
@@ -268,23 +273,23 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
   const splitTrackTitleTrimmed = splitTrackTitle.trim();
   const canSplitTrackType = Boolean(item);
   const isFullTrackSelection =
-    effectiveDuration > 0.01 &&
-    normalizedSelectionStart <= 0.01 &&
-    normalizedSelectionEnd >= effectiveDuration - 0.01;
+    effectiveDuration > 0.01 && normalizedSelectionStart <= 0.01 && normalizedSelectionEnd >= effectiveDuration - 0.01;
   const canCutSelection =
-    hasValidSelection && duration > 0.01 && !(normalizedSelectionStart <= 0.01 && normalizedSelectionEnd >= duration - 0.01);
+    hasValidSelection &&
+    duration > 0.01 &&
+    !(normalizedSelectionStart <= 0.01 && normalizedSelectionEnd >= duration - 0.01);
   const canSplitSelection = hasValidSelection && (effectiveDuration <= 0.01 || !isFullTrackSelection);
   const splitDisabledReason = !item
     ? 'No active track'
     : !hasValidSelection
-        ? 'Selection is too small'
-        : isFullTrackSelection
-          ? 'Selection covers full track'
-          : isSplittingSelection
-            ? 'Split already in progress'
-            : isConverting
-              ? 'Conversion in progress'
-              : null;
+      ? 'Selection is too small'
+      : isFullTrackSelection
+        ? 'Selection covers full track'
+        : isSplittingSelection
+          ? 'Split already in progress'
+          : isConverting
+            ? 'Conversion in progress'
+            : null;
   const clampedPlayhead = Math.max(0, Math.min(currentTime, effectiveDuration));
   const canCutBeforePlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead > 0.01;
   const canCutAfterPlayhead = Boolean(item) && effectiveDuration > 0.01 && clampedPlayhead < effectiveDuration - 0.01;
@@ -612,7 +617,8 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
         <div className="wave-topline">
           <span>{formatDuration(currentTime)}</span>
           <span className="wave-topline-meta">
-            View {formatDuration(rulerStart)} - {formatDuration(rulerEnd)} • step {formatStepLabel(renderedTickStepSeconds)}
+            View {formatDuration(rulerStart)} - {formatDuration(rulerEnd)} • step{' '}
+            {formatStepLabel(renderedTickStepSeconds)}
           </span>
           <span>{item ? formatDuration(duration || item.metadata.duration) : '00:00'}</span>
         </div>
@@ -623,7 +629,11 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               const shouldShowLabel = renderedTickStepSeconds >= 1 || Math.abs(tick - Math.round(tick)) < 0.001;
 
               return (
-                <div className="wave-time-tick" key={tick} style={{ left: `${Math.max(0, Math.min(100, leftPercent))}%` }}>
+                <div
+                  className="wave-time-tick"
+                  key={tick}
+                  style={{ left: `${Math.max(0, Math.min(100, leftPercent))}%` }}
+                >
                   {shouldShowLabel ? <span>{formatTimelineTickLabel(tick, renderedTickStepSeconds)}</span> : null}
                 </div>
               );
@@ -797,7 +807,13 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
                 disabled={isSplittingSelection}
                 onChange={(event) => setSplitTrackTitle(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && item && canSplitTrackType && canSplitSelection && splitTrackTitleTrimmed) {
+                  if (
+                    event.key === 'Enter' &&
+                    item &&
+                    canSplitTrackType &&
+                    canSplitSelection &&
+                    splitTrackTitleTrimmed
+                  ) {
                     event.preventDefault();
                     confirmSplitSelection();
                   }
@@ -809,7 +825,9 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
             </label>
 
             <div className="split-options-group" role="radiogroup" aria-label="Original file behavior">
-              <label className={splitMode === 'keep' ? 'split-option-card split-option-card-selected' : 'split-option-card'}>
+              <label
+                className={splitMode === 'keep' ? 'split-option-card split-option-card-selected' : 'split-option-card'}
+              >
                 <input
                   checked={splitMode === 'keep'}
                   onChange={() => setSplitMode('keep')}
@@ -823,7 +841,9 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
                 </span>
               </label>
 
-              <label className={splitMode === 'slice' ? 'split-option-card split-option-card-selected' : 'split-option-card'}>
+              <label
+                className={splitMode === 'slice' ? 'split-option-card split-option-card-selected' : 'split-option-card'}
+              >
                 <input
                   checked={splitMode === 'slice'}
                   onChange={() => setSplitMode('slice')}
@@ -853,7 +873,9 @@ export const PlayerPane = forwardRef<PlayerPaneHandle, PlayerPaneProps>(function
               </button>
               <button
                 className="primary-button"
-                disabled={!item || !canSplitTrackType || !canSplitSelection || isSplittingSelection || !splitTrackTitleTrimmed}
+                disabled={
+                  !item || !canSplitTrackType || !canSplitSelection || isSplittingSelection || !splitTrackTitleTrimmed
+                }
                 onClick={confirmSplitSelection}
                 type="button"
               >

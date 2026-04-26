@@ -16,11 +16,7 @@ const {
   __testables,
 } = require('./media-service');
 const { readFileAsBase64WithLimit } = require('./file-io');
-const {
-  ensureUniquePath,
-  getLaunchPaths,
-  isAllowedDownloadUrl,
-} = require('./main-utils');
+const { ensureUniquePath, getLaunchPaths, isAllowedDownloadUrl } = require('./main-utils');
 const {
   validateLibraryLoadPayload,
   validateMetadataSavePayload,
@@ -935,7 +931,10 @@ app.whenReady().then(async () => {
     const sourcePath = path.resolve(payload.filePath);
     const extension = path.extname(sourcePath).toLowerCase();
 
-    const safeTitle = payload.title.trim().replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, ' ');
+    const safeTitle = payload.title
+      .trim()
+      .replace(/[<>:"/\\|?*]+/g, '-')
+      .replace(/\s+/g, ' ');
     if (!safeTitle) {
       throw new Error('A non-empty split track title is required.');
     }
@@ -1065,7 +1064,13 @@ app.whenReady().then(async () => {
       throw new Error('Enable web downloads in Settings and save changes to install yt-dlp first.');
     }
 
-    const metadataArgs = ['--no-playlist', '--dump-single-json', '--skip-download', '--no-warnings', parsedUrl.toString()];
+    const metadataArgs = [
+      '--no-playlist',
+      '--dump-single-json',
+      '--skip-download',
+      '--no-warnings',
+      parsedUrl.toString(),
+    ];
     const { stdout } = await runCommandCapture(ytDlpPath, metadataArgs);
     const metadataLines = stdout
       .split(/\r?\n/g)
@@ -1129,7 +1134,8 @@ app.whenReady().then(async () => {
     const splitIntoChapters = payload.splitIntoChapters === true;
     const useVideoNameAsAlbum = payload.useVideoNameAsAlbum === true;
 
-    const isExistingAlbumTarget = typeof payload.targetAlbumDirectory === 'string' && payload.targetAlbumDirectory.trim();
+    const isExistingAlbumTarget =
+      typeof payload.targetAlbumDirectory === 'string' && payload.targetAlbumDirectory.trim();
     let targetAlbumDirectory = '';
     if (isExistingAlbumTarget) {
       const rawTargetDirectory = payload.targetAlbumDirectory.trim();
@@ -1337,7 +1343,9 @@ app.whenReady().then(async () => {
       let resolvedOutputPaths = [...expectedDiscoveredPaths];
 
       if (splitIntoChapters) {
-        resolvedOutputPaths = resolvedOutputPaths.filter((candidatePath) => isPathWithinDirectory(candidatePath, targetAlbumDirectory));
+        resolvedOutputPaths = resolvedOutputPaths.filter((candidatePath) =>
+          isPathWithinDirectory(candidatePath, targetAlbumDirectory),
+        );
 
         if (resolvedOutputPaths.length === 0) {
           const candidatePaths = await collectRecentFiles(targetAlbumDirectory);
@@ -1457,7 +1465,10 @@ app.whenReady().then(async () => {
 
           resolvedOutputPaths = renumberedOutputPaths;
         } catch (trackNumberApplyError) {
-          console.warn('[backend-action] audio:download-from-url:chapter-track-number-apply-failed', trackNumberApplyError);
+          console.warn(
+            '[backend-action] audio:download-from-url:chapter-track-number-apply-failed',
+            trackNumberApplyError,
+          );
         }
       }
 
@@ -1483,8 +1494,9 @@ app.whenReady().then(async () => {
             };
 
             const inheritedCoverArt =
-              sourceAlbumItems.find((item) => typeof item.metadata.coverArt === 'string' && item.metadata.coverArt.trim())
-                ?.metadata.coverArt || null;
+              sourceAlbumItems.find(
+                (item) => typeof item.metadata.coverArt === 'string' && item.metadata.coverArt.trim(),
+              )?.metadata.coverArt || null;
 
             const inheritedAlbumMetadata = {
               album: pickInheritedValue('album'),

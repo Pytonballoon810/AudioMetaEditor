@@ -129,7 +129,11 @@ function findItemIndexByPath(items: AudioLibraryItem[], normalizedTargetPath: st
   return { found: false, index: low };
 }
 
-function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLibraryItem[], loadedSourcePaths: string[]) {
+function mergeIncrementalItems(
+  items: AudioLibraryItem[],
+  incomingItems: AudioLibraryItem[],
+  loadedSourcePaths: string[],
+) {
   if (incomingItems.length === 0) {
     return items;
   }
@@ -150,7 +154,8 @@ function mergeIncrementalItems(items: AudioLibraryItem[], incomingItems: AudioLi
   }
 
   for (const incomingItem of incomingItems) {
-    const inferredRoot = incomingItem.openedDirectoryRoot || inferOpenedDirectoryRoot(incomingItem.path, loadedSourcePaths);
+    const inferredRoot =
+      incomingItem.openedDirectoryRoot || inferOpenedDirectoryRoot(incomingItem.path, loadedSourcePaths);
     let nextItem = inferredRoot
       ? {
           ...incomingItem,
@@ -373,7 +378,9 @@ export function useDesktopBridgeSubscriptions({
 
             if (pathsToRefresh.length > 0) {
               if (!audioMetaApi.loadLibraryIncremental) {
-                setStatus('Incremental library refresh is unavailable. Restart the app to apply file updates without full reindexing.');
+                setStatus(
+                  'Incremental library refresh is unavailable. Restart the app to apply file updates without full reindexing.',
+                );
                 continue;
               }
 
@@ -385,8 +392,10 @@ export function useDesktopBridgeSubscriptions({
             const previousActiveStillExists = previousActivePath
               ? Boolean(findLoadedItemPath(nextLibrary, previousActivePath))
               : false;
-            const didReplaceRemovedActivePath = Boolean(previousActivePath) && !previousActiveStillExists && Boolean(nextActivePath);
-            const didClearRemovedActivePath = Boolean(previousActivePath) && !previousActiveStillExists && !nextActivePath;
+            const didReplaceRemovedActivePath =
+              Boolean(previousActivePath) && !previousActiveStillExists && Boolean(nextActivePath);
+            const didClearRemovedActivePath =
+              Boolean(previousActivePath) && !previousActiveStillExists && !nextActivePath;
 
             libraryRef.current = nextLibrary;
             setLibrary(nextLibrary);
@@ -410,7 +419,7 @@ export function useDesktopBridgeSubscriptions({
                   ? `Applied incremental library update (${summaryParts.join(' ')}). Selected track was removed, so focus moved to a nearby track.`
                   : didClearRemovedActivePath
                     ? `Applied incremental library update (${summaryParts.join(' ')}). Selected track was removed, so no track is selected.`
-                  : `Applied incremental library update (${summaryParts.join(' ')}).`
+                    : `Applied incremental library update (${summaryParts.join(' ')}).`
                 : 'Applied incremental library update.',
             );
           } catch (error) {
@@ -435,6 +444,5 @@ export function useDesktopBridgeSubscriptions({
       isDisposed = true;
       dispose();
     };
-
   }, [audioMetaApi, estimateLibraryWidthForItems, setActivePath, setLibrary, setLibraryWidth, setStatus]);
 }

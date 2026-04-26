@@ -269,7 +269,9 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
       }
 
       const scrollLeft = scrollAwareWaveSurfer.getScroll ? scrollAwareWaveSurfer.getScroll() : 0;
-      const viewportWidth = scrollAwareWaveSurfer.getWidth ? scrollAwareWaveSurfer.getWidth() : containerElement.clientWidth;
+      const viewportWidth = scrollAwareWaveSurfer.getWidth
+        ? scrollAwareWaveSurfer.getWidth()
+        : containerElement.clientWidth;
       const visibleSpan = Math.max(0.01, viewportWidth / zoomPxPerSec);
 
       let start = Math.max(0, scrollLeft / zoomPxPerSec);
@@ -406,15 +408,24 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
       const fromDeltaX = hasHorizontalDelta ? wheelDeltaToPixels(event, event.deltaX, pageSize) : 0;
 
       const legacyDeltaX =
-        typeof event.wheelDeltaX === 'number' && Math.abs(event.wheelDeltaX) > 0.01 ? (-event.wheelDeltaX / 120) * 40 : 0;
+        typeof event.wheelDeltaX === 'number' && Math.abs(event.wheelDeltaX) > 0.01
+          ? (-event.wheelDeltaX / 120) * 40
+          : 0;
 
       const hasLegacyHorizontalAxis =
-        typeof event.axis === 'number' && typeof event.HORIZONTAL_AXIS === 'number' && event.axis === event.HORIZONTAL_AXIS;
+        typeof event.axis === 'number' &&
+        typeof event.HORIZONTAL_AXIS === 'number' &&
+        event.axis === event.HORIZONTAL_AXIS;
       const fromLegacyAxis =
-        hasLegacyHorizontalAxis && typeof event.detail === 'number' && Math.abs(event.detail) > 0.01 ? event.detail * 16 : 0;
+        hasLegacyHorizontalAxis && typeof event.detail === 'number' && Math.abs(event.detail) > 0.01
+          ? event.detail * 16
+          : 0;
 
       const fromShiftFallback =
-        Math.abs(fromDeltaX) <= 0.01 && Math.abs(legacyDeltaX) <= 0.01 && Math.abs(fromLegacyAxis) <= 0.01 && event.shiftKey
+        Math.abs(fromDeltaX) <= 0.01 &&
+        Math.abs(legacyDeltaX) <= 0.01 &&
+        Math.abs(fromLegacyAxis) <= 0.01 &&
+        event.shiftKey
           ? wheelDeltaToPixels(event, event.deltaY, pageSize)
           : 0;
 
@@ -501,7 +512,8 @@ export function useWaveSurfer({ audioUrl, onReady, onTimeUpdate, onFinish }: Use
       updateVisibleTimeframe();
     };
 
-    const wheelTargets = scrollElement && scrollElement !== containerElement ? [containerElement, scrollElement] : [containerElement];
+    const wheelTargets =
+      scrollElement && scrollElement !== containerElement ? [containerElement, scrollElement] : [containerElement];
     wheelTargets.forEach((target) => {
       target.addEventListener('wheel', handleWheelInteraction, { passive: false });
       target.addEventListener('mousewheel', handleWheelInteraction, { passive: false });

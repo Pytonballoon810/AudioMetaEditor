@@ -376,10 +376,7 @@ textarea {
   height: 14px;
   display: inline-block;
   border-radius: 50%;
-  background: conic-gradient(
-    rgba(117, 201, 255, 0.98) calc(var(--progress) * 1turn),
-    rgba(255, 255, 255, 0.2) 0
-  );
+  background: conic-gradient(rgba(117, 201, 255, 0.98) calc(var(--progress) * 1turn), rgba(255, 255, 255, 0.2) 0);
   -webkit-mask: radial-gradient(circle, transparent 56%, #000 58%);
   mask: radial-gradient(circle, transparent 56%, #000 58%);
 }
@@ -1353,7 +1350,9 @@ textarea {
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   background: transparent;
   cursor: pointer;
-  transition: background-color 0.14s ease, box-shadow 0.14s ease;
+  transition:
+    background-color 0.14s ease,
+    box-shadow 0.14s ease;
 }
 
 .split-option-card:last-child {
@@ -1382,7 +1381,9 @@ textarea {
   background: rgba(255, 255, 255, 0.07);
   display: grid;
   place-items: center;
-  transition: border-color 0.14s ease, background-color 0.14s ease;
+  transition:
+    border-color 0.14s ease,
+    background-color 0.14s ease;
 }
 
 .split-option-card input[type='radio']::before {

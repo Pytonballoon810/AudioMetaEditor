@@ -1598,7 +1598,9 @@ export function LibraryPane({
                     event.preventDefault();
                     event.stopPropagation();
                   }}
-                  onClick={() => void onOpenFileLocation(trackContextMenu.item).finally(() => setTrackContextMenu(null))}
+                  onClick={() =>
+                    void onOpenFileLocation(trackContextMenu.item).finally(() => setTrackContextMenu(null))
+                  }
                   type="button"
                 >
                   Open file location
